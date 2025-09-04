@@ -1,6 +1,6 @@
-## 🔧 Installation Instructions
+# 🔧 Installation Instructions
 
-### 🐍 Create Virtual Environment (Recommended)
+## 🐍 Create Virtual Environment (Recommended)
 
 ### PowerShell (Windows)
 
@@ -23,13 +23,13 @@ myenv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-CD in to Backend
+#### CD in to Backend
 
 ```powershell
 cd .\backend\
 ```
 
-Running Server
+#### Running Server
 
 ```powershell
 python manage.py runserver
