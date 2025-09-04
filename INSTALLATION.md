@@ -22,3 +22,15 @@ myenv\Scripts\activate
 ```powershell
 pip install -r requirements.txt
 ```
+
+CD in to Backend
+
+```powershell
+cd .\backend\
+```
+
+Running Server
+
+```powershell
+python manage.py runserver
+```
