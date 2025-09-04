@@ -22,3 +22,6 @@ To address the issue of missed deadlines, overwhelm, and confusion caused by the
 2. 6610545774 Jongchana Khachatrokphai
 3. 6610545421 Panthut Ketphan
 4. 6610545944 Sorasit Kateratorn
+
+## How to run
+**Follow the instructions in [Installation guide](INSTALLATION.md) if this is your first time.**
