@@ -7,13 +7,14 @@
 #### Create Virtual Environment
 
 ```powershell
-python -m venv env
+python -m venv myenv
 ```
 
 #### Activate Virtual Environment
 
 ```powershell
-.\env\Scripts\Activate
+myenv\Scripts\activate
+
 ```
 
 #### Install all requirements
