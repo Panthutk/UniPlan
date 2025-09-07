@@ -35,3 +35,9 @@ UniPlan aims to provide an **all-in-one application** that integrates both class
 ## ⚙️ Installation & Running
 
 **Follow the instructions in [Installation guide](INSTALLATION.md) if this is your first time.**
+
+
+
+## Video for presentation
+
+- [Youtube](https://youtu.be/29njDEQp5Lw) — Sprint1

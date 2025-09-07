@@ -26,6 +26,7 @@ backend runt at: <http://127.0.0.1:8000>
 ``` bash
 cd frontend
 npm install
+npm install react-router-dom
 npm run dev
 ```
 
