@@ -25,14 +25,14 @@ export default function About() {
         {/* Background */}
         <h2 className="text-2xl font-bold mb-2">Background</h2>
         <p className="mb-6">
-          University students often need a timetable for classes and a task
-          tracker for homework...
+University students often need a timetable for classes and a task tracker for homework. Most tools keep these separate, forcing students to manually connect assignments with the related class. This leads to missed deadlines, confusion, and extra work.
+
         </p>
 
         {/* Objective */}
         <h2 className="text-2xl font-bold mb-2">Objective</h2>
         <p className="mb-6">
-          To address the issue of missed deadlines...
+          To address the issue of missed deadlines, overwhelm, and confusion caused by the need to manage multiple timetables, particularly for university students, because most existing tools keep class schedules and task deadlines separate. Therefore, we aim to develop an all-in-one application that integrates both class schedules and task tracking into a single, unified timetable.
         </p>
 
         {/* Contact */}
