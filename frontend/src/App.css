@@ -40,3 +40,23 @@
 .read-the-docs {
   color: #888;
 }
+
+/* App.css */
+.banner {
+  position: fixed;        /* stick to the top */
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  text-align: center;
+  background-color: #4caf50; /* optional background */
+  padding: 10px;
+}
+
+.banner-img {
+  width: 100%;            /* full width */
+  height: auto;           /* maintain aspect ratio */
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
