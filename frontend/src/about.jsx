@@ -16,25 +16,28 @@ export default function About() {
         backgroundRepeat: "no-repeat",
       }}
     >
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl overflow-y-auto">
+      <div
+        className="p-8 rounded-lg shadow-md w-full max-w-2xl overflow-y-auto text-white"
+        style={{ backgroundColor: "#2a8d5c" }}
+      >
         <h1 className="text-3xl font-bold mb-4 text-center">About Us</h1>
 
         {/* Background */}
         <h2 className="text-2xl font-bold mb-2">Background</h2>
-        <p className="text-gray-700 mb-6">
+        <p className="mb-6">
           University students often need a timetable for classes and a task
           tracker for homework...
         </p>
 
         {/* Objective */}
         <h2 className="text-2xl font-bold mb-2">Objective</h2>
-        <p className="text-gray-700 mb-6">
+        <p className="mb-6">
           To address the issue of missed deadlines...
         </p>
 
         {/* Contact */}
         <h2 className="text-2xl font-bold mb-2">Contact</h2>
-        <ul className="list-disc list-inside text-gray-700 mb-6 space-y-1">
+        <ul className="list-disc list-inside mb-6 space-y-1">
           <li>pannawit.m@ku.th</li>
           <li>sugarduck500@gmail.com</li>
           <li>panthat.k@gmail.com</li>
@@ -45,7 +48,7 @@ export default function About() {
         <div className="grid gap-2 mt-6">
           <button
             onClick={() => navigate("/")}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-900 text-white rounded hover:bg-black"
           >
             Back to Home
           </button>
