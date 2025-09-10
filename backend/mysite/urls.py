@@ -16,9 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import hello
+from core import views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/hello/", hello),
+    path("api/hello/", views.hello),
+
+    # OAuth
+    path("api/auth/google/login", views.google_login),
+    path("api/auth/google/callback", views.google_callback),
+
+    # Test endpoints the React page will call
+    path("api/classroom/courses", views.list_courses),
+    path("api/classroom/summary", views.summary),
 ]

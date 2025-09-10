@@ -1,9 +1,63 @@
+import React, { useEffect } from "react";
 import Button from "@mui/material/Button";
 import GoogleIcon from "@mui/icons-material/Google";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+
+// ---- tiny auth helpers ----
+const auth = {
+  get token() { return localStorage.getItem("jwt"); },
+  set token(v) { v ? localStorage.setItem("jwt", v) : localStorage.removeItem("jwt"); },
+  get user() { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } },
+  set user(v) { v ? localStorage.setItem("user", JSON.stringify(v)) : localStorage.removeItem("user"); }
+};
+
+// ---- API helpers  ----
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+async function getGoogleAuthUrl() {
+  const r = await fetch(`${BASE_URL}/api/auth/google/login`);
+  if (!r.ok) throw new Error("Failed to get Google auth URL");
+  return r.json(); // { auth_url }
+}
+
+async function exchangeCode(code) {
+  const url = new URL(`${BASE_URL}/api/auth/google/callback`);
+  url.searchParams.set("code", code);
+  const r = await fetch(url, { credentials: "include" });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json(); // { token, user }
+}
 
 export default function Login() {
-  const onGoogleClick = () => alert("Google has been clicked");
+  const navigate = useNavigate();
+
+  // If we arrive with ?code=..., finish the sign-in
+  useEffect(() => {
+    (async () => {
+      const qs = new URLSearchParams(window.location.search);
+      const code = qs.get("code");
+      if (!code) return;
+
+      try {
+        const data = await exchangeCode(code); // { token, user }
+        auth.token = data.token;
+        auth.user = data.user;
+        navigate("/tableandtask", { replace: true });
+      } catch (e) {
+        console.error(e);
+        alert("Sign-in failed. Please try again.");
+      }
+    })();
+  }, [navigate]);
+
+  const onGoogleClick = async () => {
+    try {
+      const { auth_url } = await getGoogleAuthUrl();
+      window.location.href = auth_url;
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
