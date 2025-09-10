@@ -1,6 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import Button from "@mui/material/Button";
-import { Button as ShadButton } from "./components/ui/button";
 import AdobeStock_433725201 from "./assets/AdobeStock_433725201.jpeg";
 
 export default function About() {
@@ -25,7 +23,7 @@ export default function About() {
         {/* Background */}
         <h2 className="text-2xl font-bold mb-2">Background</h2>
         <p className="mb-6">
-University students often need a timetable for classes and a task tracker for homework. Most tools keep these separate, forcing students to manually connect assignments with the related class. This leads to missed deadlines, confusion, and extra work.
+          University students often need a timetable for classes and a task tracker for homework. Most tools keep these separate, forcing students to manually connect assignments with the related class. This leads to missed deadlines, confusion, and extra work.
 
         </p>
 
