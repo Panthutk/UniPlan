@@ -3,7 +3,6 @@ import Button from "@mui/material/Button";
 import GoogleIcon from "@mui/icons-material/Google";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
-// ---- tiny auth helpers ----
 const auth = {
   get token() { return localStorage.getItem("jwt"); },
   set token(v) { v ? localStorage.setItem("jwt", v) : localStorage.removeItem("jwt"); },
@@ -11,7 +10,6 @@ const auth = {
   set user(v) { v ? localStorage.setItem("user", JSON.stringify(v)) : localStorage.removeItem("user"); }
 };
 
-// ---- API helpers  ----
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 async function getGoogleAuthUrl() {
@@ -20,34 +18,25 @@ async function getGoogleAuthUrl() {
   return r.json(); // { auth_url }
 }
 
-async function exchangeCode(code) {
-  const url = new URL(`${BASE_URL}/api/auth/google/callback`);
-  url.searchParams.set("code", code);
-  const r = await fetch(url, { credentials: "include" });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json(); // { token, user }
-}
-
 export default function Login() {
   const navigate = useNavigate();
 
-  // If we arrive with ?code=..., finish the sign-in
+  // If we arrive with ?token=..., store and continue
   useEffect(() => {
-    (async () => {
-      const qs = new URLSearchParams(window.location.search);
-      const code = qs.get("code");
-      if (!code) return;
-
-      try {
-        const data = await exchangeCode(code); // { token, user }
-        auth.token = data.token;
-        auth.user = data.user;
-        navigate("/tableandtask", { replace: true });
-      } catch (e) {
-        console.error(e);
-        alert("Sign-in failed. Please try again.");
-      }
-    })();
+    const qs = new URLSearchParams(window.location.search);
+    const token = qs.get("token");
+    if (token) {
+      const user = {
+        email: qs.get("email"),
+        name: qs.get("name"),
+        picture: qs.get("picture"),
+      };
+      auth.token = token;
+      auth.user = user;
+      // Clean the URL so the params don't linger
+      window.history.replaceState({}, "", "/login");
+      navigate("/tableandtask", { replace: true });
+    }
   }, [navigate]);
 
   const onGoogleClick = async () => {
@@ -55,19 +44,17 @@ export default function Login() {
       const { auth_url } = await getGoogleAuthUrl();
       window.location.href = auth_url;
     } catch (e) {
-      alert(e.message);
+      console.error(e);
+      alert("Failed to start Google sign-in.");
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
-      {/* Top bar */}
       <header className="fixed top-0 inset-x-0 z-50 bg-zinc-900/70 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <Link to="/" className="font-black tracking-wide text-3xl sm:text-4xl">
-              LOGO
-            </Link>
+            <Link to="/" className="font-black tracking-wide text-3xl sm:text-4xl">LOGO</Link>
             <nav className="flex items-center gap-3">
               <NavLink
                 to="/about"
@@ -83,7 +70,6 @@ export default function Login() {
         </div>
       </header>
 
-      {/* Hero */}
       <main className="pt-28">
         <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 lg:grid-cols-12 items-center">
@@ -95,20 +81,13 @@ export default function Login() {
                 One timetable to rule your classes <span className="text-zinc-400">and</span> tasks.
                 Plan faster, stay organized, never miss a deadline.
               </p>
-
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Button
                   aria-label="Start with Google"
                   onClick={onGoogleClick}
                   variant="contained"
                   startIcon={<GoogleIcon />}
-                  sx={{
-                    bgcolor: "#2a8d5c",
-                    px: 3,
-                    py: 1.25,
-                    borderRadius: 2,
-                    "&:hover": { bgcolor: "#246042" },
-                  }}
+                  sx={{ bgcolor: "#2a8d5c", px: 3, py: 1.25, borderRadius: 2, "&:hover": { bgcolor: "#246042" } }}
                 >
                   Start with Google
                 </Button>

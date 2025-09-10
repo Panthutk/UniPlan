@@ -1,7 +1,8 @@
 # backend/core/views.py
-import json
+import json, os, urllib.parse
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest
+from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.core.signing import dumps, loads, BadSignature, SignatureExpired
 
@@ -12,6 +13,7 @@ from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
 
+# ---- Scopes (NO coursework scope needed) ----
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -33,12 +35,13 @@ def _client_config():
         }
     }
 
+# ---- signed token helpers (demo) ----
 def _sign(email: str) -> str:
     return dumps({"sub": email}, salt="uniplan", key=settings.SECRET_KEY)
 
 def _unsign(token: str):
     try:
-        return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60*60*8)["sub"]
+        return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8)["sub"]
     except (BadSignature, SignatureExpired, KeyError):
         return None
 
@@ -53,11 +56,16 @@ def _creds_for(email: str):
 def hello(request):
     return JsonResponse({"ok": True})
 
+# ---- OAuth ----
 @require_GET
 def google_login(request):
-    flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI)
+    flow = Flow.from_client_config(
+        _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
+    )
     auth_url, _ = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true", prompt="consent"
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
     )
     return JsonResponse({"auth_url": auth_url})
 
@@ -67,7 +75,9 @@ def google_callback(request):
     if not code:
         return HttpResponseBadRequest("Missing code")
 
-    flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI)
+    flow = Flow.from_client_config(
+        _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
+    )
     flow.fetch_token(code=code)
     creds: Credentials = flow.credentials
 
@@ -83,12 +93,17 @@ def google_callback(request):
     )
 
     token = _sign(email)
-    return JsonResponse({"token": token, "user": {"email": email, "name": name, "picture": picture}})
+    frontend_redirect = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
 
+    qs = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
+    return redirect(f"{frontend_redirect}?{qs}")
+
+# ---- auth guard ----
 def _require_auth(request):
     authz = request.META.get("HTTP_AUTHORIZATION", "")
     if not authz.startswith("Bearer "):
         return None, JsonResponse({"detail": "Missing bearer token"}, status=401)
+
     email = _unsign(authz.split(" ", 1)[1])
     if not email:
         return None, JsonResponse({"detail": "Invalid/expired token"}, status=401)
@@ -96,31 +111,61 @@ def _require_auth(request):
     creds = _creds_for(email)
     if not creds:
         return None, JsonResponse({"detail": "No Google credentials stored"}, status=401)
+
+    # refresh if needed and persist
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        # persist refreshed creds
-        from .models import GoogleAccount as GA
-        acc = GA.objects.get(pk=email)
-        acc.credentials = json.loads(creds.to_json())
-        acc.save(update_fields=["credentials"])
+        try:
+            acc = GoogleAccount.objects.get(pk=email)
+            acc.credentials = json.loads(creds.to_json())
+            acc.save(update_fields=["credentials"])
+        except GoogleAccount.DoesNotExist:
+            pass
+
     return (email, creds), None
 
+# ---- Classroom API ----
 @require_GET
 def list_courses(request):
+    """Return ACTIVE courses only."""
     auth, err = _require_auth(request)
     if err: return err
     _, creds = auth
+
     classroom = build("classroom", "v1", credentials=creds)
-    data = classroom.courses().list(pageSize=50).execute()
+    data = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute()
+    return JsonResponse(data)
+
+@require_GET
+def list_active_submissions(request, course_id: str):
+    """
+    Return *my* active (pending) submissions for a given course.
+    Active states: NEW, CREATED, RECLAIMED_BY_STUDENT
+    """
+    auth, err = _require_auth(request)
+    if err: return err
+    _, creds = auth
+
+    classroom = build("classroom", "v1", credentials=creds)
+    data = classroom.courses().courseWork().studentSubmissions().list(
+        courseId=course_id,
+        courseWorkId="-",  # across all coursework in the course
+        pageSize=100,
+        states=["NEW", "CREATED", "RECLAIMED_BY_STUDENT"],
+    ).execute()
     return JsonResponse(data)
 
 @require_GET
 def summary(request):
+    """Small summary for the header."""
     auth, err = _require_auth(request)
     if err: return err
     email, creds = auth
+
     classroom = build("classroom", "v1", credentials=creds)
-    courses = classroom.courses().list(pageSize=50).execute().get("courses", [])
-    out = {"email": email, "courseCount": len(courses),
-           "courses": [{"id": c.get("id"), "name": c.get("name"), "section": c.get("section")} for c in courses]}
-    return JsonResponse(out)
+    courses = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute().get("courses", [])
+    return JsonResponse({
+        "email": email,
+        "courseCount": len(courses),
+        "courses": [{"id": c.get("id"), "name": c.get("name"), "section": c.get("section")} for c in courses],
+    })
