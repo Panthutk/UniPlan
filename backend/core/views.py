@@ -13,7 +13,7 @@ from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
 
-# ---- Scopes (NO coursework scope needed) ----
+# ---- Scopes----
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
