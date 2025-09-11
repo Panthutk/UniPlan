@@ -20,6 +20,8 @@ UniPlan aims to provide an **all-in-one application** that integrates both class
 
 ## 👥 Team Members
 
+- Contact [Discord](<https://discord.gg/DNTQBCzt>)
+
 1. **Pannawit Mahacharoensiri** — 6610545855  
 2. **Jongchana Khachatrokphai** — 6610545774  
 3. **Panthut Ketphan** — 6610545421  

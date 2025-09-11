@@ -7,7 +7,7 @@ git clone https://github.com/Panthutk/UniPlan
 cd UniPlan
 ```
 
-2.. **Create Env ***
+2.. **Create Env (Contact Members for KEY)**
 
 - Create file `.env` int `./backend/`
 
@@ -26,13 +26,14 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 3. **cd backend (Django)**
 
-```Bash
-cd backend
+```powershell
+ cd .\backend\
 python -m venv myenv
 .\myenv\Scripts\activate   # Windows
 # source myenv/bin/activate  # macOS/Linux
-
+cd ..
 pip install -r requirements.txt
+ cd .\backend\
 python manage.py migrate
 python manage.py runserver
 ```
@@ -40,7 +41,7 @@ python manage.py runserver
 3. **Frontend (React + Vite)**
 
 ``` bash
-cd frontend
+ cd .\frontend\
 npm install
 npm install react-router-dom
 npm run dev
