@@ -417,10 +417,6 @@ const handleSaveEvent = (payload) => {
     setModalOpen(false);
   };
 
-  function pickColor(i) {
-    const colors = ["bg-emerald-400", "bg-sky-400", "bg-amber-400", "bg-pink-400", "bg-violet-400"];
-    return colors[i % colors.length];
-  }
 
   useEffect(() => {
     if (!token) { nav("/login"); return; }
