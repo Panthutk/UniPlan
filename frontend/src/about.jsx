@@ -2,17 +2,17 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import Pic1 from "./assets/pic1.png";
 import Pic2 from "./assets/pic2.png";
-import Pic3 from "./assets/pic3.png";
+import Pic3 from "./assets/pic3.jpg";
 import Pic4 from "./assets/pic4.png";
 
 
 
 export default function About() {
   const members = [
-    { id: 1, src: Pic1, name: "Alice", email: "alice@email.com" },
-    { id: 2, src: Pic2, name: "Bob", email: "bob@email.com" },
-    { id: 3, src: Pic3, name: "Charlie", email: "charlie@email.com" },
-    { id: 4, src: Pic4, name: "Dana", email: "dana@email.com" },
+    { id: 1, src: Pic1, name: "Pannawit Mahacharoensiri", email: "pannawit.m@ku.th" },
+    { id: 2, src: Pic2, name: "Jongchana Khachatrokphai", email: "jongchana.kh@ku.th" },
+    { id: 3, src: Pic3, name: "Panthut Ketphan", email: "panthut.k@ku.th" },
+    { id: 4, src: Pic4, name: "Sorasit Kateratorn", email: "sorasit.ka@ku.th" },
   ];
   const navigate = useNavigate();
 
@@ -63,7 +63,8 @@ export default function About() {
                     <span className="text-5xl text-[#fbbf24]"> & TASK</span>
                   </p>
 
-                  <span className="bg-gradient-to-r from-[#fbdf24] to-[#60c3fa] font-bold text-9xl mx-4 bg-clip-text text-transparent">+</span>
+                  <span className="bg-gradient-to-r from-[#fbdf24] to-[#60c3fa] font-bold text-9xl mx-4 
+                  bg-clip-text text-transparent transition delay-150 duration-300 ease-in-out hover:scale-150">+</span>
                   
                   <p className="font-bold text-xl">
                     <span className="text-5xl text-[#60a5fa]">CLASS</span>
@@ -107,8 +108,8 @@ export default function About() {
 
           {/*Seperate each reason to be 3 reasons*/}
             <div className="flex flex-col md:flex-row justify-center md:items-stretch items-center gap-20 mt-10 min-h-[400px]">
-              <ReasonCard info_text="Many students struggle to manage multiple timetables and assignment deadlines, which can lead to stress, disorganization, and overlooked tasks."/>
-              <ReasonCard info_text="Losing track of assignments and due dates negatively impacts students’ performance and overall academic success."/>
+              <ReasonCard info_text="Losing track of assignments because of due dates negatively impacts students’ performance and overall academic success, leading to more and more problems."/>
+              <ReasonCard info_text="Many students struggle to manage multiple timetables and assignment deadlines, which can lead to stress, panicky,disorganization, and overlooked tasks."/>
               <ReasonCard info_text="There are currently no applications that integrate Google Classroom with timetables and task management, which is why we decided to develop one ourselves."/>
             </div>
       </div>
