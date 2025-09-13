@@ -535,9 +535,9 @@ const handleSaveEvent = (payload) => {
 
 
 
-      {/* Layout: [20px spacer][CENTER MENU CARD][RIGHT MAIN] */}
+      {/* Layout: [5px spacer][CENTER MENU CARD][RIGHT MAIN] */}
       <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 md:grid-cols-[20px,360px,1fr] gap-6 items-start">
+        <div className="pb-10 grid grid-cols-1 md:grid-cols-[5px,360px,1fr] gap-6 items-start">
           {/* spacer */}
           <div className="hidden md:block" aria-hidden />
 
