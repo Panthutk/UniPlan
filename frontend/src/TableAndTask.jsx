@@ -1,187 +1,660 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState, memo } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
+/* ----------------- API (from google classroom) ----------------- */
 async function authGet(path, token) {
-    const r = await fetch(`${BASE_URL}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include",
-    });
-    if (!r.ok) throw new Error(`GET ${path} failed (${r.status})`);
-    return r.json();
+  const r = await fetch(`${BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(`GET ${path} failed (${r.status})`);
+  return r.json();
 }
-
 function normalizeCourses(json) {
-    return Array.isArray(json) ? json : (json?.courses || []);
+  return Array.isArray(json) ? json : json?.courses || [];
 }
 function normalizeSubmissions(json) {
-    return Array.isArray(json) ? json : (json?.studentSubmissions || []);
+  return Array.isArray(json) ? json : json?.studentSubmissions || [];
 }
 function fmtDate(s) {
-    if (!s) return "—";
-    const d = new Date(s);
-    return isNaN(d) ? "—" : d.toLocaleString();
+  if (!s) return "—";
+  const d = new Date(s);
+  return isNaN(d) ? "—" : d.toLocaleString();
 }
 
-export default function TableAndTask() {
-    const nav = useNavigate();
-    const token = localStorage.getItem("jwt");
-    const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
+/* ----------------- time/day ----------------- */
+const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const TIMES = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
+const colFromTime = (h) => (h - 8) + 2;   // 8 -> col 2, 19 -> 13
+const rowFromDay  = (d) => d + 2;         // 0..6 -> rows 2..8
 
-    const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState(null);
 
-    const [courses, setCourses] = useState([]);           // ACTIVE courses
-    const [subsByCourse, setSubsByCourse] = useState({}); // { [courseId]: StudentSubmission[] }
-    const [showRaw, setShowRaw] = useState(false);
 
-    useEffect(() => {
-        if (!token) { nav("/login"); return; }
+function colorForDay(day) {
+  // 0=Mon ... 6=Sun
+  const map = [
+    "bg-yellow-400", 
+    "bg-pink-400",   
+    "bg-green-400",  
+    "bg-orange-400", 
+    "bg-blue-400",   
+    "bg-purple-400", 
+    "bg-red-400",    
+  ];
+  return map[day] ?? "bg-slate-400";
+}
 
-        (async () => {
-            try {
-                setLoading(true);
-                setErr(null);
 
-                // 1) ACTIVE courses
-                const coursesJson = await authGet("/api/classroom/courses", token);
-                const active = normalizeCourses(coursesJson).filter(
-                    c => (c.courseState || c.state || "ACTIVE") === "ACTIVE"
-                );
-                setCourses(active);
 
-                // 2) Active submissions for each course
-                const results = await Promise.allSettled(
-                    active.map(async (c) => {
-                        const id = c.id || c.courseId;
-                        const sj = await authGet(`/api/classroom/active-submissions/${encodeURIComponent(id)}`, token);
-                        return { id, list: normalizeSubmissions(sj) };
-                    })
-                );
-                const byId = {};
-                for (const r of results) if (r.status === "fulfilled") byId[r.value.id] = r.value.list;
-                setSubsByCourse(byId);
-            } catch (e) {
-                console.error(e);
-                setErr(String(e));
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [token, nav]);
+/* ----------------- UI: Timetable (clickable & shows events) ------------------- */
+const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
+  const HEADER_H = 48;
+  const ROW_H = 72;
+  const LABEL_W = 120;
+  const HOUR_MIN_W = 96;
+  const GRID_MIN_W = 1400;
 
-    if (!token) return null;
+  return (
+    <div className="rounded-xl bg-neutral-800 p-2 overflow-auto">
+      <div
+        className="relative grid gap-[2px] select-none"
+        style={{
+          minWidth: `${GRID_MIN_W}px`,
+          gridTemplateRows: `${HEADER_H}px repeat(7, ${ROW_H}px)`,
+          gridTemplateColumns: `${LABEL_W}px repeat(12, minmax(${HOUR_MIN_W}px, 1fr))`,
+        }}
+      >
+        {/* Corner */}
+        <div className="bg-neutral-900/60 flex items-center justify-center text-xs">
+          Day/Time
+        </div>
 
-    return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <div className="font-semibold">Logged in as {user?.name || user?.email}</div>
-                    <div className="opacity-70 text-sm">{user?.email}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm">
-                        <input
-                            type="checkbox"
-                            className="accent-current"
-                            checked={showRaw}
-                            onChange={(e) => setShowRaw(e.target.checked)}
-                        />
-                        Show raw JSON
-                    </label>
-                    <button
-                        className="border rounded-lg px-3 py-2"
-                        onClick={() => { localStorage.clear(); nav("/login"); }}
-                    >
-                        Logout
-                    </button>
-                </div>
+        {/* Time headers */}
+        {TIMES.map((h) => (
+          <div
+            key={h}
+            className="bg-neutral-900/60 flex items-center justify-center text-xs"
+          >
+            {h}:00
+          </div>
+        ))}
+
+        {/* Day labels */}
+        {DAYS.map((d, i) => (
+          <div
+            key={d}
+            className="bg-neutral-900/60 flex items-center justify-center text-xs"
+            style={{ gridRow: i + 2, gridColumn: 1 }}
+          >
+            {d}
+          </div>
+        ))}
+
+        {/* Background cells*/}
+        {DAYS.map((_, di) =>
+          TIMES.map((h, ti) => (
+            <button
+              key={`bg-${di}-${ti}`}
+              type="button"
+              onClick={() => onCellClick(di, h)}
+              className="bg-neutral-900/20 hover:bg-neutral-900/30 transition-colors"
+              style={{ gridRow: di + 2, gridColumn: ti + 2, cursor: "pointer" }}
+              aria-label={`Add on ${DAYS[di]} at ${h}:00`}
+            />
+          ))
+        )}
+
+        {/* Events layer*/}
+        {events.map((e) => (
+          <div
+            key={e.id}
+            onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
+            className={`rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90`}
+            style={{
+              gridRow: rowFromDay(e.day),
+              gridColumn: `${colFromTime(e.start)} / ${colFromTime(e.end)}`,
+              zIndex: 10,
+            }}
+            title={`${e.title} — ${e.start}:00–${e.end}:00`}
+          >
+            {e.title}
+            <div className="text-[10px] opacity-80">
+              {e.start}:00–{e.end}:00
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+/* ----------------- UI: Tasks (from API) -------------------- */
+function CourseTasksCard({ course, submissions, showRaw }) {
+  const id = course.id || course.courseId;
+  const subs = (submissions || [])
+    .slice()
+    .sort((a, b) => {
+      const ta = Date.parse(a.updateTime || a.creationTime || 0);
+      const tb = Date.parse(b.updateTime || b.creationTime || 0);
+      return (tb || 0) - (ta || 0);
+    });
+
+  return (
+    <div className="rounded-xl border border-white/10 p-4 bg-white/5">
+      <div className="flex items-baseline justify-between">
+        <div className="font-medium">
+          {course.name}{" "}
+          {course.section ? <span className="opacity-70">({course.section})</span> : null}
+        </div>
+        <div className="text-xs opacity-70">ID: {id}</div>
+      </div>
+
+      <div className="mt-3 text-sm font-semibold">Active Assignments ({subs.length})</div>
+
+      {subs.length === 0 ? (
+        <div className="text-sm opacity-70 mt-1">No active assignments.</div>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {subs.map((s) => (
+            <li key={s.id} className="rounded-lg border border-white/10 p-3 bg-white/5">
+              <div className="font-medium">
+                #{s.courseWorkId} · {s.courseWorkType || "CourseWork"}
+              </div>
+              <div className="text-xs opacity-70">
+                State: {s.state} · Late: {String(s.late)} · Created: {fmtDate(s.creationTime)} · Updated: {fmtDate(s.updateTime)}
+              </div>
+              {s.alternateLink && (
+                <a className="text-xs underline" href={s.alternateLink} target="_blank" rel="noreferrer">
+                  Open in Classroom
+                </a>
+              )}
+              {showRaw && (
+                <pre className="mt-2 text-xs bg-black/10 p-2 rounded overflow-auto">
+                  {JSON.stringify(s, null, 2)}
+                </pre>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showRaw && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs opacity-70">Course raw JSON</summary>
+          <pre className="mt-2 text-xs bg-black/10 p-3 rounded overflow-auto">
+            {JSON.stringify(course, null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw }) {
+  if (!courses?.length) return <div className="text-sm opacity-70">No active classes found.</div>;
+  return (
+    <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {courses.map((c) => (
+        <CourseTasksCard
+          key={c.id || c.courseId}
+          course={c}
+          submissions={subsByCourse[c.id || c.courseId]}
+          showRaw={showRaw}
+        />
+      ))}
+    </div>
+  );
+});
+
+/* ----------------- Modal form (Subject combo box from API) -------------------- */
+function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
+  const [title, setTitle] = useState(initial.title || "");
+  const [day, setDay] = useState(initial.day ?? 0);
+  const [start, setStart] = useState(initial.start ?? 8);
+  const [end, setEnd] = useState(initial.end ?? 9);
+  const [desc, setDesc] = useState(initial.desc || "");
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle(initial.title || "");
+    setDay(initial.day ?? 0);
+    setStart(initial.start ?? 8);
+    setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
+    setDesc(initial.desc || "");
+  }, [open, initial]);
+
+  if (!open) return null;
+
+  const isEditing = Boolean(initial?.id);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
+                      w-[min(560px,92vw)] rounded-2xl bg-neutral-900 text-white p-5 shadow-xl">
+        <div className="text-lg font-semibold mb-1">Subject</div>
+        <div className="text-xs opacity-70 mb-2">
+          You can add subject from Google Classroom or manually add it
+        </div>
+
+        {/* Combo box */}
+        <input
+          list="subject-options"
+          className="w-full mb-4 rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+          placeholder="Start typing to choose…"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <datalist id="subject-options">
+          {subjectOptions.map((opt) => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-sm mb-1">Start Class</div>
+            <select
+              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+              value={start}
+              onChange={(e) => setStart(Number(e.target.value))}
+            >
+              {TIMES.map((h) => (
+                <option key={h} value={h}>{h}:00</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div className="text-sm mb-1">End Class</div>
+            <select
+              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+              value={end}
+              onChange={(e) => setEnd(Number(e.target.value))}
+            >
+              {TIMES.map((h) => (
+                <option key={h} value={h}>{h}:00</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <div className="text-sm mb-1">Day</div>
+          <select
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+            value={day}
+            onChange={(e) => setDay(Number(e.target.value))}
+          >
+            {DAYS.map((d, i) => (
+              <option key={d} value={i}>{d}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-3">
+          <div className="text-sm mb-1">Description</div>
+          <textarea
+            rows={4}
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+            placeholder="Optional"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-3">
+          {/* DELETE only when editing */}
+          {isEditing ? (
+            <button
+              onClick={() => onDelete?.(initial.id)}
+              className="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-700 font-semibold"
+            >
+              DELETE
+            </button>
+          ) : <span />}
+
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-full bg-neutral-700 hover:bg-neutral-600 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                const s = Math.min(start, end);
+                const e = Math.max(start, end);
+                onSave({
+                  ...(isEditing ? { id: initial.id } : {}),
+                  title: title || "Untitled",
+                  day,
+                  start: s,
+                  end: Math.max(e, s + 1),
+                  desc,
+                });
+              }}
+              className="px-6 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Page: layout  */
+export default function ClassroomTimetableDashboard() {
+  const nav = useNavigate();
+  const token = localStorage.getItem("jwt");
+  const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
+
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [subsByCourse, setSubsByCourse] = useState({});
+  const [showRaw, setShowRaw] = useState(false);
+
+  // local timetable events created via the modal
+  const [events, setEvents] = useState([]);
+
+  // Refs + active-menu logic (center-closest)
+  const timetableRef = useRef(null);
+  const tasksRef = useRef(null);
+  const [activeMenu, setActiveMenu] = useState("timetable");
+  const activeRef = useRef(activeMenu);
+  useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalInitial, setModalInitial] = useState({ day: 0, start: 8, end: 9, title: "", desc: "" });
+
+  // Initialize from grid (create)
+  const handleCellClick = (dayIdx, hour) => {
+    setModalInitial({ day: dayIdx, start: hour, end: Math.min(hour + 1, 20), title: "", desc: "" });
+    setModalOpen(true);
+  };
+
+  // Initialize from event (edit)
+  const handleEventClick = (evt) => {
+    setModalInitial({ ...evt }); // contains id, title, day, start, end, desc, color
+    setModalOpen(true);
+  };
+
+const handleSaveEvent = (payload) => {
+  if (payload.id) {
+    // update existing
+    setEvents(prev =>
+      prev.map(e =>
+        e.id === payload.id ? { ...e, ...payload, color: colorForDay(payload.day) } : e
+      )
+    );
+  } else {
+    // create new
+    setEvents(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        color: colorForDay(payload.day),
+        ...payload,
+      },
+    ]);
+  }
+  setModalOpen(false);
+};
+
+
+  const handleDeleteEvent = (id) => {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setModalOpen(false);
+  };
+
+  const handleClearEvents = () => {
+    setEvents([]);
+    setModalOpen(false);
+  };
+
+
+  useEffect(() => {
+    if (!token) { nav("/login"); return; }
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+
+        const coursesJson = await authGet("/api/classroom/courses", token);
+        const active = normalizeCourses(coursesJson).filter(
+          (c) => (c.courseState || c.state || "ACTIVE") === "ACTIVE"
+        );
+        setCourses(active);
+
+        const results = await Promise.allSettled(
+          active.map(async (c) => {
+            const id = c.id || c.courseId;
+            const sj = await authGet(`/api/classroom/active-submissions/${encodeURIComponent(id)}`, token);
+            return { id, list: normalizeSubmissions(sj) };
+          })
+        );
+        const byId = {};
+        for (const r of results) if (r.status === "fulfilled") byId[r.value.id] = r.value.list;
+        setSubsByCourse(byId);
+      } catch (e) {
+        console.error(e);
+        setErr(String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, nav]);
+
+  // subject options for datalist
+  const subjectOptions = useMemo(() => {
+    const set = new Set();
+    for (const c of courses) if (c?.name) set.add(c.name.trim());
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [courses]);
+
+  // Active menu (closest section center)
+  useEffect(() => {
+    let raf = 0;
+    const computeActive = () => {
+      const t = timetableRef.current;
+      const k = tasksRef.current;
+      if (!t || !k) return;
+
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const centerY = vh / 2;
+
+      const rectT = t.getBoundingClientRect();
+      const rectK = k.getBoundingClientRect();
+
+      const isVis = (r) => r.bottom > 0 && r.top < vh;
+      const dist = (r) => Math.abs((r.top + r.bottom) / 2 - centerY);
+
+      const tVis = isVis(rectT);
+      const kVis = isVis(rectK);
+
+      let next = activeRef.current;
+
+      if (tVis && !kVis) next = "timetable";
+      else if (!tVis && kVis) next = "tasks";
+      else if (tVis && kVis) next = dist(rectK) <= dist(rectT) ? "tasks" : "timetable";
+
+      if (next !== activeRef.current) setActiveMenu(next);
+    };
+
+    const onScrollOrResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(computeActive);
+    };
+
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
+    onScrollOrResize();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, []);
+
+  if (!token) return null;
+
+  return (
+    <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
+        <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="font-bold tracking-wide text-lg">LOGO</div>
+
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 text-sm opacity-80">
+              <input
+                type="checkbox"
+                className="accent-current"
+                checked={showRaw}
+                onChange={(e) => setShowRaw(e.target.checked)}
+              />
+              Show raw JSON
+            </label>
+            <Link to="/about" className="opacity-90 text-sm hover:underline">Contact</Link>
+            <button
+              className="border rounded-lg px-3 py-2"
+              onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+
+
+
+      {/* Layout: [5px spacer][CENTER MENU CARD][RIGHT MAIN] */}
+      <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8">
+        <div className="pb-10 grid grid-cols-1 md:grid-cols-[5px,360px,1fr] gap-6 items-start">
+          {/* spacer */}
+          <div className="hidden md:block" aria-hidden />
+
+          {/* CENTER — sticky/tall menu card */}
+          <section
+            className="
+              bg-neutral-800 rounded-2xl p-4
+              flex flex-col
+              md:sticky md:top-[72px] md:bottom-4 md:z-40 self-start
+              min-h-[60vh] md:min-h-0
+              md:max-h-[calc(100vh-72px-16px)]
+              md:overflow-auto
+            "
+          >
+            {/* user chip */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-4 w-4 rounded-full bg-emerald-500" />
+              <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
+                {user?.email || "student@gmail.com"}
+              </div>
             </div>
 
-            {/* Status */}
-            {loading && <div className="text-sm opacity-70">Loading active classes & active assignments…</div>}
-            {err && <div className="text-sm text-red-400">Error: {err}</div>}
 
-            {/* Active classes + Active assignments */}
-            <section>
-                <h2 className="text-xl font-semibold mb-2">Active Classes</h2>
-                {!loading && courses.length === 0 && (
-                    <div className="text-sm opacity-70">No active classes found.</div>
-                )}
+            {/* Active buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={() => timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                aria-current={activeMenu === "timetable" ? "page" : undefined}
+                className={[
+                  "w-full py-4 rounded-full font-semibold transition-colors",
+                  activeMenu === "timetable"
+                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                    : "bg-neutral-700 hover:bg-neutral-600",
+                ].join(" ")}
+              >
+                TimeTable
+              </button>
 
-                <div className="space-y-4">
-                    {courses.map((c) => {
-                        const id = c.id || c.courseId;
-                        // newest updated first
-                        const subs = (subsByCourse[id] || []).slice().sort((a, b) => {
-                            const ta = Date.parse(a.updateTime || a.creationTime || 0);
-                            const tb = Date.parse(b.updateTime || b.creationTime || 0);
-                            return (tb || 0) - (ta || 0);
-                        });
+              <button
+                onClick={() => tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                aria-current={activeMenu === "tasks" ? "page" : undefined}
+                className={[
+                  "w-full py-4 rounded-full font-semibold transition-colors",
+                  activeMenu === "tasks"
+                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                    : "bg-neutral-700 hover:bg-neutral-600",
+                ].join(" ")}
+              >
+                Tasks
+              </button>
+            </div>
+          </section>
 
-                        return (
-                            <div key={id} className="rounded-xl border border-white/10 p-4 bg-black/5">
-                                <div className="flex items-baseline justify-between">
-                                    <div className="font-medium">
-                                        {c.name} {c.section ? <span className="opacity-70">({c.section})</span> : null}
-                                    </div>
-                                    <div className="text-xs opacity-70">Course ID: {id}</div>
-                                </div>
+          {/* RIGHT — timetable + tasks */}
+          <main className="space-y-6">
+            {/* actions */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleClearEvents}
+                className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
+              >
+                Clear
+              </button>
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+                Import
+              </button>
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+                Export
+              </button>
+            </div>
 
-                                <div className="mt-3">
-                                    <div className="text-sm font-semibold mb-2">
-                                        Active Assignments ({subs.length})
-                                    </div>
+            {/* Timetable (click cells to add; click events to edit) */}
+            <div ref={timetableRef} className="scroll-mt-[80px]">
+              <TimetableGrid
+                events={events}
+                onCellClick={handleCellClick}
+                onEventClick={handleEventClick}
+              />
+            </div>
 
-                                    {subs.length === 0 ? (
-                                        <div className="text-sm opacity-70">No active assignments.</div>
-                                    ) : (
-                                        <ul className="space-y-2">
-                                            {subs.map((s) => (
-                                                <li key={s.id} className="rounded-lg border border-white/10 p-3 bg-white/5">
-                                                    <div className="font-medium">
-                                                        #{s.courseWorkId} · {s.courseWorkType || "CourseWork"}
-                                                    </div>
-                                                    <div className="text-xs opacity-70">
-                                                        State: {s.state} · Late: {String(s.late)} ·
-                                                        Created: {fmtDate(s.creationTime)} · Updated: {fmtDate(s.updateTime)}
-                                                    </div>
-                                                    {s.alternateLink && (
-                                                        <a
-                                                            className="text-xs underline"
-                                                            href={s.alternateLink}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                        >
-                                                            Open in Classroom
-                                                        </a>
-                                                    )}
-                                                    {showRaw && (
-                                                        <pre className="mt-2 text-xs bg-black/10 p-2 rounded overflow-auto">
-                                                            {JSON.stringify(s, null, 2)}
-                                                        </pre>
-                                                    )}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
+            {/* Tasks */}
+            <section ref={tasksRef} className="scroll-mt-[80px]">
+              <h2 className="text-lg font-semibold mb-3">Classroom Tasks</h2>
 
-                                {showRaw && (
-                                    <details className="mt-3">
-                                        <summary className="cursor-pointer text-xs opacity-70">Course raw JSON</summary>
-                                        <pre className="mt-2 text-xs bg-black/10 p-3 rounded overflow-auto">
-                                            {JSON.stringify(c, null, 2)}
-                                        </pre>
-                                    </details>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+
+            {/* Status moved here */}
+            {loading && (
+              <div className="text-sm opacity-70 mb-3">
+                Loading active classes & active assignments…
+              </div>
+            )}
+            {err && (
+              <div className="text-sm text-rose-400 mb-3">
+                Error: {err}
+              </div>
+            )}
+
+
+              <TasksSection
+                courses={courses}
+                subsByCourse={subsByCourse}
+                showRaw={showRaw}
+              />
             </section>
+          </main>
         </div>
-    );
+      </div>
+
+      {/* Modal */}
+      <EventModal
+        open={modalOpen}
+        initial={modalInitial}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+        subjectOptions={subjectOptions}
+      />
+    </div>
+  );
 }
