@@ -39,3 +39,4 @@ UniPlan aims to provide an **all-in-one application** that integrates both class
 ## Video for presentation
 
 - [Youtube](https://youtu.be/29njDEQp5Lw) — Sprint1
+- [Youtube](https://youtu.be/YryekItrpHo) — Sprint2
