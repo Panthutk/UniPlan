@@ -50,11 +50,11 @@ function colorForDay(day) {
 
 /* ----------------- UI: Timetable (clickable & shows events) ------------------- */
 const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
-  const HEADER_H = 48;
-  const ROW_H = 72;
-  const LABEL_W = 120;
-  const HOUR_MIN_W = 96;
-  const GRID_MIN_W = 1400;
+  const HEADER_H = 52;
+  const ROW_H = 92;
+  const LABEL_W = 132;
+  const HOUR_MIN_W = 120;
+  const GRID_MIN_W = 0;
 
   return (
     <div className="rounded-xl bg-neutral-800 p-2 overflow-auto">
@@ -508,10 +508,10 @@ const handleSaveEvent = (payload) => {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
           <div className="font-bold tracking-wide text-lg">LOGO</div>
 
-          <div className="flex items-center gap-6">
+          <div className="ml-auto flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
                 type="checkbox"
@@ -535,11 +535,9 @@ const handleSaveEvent = (payload) => {
 
 
 
-      {/* Layout: [5px spacer][CENTER MENU CARD][RIGHT MAIN] */}
-      <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 md:grid-cols-[5px,360px,1fr] gap-6 items-start">
-          {/* spacer */}
-          <div className="hidden md:block" aria-hidden />
+      {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
+      <div className="container mx-auto md:mx-0 max-w-[1600px] pl-4 pr-8 sm:pl-6 sm:pr-10 lg:pl-8 lg:pr-12">
+        <div className="pb-10 grid grid-cols-1 md:grid-cols-[minmax(320px,360px),1fr] gap-y-6 md:gap-x-10 items-start">
 
           {/* CENTER — sticky/tall menu card */}
           <section
