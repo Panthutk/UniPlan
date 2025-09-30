@@ -7,7 +7,7 @@ git clone https://github.com/Panthutk/UniPlan
 cd UniPlan
 ```
 
-2.. **Create Env ***
+2. ***Create Env***
 
 - Create file `.env` int `./backend/`
 
