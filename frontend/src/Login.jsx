@@ -1,6 +1,9 @@
 import React, { useEffect } from "react";
 import Button from "@mui/material/Button";
 import GoogleIcon from "@mui/icons-material/Google";
+import EventIcon from "@mui/icons-material/Event";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import SchoolIcon from "@mui/icons-material/School";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 const auth = {
@@ -55,7 +58,16 @@ export default function Login() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <Link to="/" className="font-black tracking-wide text-3xl sm:text-4xl">LOGO</Link>
+
             <nav className="flex items-center gap-3">
+              {/* NEW: in-page jump link */}
+              <a
+                href="#whatwedo"
+                className="rounded-md border border-white/15 px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/5"
+              >
+                What we do
+              </a>
+
               <NavLink
                 to="/about"
                 className={({ isActive }) =>
@@ -71,6 +83,7 @@ export default function Login() {
       </header>
 
       <main className="pt-28">
+        {/* ---- HERO ---- */}
         <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 lg:grid-cols-12 items-center">
             <div className="lg:col-span-7">
@@ -91,6 +104,13 @@ export default function Login() {
                 >
                   Start with Google
                 </Button>
+                {/* NEW helper link */}
+                <a
+                  href="#whatwedo"
+                  className="text-sm text-zinc-400 hover:text-zinc-200 underline underline-offset-4"
+                >
+                  Learn what we do ↓
+                </a>
               </div>
             </div>
 
@@ -100,6 +120,73 @@ export default function Login() {
                 <FeatureCard title="Linked Tasks" desc="Create homework directly from a class block." />
                 <FeatureCard title="Classroom Sync" desc="Pull subjects & assignments from Google Classroom." />
                 <FeatureCard title="Reminders" desc="Get notified before due dates so you never miss one." />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ---- WHAT WE DO ---- */}
+        <section
+          id="whatwedo"
+          className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-28 scroll-mt-24"
+        >
+          {/* NEW: subtle glass container + separator for a more premium feel */}
+          <div className="relative rounded-3xl border border-white/10 bg-zinc-900/40 p-6 sm:p-8 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-emerald-200 to-zinc-100">
+                WHAT WE DO
+              </span>
+            </h2>
+
+            {/* Top: description + bullets (full width on all screens) */}
+            <div className="mt-6 sm:mt-7">
+              <p className="text-zinc-300/90 leading-relaxed">
+                We developed an <span className="font-semibold text-zinc-100">integrated platform</span> that
+                combines task management with class timetables, designed to help students stay organized with ease.
+              </p>
+
+              {/* NEW: cleaner bullets with emerald bead markers */}
+              <ul className="mt-6 space-y-3 text-zinc-300">
+                <li className="relative pl-6">
+                  <span className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-emerald-400/90 shadow-[0_0_0_3px_rgba(16,185,129,.15)]"></span>
+                  Users can add, remove, and modify classes directly within the timetable.
+                </li>
+                <li className="relative pl-6">
+                  <span className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-emerald-400/90 shadow-[0_0_0_3px_rgba(16,185,129,.15)]"></span>
+                  Homework can be created straight from a class block on the timetable.
+                </li>
+                <li className="relative pl-6">
+                  <span className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-emerald-400/90 shadow-[0_0_0_3px_rgba(16,185,129,.15)]"></span>
+                  Email reminders go out before due dates so nothing slips through.
+                </li>
+                <li className="relative pl-6">
+                  <span className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-emerald-400/90 shadow-[0_0_0_3px_rgba(16,185,129,.15)]"></span>
+                  Google Classroom subjects &amp; assignments sync automatically for quick setup.
+                </li>
+              </ul>
+            </div>
+
+            {/* NEW: soft divider between text and cards */}
+            <div className="mt-8 border-t border-white/10"></div>
+
+            {/* Bottom: the three reveal cards (now below the section text) */}
+            <div className="mt-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <RevealCard
+                  short="Deadlines"
+                  icon={<EventIcon fontSize="small" />}
+                  more="Losing track of due dates hurts performance and increases stress, leading to bigger problems."
+                />
+                <RevealCard
+                  short="Juggling"
+                  icon={<AssignmentIcon fontSize="small" />}
+                  more="Students juggle multiple timetables and assignment deadlines, causing panic and disorganization."
+                />
+                <RevealCard
+                  short="Gap in Tools"
+                  icon={<SchoolIcon fontSize="small" />}
+                  more="No tool tightly integrates Google Classroom with timetables + task management—so we built one."
+                />
               </div>
             </div>
           </div>
@@ -115,11 +202,39 @@ export default function Login() {
   );
 }
 
+// Simple feature card
 function FeatureCard({ title, desc }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-zinc-800/60 p-5 hover:bg-zinc-800/80 transition">
+    // NEW: match reveal-card hover feel (lift + glow + subtle bg change)
+    <div className="rounded-2xl border border-white/10 bg-zinc-800/60 p-5 transition
+                    hover:bg-zinc-800/80 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/10">
       <h3 className="font-semibold text-zinc-100">{title}</h3>
       <p className="mt-2 text-sm text-zinc-300">{desc}</p>
+    </div>
+  );
+}
+
+//  hover-reveal card 
+function RevealCard({ icon, short, more }) {
+  return (
+    <div className="group rounded-2xl border border-white/10 bg-zinc-800/60 p-4 transition
+                    hover:bg-zinc-800/80 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/10">
+      {/* top row: icon + short title (always visible) */}
+      <div className="flex flex-col items-center text-center gap-2">
+        {/* NEW: icon badge box matches theme */}
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl
+                        bg-zinc-900/60 border border-white/10 text-zinc-100">
+          {icon}
+        </div>
+        <div className="text-sm font-semibold text-zinc-100 tracking-wide">{short}</div>
+      </div>
+
+      {/* reveal body: expands smoothly, never overflows/clips */}
+      <div className="mt-2 overflow-hidden transition-[max-height,opacity] duration-300 delay-100 ease-out max-h-0 opacity-0 group-hover:max-h-60 group-hover:opacity-100">
+        <div className="mt-3 rounded-lg bg-zinc-900/70 border border-white/10 p-3 text-[13px] leading-relaxed text-zinc-300">
+          {more}
+        </div>
+      </div>
     </div>
   );
 }

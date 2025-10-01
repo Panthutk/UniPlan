@@ -28,20 +28,20 @@ function fmtDate(s) {
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const TIMES = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
 const colFromTime = (h) => (h - 8) + 2;   // 8 -> col 2, 19 -> 13
-const rowFromDay  = (d) => d + 2;         // 0..6 -> rows 2..8
+const rowFromDay = (d) => d + 2;         // 0..6 -> rows 2..8
 
 
 
 function colorForDay(day) {
   // 0=Mon ... 6=Sun
   const map = [
-    "bg-yellow-400", 
-    "bg-pink-400",   
-    "bg-green-400",  
-    "bg-orange-400", 
-    "bg-blue-400",   
-    "bg-purple-400", 
-    "bg-red-400",    
+    "bg-yellow-400",
+    "bg-pink-400",
+    "bg-green-400",
+    "bg-orange-400",
+    "bg-blue-400",
+    "bg-purple-400",
+    "bg-red-400",
   ];
   return map[day] ?? "bg-slate-400";
 }
@@ -384,27 +384,27 @@ export default function ClassroomTimetableDashboard() {
     setModalOpen(true);
   };
 
-const handleSaveEvent = (payload) => {
-  if (payload.id) {
-    // update existing
-    setEvents(prev =>
-      prev.map(e =>
-        e.id === payload.id ? { ...e, ...payload, color: colorForDay(payload.day) } : e
-      )
-    );
-  } else {
-    // create new
-    setEvents(prev => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        color: colorForDay(payload.day),
-        ...payload,
-      },
-    ]);
-  }
-  setModalOpen(false);
-};
+  const handleSaveEvent = (payload) => {
+    if (payload.id) {
+      // update existing
+      setEvents(prev =>
+        prev.map(e =>
+          e.id === payload.id ? { ...e, ...payload, color: colorForDay(payload.day) } : e
+        )
+      );
+    } else {
+      // create new
+      setEvents(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          color: colorForDay(payload.day),
+          ...payload,
+        },
+      ]);
+    }
+    setModalOpen(false);
+  };
 
 
   const handleDeleteEvent = (id) => {
@@ -623,17 +623,17 @@ const handleSaveEvent = (payload) => {
               <h2 className="text-lg font-semibold mb-3">Classroom Tasks</h2>
 
 
-            {/* Status moved here */}
-            {loading && (
-              <div className="text-sm opacity-70 mb-3">
-                Loading active classes & active assignments…
-              </div>
-            )}
-            {err && (
-              <div className="text-sm text-rose-400 mb-3">
-                Error: {err}
-              </div>
-            )}
+              {/* Status moved here */}
+              {loading && (
+                <div className="text-sm opacity-70 mb-3">
+                  Loading active classes & active assignments…
+                </div>
+              )}
+              {err && (
+                <div className="text-sm text-rose-400 mb-3">
+                  Error: {err}
+                </div>
+              )}
 
 
               <TasksSection
