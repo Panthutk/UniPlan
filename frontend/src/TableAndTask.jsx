@@ -3,6 +3,150 @@ import { useNavigate, Link } from "react-router-dom";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
+
+// --- Linking assignments to timetable events ---
+function norm(s) {
+  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// returns { linked, day, color, eventTitle }
+function linkOneAssignmentToEvents(assignment, events) {
+  const aCourse = norm(assignment.courseName);
+  const aTitle  = norm(assignment.title);
+
+  // Best effort: match on courseName or assignment title being in event title (or vice versa)
+  for (const ev of events || []) {
+    const eTitle = norm(ev.title);
+    if (!eTitle) continue;
+
+    const match =
+      eTitle.includes(aCourse) ||
+      aCourse.includes(eTitle) ||
+      eTitle.includes(aTitle) ||
+      aTitle.includes(eTitle);
+
+    if (match) {
+      return {
+        linked: true,
+        day: ev.day,                              // 0..6
+        color: colorForDay(ev.day),               // use your existing day→color helper
+        eventTitle: ev.title,
+      };
+    }
+  }
+  return { linked: false, day: null, color: "bg-neutral-900", eventTitle: null };
+}
+
+function annotateAssignmentsWithEvents(items, events) {
+  return (items || []).map((a) => {
+    const link = linkOneAssignmentToEvents(a, events);
+    return { ...a, _link: link };
+  });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ----------------- Assignment helpers (no API changes) ----------------- */
+
+// Try to read a due date from various shapes the Classroom JSON might use.
+// If missing, we fall back to updateTime/creationTime (so something shows).
+function parseDueDate(sub) {
+  // Common patterns from Classroom payloads:
+  // - sub.dueDate: { year, month, day } and maybe dueTime: { hours, minutes }
+  // - sub.assignmentSubmission?.dueDate / dueTime (sometimes nested)
+  // - otherwise fallback to updateTime/creationTime
+  const pick = (obj, path) =>
+    path.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
+
+  let y = pick(sub, "dueDate.year") ?? pick(sub, "assignmentSubmission.dueDate.year");
+  let m = pick(sub, "dueDate.month") ?? pick(sub, "assignmentSubmission.dueDate.month");
+  let d = pick(sub, "dueDate.day") ?? pick(sub, "assignmentSubmission.dueDate.day");
+
+  let hh = pick(sub, "dueTime.hours") ?? pick(sub, "assignmentSubmission.dueTime.hours");
+  let mm = pick(sub, "dueTime.minutes") ?? pick(sub, "assignmentSubmission.dueTime.minutes");
+
+  if (y && m && d) {
+    // JS Date months are 0-based
+    const dt = new Date(y, m - 1, d, hh ?? 23, mm ?? 59, 0);
+    return isNaN(+dt) ? null : dt;
+  }
+
+  // fallback: updated/created
+  const t =
+    Date.parse(sub.updateTime || "") ||
+    Date.parse(sub.creationTime || "") ||
+    Date.now();
+  const dt = new Date(t);
+  return isNaN(+dt) ? null : dt;
+}
+
+function daysLeft(fromDate, toDate = new Date()) {
+  const ms = parseDueDate(fromDate)?.getTime?.() ?? 0;
+  const now = toDate.getTime();
+  const diff = Math.ceil((ms - now) / (1000 * 60 * 60 * 24));
+  return diff;
+}
+
+
+
+function buildAssignments(courses, subsByCourse) {
+  // Flatten and annotate with course name, “days left”, etc.
+  const courseName = (id) =>
+    courses.find((c) => (c.id || c.courseId) === id)?.name || "Unknown Course";
+
+  const items = [];
+  for (const cid of Object.keys(subsByCourse || {})) {
+    for (const s of subsByCourse[cid] || []) {
+      const due = parseDueDate(s);
+      const left = due ? daysLeft(s) : null;
+      items.push({
+        id: `${cid}:${s.id}`,
+        courseId: cid,
+        courseName: courseName(cid),
+        title:
+          s.title ||
+          s.courseWorkType ||
+          (s.assignmentSubmission ? "Assignment" : "CourseWork"),
+        altLink: s.alternateLink,
+        state: s.state || "NEW",
+        due,
+        daysLeft: left,
+        raw: s,
+      });
+    }
+  }
+
+  // sort soonest first; put undated at bottom
+  items.sort((a, b) => {
+    if (a.due && b.due) return a.due - b.due;
+    if (a.due && !b.due) return -1;
+    if (!a.due && b.due) return 1;
+    return 0;
+  });
+
+  return items;
+}
+
+
+
+
+
+
+
 /* ----------------- API (from google classroom) ----------------- */
 async function authGet(path, token) {
   const r = await fetch(`${BASE_URL}${path}`, {
@@ -50,20 +194,19 @@ function colorForDay(day) {
 
 /* ----------------- UI: Timetable (clickable & shows events) ------------------- */
 const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
-  const HEADER_H = 48;
-  const ROW_H = 72;
-  const LABEL_W = 120;
-  const HOUR_MIN_W = 96;
-  const GRID_MIN_W = 1400;
+  const HEADER_H = 52;
+  const ROW_H = 92;
+  const LABEL_W = 132;
+  const GRID_MIN_W = 0;
 
   return (
-    <div className="rounded-xl bg-neutral-800 p-2 overflow-auto">
+    <div className="rounded-xl bg-neutral-800 p-2 overflow-hidden w-full">
       <div
-        className="relative grid gap-[2px] select-none"
+        className="relative grid gap-[2px] select-none w-full"
         style={{
           minWidth: `${GRID_MIN_W}px`,
           gridTemplateRows: `${HEADER_H}px repeat(7, ${ROW_H}px)`,
-          gridTemplateColumns: `${LABEL_W}px repeat(12, minmax(${HOUR_MIN_W}px, 1fr))`,
+          gridTemplateColumns: `${LABEL_W}px repeat(12, minmax(0, 1fr))`,
         }}
       >
         {/* Corner */}
@@ -207,6 +350,149 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
     </div>
   );
 });
+
+
+
+
+/* -----------------Assignments Board----------------- */
+function AssignmentsBoard({ items }) {
+  const groups = useMemo(() => {
+    const m = new Map();
+    for (const a of items || []) {
+      const key = a._link?.linked ? String(a._link.day ?? "Unassigned") : "Unassigned";
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push(a);
+    }
+    // sort inside each group by due date (soonest first)
+    for (const [k, arr] of m) {
+      arr.sort((x, y) => {
+        if (x.due && y.due) return x.due - y.due;
+        if (x.due && !y.due) return -1;
+        if (!x.due && y.due) return 1;
+        return 0;
+      });
+    }
+    return m;
+  }, [items]);
+
+  const orderKeys = ["0","1","2","3","4","5","6","Unassigned"].filter(k => groups.has(k));
+
+  if (orderKeys.length === 0) {
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Tasks</h3>
+        </div>
+        <div className="text-sm opacity-70">No tasks to show.</div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">Tasks</h3>
+      </div>
+
+      {orderKeys.map((key) => {
+        const list = groups.get(key) || [];
+        const isUnassigned = key === "Unassigned";
+        const dayIdx = isUnassigned ? null : Number(key);
+        const dayName = isUnassigned ? "Unassigned" : DAYS[dayIdx];
+        const headerChip = isUnassigned ? "bg-neutral-800" : colorForDay(dayIdx);
+
+        return (
+          <div key={key} className="space-y-3">
+            {/* Section header */}
+            <div className="flex items-center gap-2">
+              <span className={`inline-block h-3 w-3 rounded ${headerChip}`} />
+              <h4 className="font-semibold">{dayName}</h4>
+              <span className="text-xs opacity-60">({list.length})</span>
+            </div>
+
+            {/* Cards */}
+            <div className="space-y-4">
+              {list.map((a) => {
+                const n = a.daysLeft;
+                const leftText =
+                  n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
+
+                const linked  = a._link?.linked;
+                const dayBg   = linked ? (a._link?.color || "bg-neutral-900") : "bg-neutral-900";
+                const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
+
+                return (
+                  <div
+                    key={a.id}
+                    className={`grid grid-cols-[10rem,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
+                  >
+                    {/* Left label (day color only when linked) */}
+                    <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
+                      <div className="text-center text-xl">{leftText}</div>
+                    </div>
+
+                    {/* Right content */}
+                    <div className="p-4 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm opacity-80 truncate">
+                          <span className="tracking-wider">{a.courseName}</span>
+                          {linked && a._link?.eventTitle ? (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                              {a._link.eventTitle}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* HW line only when linked */}
+                      {linked ? (
+                        <div className="mt-1 text-sm">
+                          <span className="opacity-80 mr-2">HW:</span>
+                          <span className="font-semibold">{a.title}</span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
+                      )}
+
+                      <div className="mt-3 flex items-center gap-3">
+                        {a.altLink && (
+                          <a
+                            href={a.altLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                            title="Open in Classroom"
+                          >
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                            Classroom
+                          </a>
+                        )}
+                        <div className="ml-auto flex items-center gap-2">
+                          <span className="text-xs opacity-75">Status:</span>
+                          <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
+                            OPEN
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+
+
+
+
+
+
+
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
 function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
@@ -457,6 +743,25 @@ export default function ClassroomTimetableDashboard() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [courses]);
 
+
+
+
+  const liveAssignments = useMemo(
+    () => buildAssignments(courses, subsByCourse),
+    [courses, subsByCourse]
+  );
+
+
+
+
+
+// Link assignments to timetable events (so board knows which ones are placed)
+  const linkedAssignments = useMemo(
+    () => annotateAssignmentsWithEvents(liveAssignments, events),
+    [liveAssignments, events]
+  );
+
+
   // Active menu (closest section center)
   useEffect(() => {
     let raf = 0;
@@ -508,10 +813,10 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
           <div className="font-bold tracking-wide text-lg">LOGO</div>
 
-          <div className="flex items-center gap-6">
+          <div className="ml-auto flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
                 type="checkbox"
@@ -535,18 +840,16 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-      {/* Layout: [5px spacer][CENTER MENU CARD][RIGHT MAIN] */}
-      <div className="container mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 md:grid-cols-[5px,360px,1fr] gap-6 items-start">
-          {/* spacer */}
-          <div className="hidden md:block" aria-hidden />
+      {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
+      <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
+        <div className="pb-10 grid grid-cols-1 md:grid-cols-[minmax(320px,360px),minmax(0,1fr)] xl:grid-cols-[minmax(300px,340px),minmax(0,1fr)] 2xl:grid-cols-[minmax(320px,360px),minmax(0,1fr)] gap-y-6 md:gap-x-10 items-start min-w-0">
 
           {/* CENTER — sticky/tall menu card */}
           <section
             className="
               bg-neutral-800 rounded-2xl p-4
               flex flex-col
-              md:sticky md:top-[72px] md:bottom-4 md:z-40 self-start
+              md:sticky md:top-[72px] md:z-40 self-start
               min-h-[60vh] md:min-h-0
               md:max-h-[calc(100vh-72px-16px)]
               md:overflow-auto
@@ -592,7 +895,7 @@ export default function ClassroomTimetableDashboard() {
           </section>
 
           {/* RIGHT — timetable + tasks */}
-          <main className="space-y-6">
+          <main className="space-y-6 min-w-0">
             {/* actions */}
             <div className="flex justify-end gap-3">
               <button
@@ -610,7 +913,7 @@ export default function ClassroomTimetableDashboard() {
             </div>
 
             {/* Timetable (click cells to add; click events to edit) */}
-            <div ref={timetableRef} className="scroll-mt-[80px]">
+            <div ref={timetableRef} className="scroll-mt-[80px] min-w-0">
               <TimetableGrid
                 events={events}
                 onCellClick={handleCellClick}
@@ -618,9 +921,22 @@ export default function ClassroomTimetableDashboard() {
               />
             </div>
 
+
+          
+            <div ref={tasksRef} className="scroll-mt-[80px]">
+            <AssignmentsBoard
+              items={linkedAssignments}
+            />
+            </div>
+
+
+
+
+
+
             {/* Tasks */}
-            <section ref={tasksRef} className="scroll-mt-[80px]">
-              <h2 className="text-lg font-semibold mb-3">Classroom Tasks</h2>
+            <section  className="scroll-mt-[80px]">
+              <h2 className="text-lg font-semibold mb-3">Api from google classroom </h2>
 
 
               {/* Status moved here */}
