@@ -125,7 +125,6 @@ function buildAssignments(courses, subsByCourse) {
         state: s.state || "NEW",
         due,
         daysLeft: left,
-        // You can keep more raw if you want to show later:
         raw: s,
       });
     }
@@ -357,83 +356,132 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
 
 /* -----------------Assignments Board----------------- */
 function AssignmentsBoard({ items }) {
+  const groups = useMemo(() => {
+    const m = new Map();
+    for (const a of items || []) {
+      const key = a._link?.linked ? String(a._link.day ?? "unplaced") : "unplaced";
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push(a);
+    }
+    // sort inside each group by due date (soonest first)
+    for (const [k, arr] of m) {
+      arr.sort((x, y) => {
+        if (x.due && y.due) return x.due - y.due;
+        if (x.due && !y.due) return -1;
+        if (!x.due && y.due) return 1;
+        return 0;
+      });
+    }
+    return m;
+  }, [items]);
+
+  const orderKeys = ["0","1","2","3","4","5","6","unplaced"].filter(k => groups.has(k));
+
+  if (orderKeys.length === 0) {
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Tasks</h3>
+        </div>
+        <div className="text-sm opacity-70">No tasks to show.</div>
+      </section>
+    );
+  }
+
   return (
-    <section className="space-y-3">
+    <section className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold">Tasks</h3>
       </div>
 
-      <div className="space-y-4">
-        {items.length === 0 ? (
-          <div className="text-sm opacity-70">No tasks to show.</div>
-        ) : (
-          items.map((a) => {
-            const n = a.daysLeft;
-            const leftText = n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
+      {orderKeys.map((key) => {
+        const list = groups.get(key) || [];
+        const isUnplaced = key === "unplaced";
+        const dayIdx = isUnplaced ? null : Number(key);
+        const dayName = isUnplaced ? "Unplaced" : DAYS[dayIdx];
+        const headerChip = isUnplaced ? "bg-neutral-800" : colorForDay(dayIdx);
 
-            const linked  = a._link?.linked;
-            const dayBg   = a._link?.color || "bg-neutral-900"; // black until linked
-            const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
+        return (
+          <div key={key} className="space-y-3">
+            {/* Section header */}
+            <div className="flex items-center gap-2">
+              <span className={`inline-block h-3 w-3 rounded ${headerChip}`} />
+              <h4 className="font-semibold">{dayName}</h4>
+              <span className="text-xs opacity-60">({list.length})</span>
+            </div>
 
-            return (
-              <div
-                key={a.id}
-                className={`grid grid-cols-[10rem,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
-              >
-                {/* Left label (turns day color only when linked) */}
-                <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
-                  <div className="text-center text-xl">{leftText}</div>
-                </div>
+            {/* Cards */}
+            <div className="space-y-4">
+              {list.map((a) => {
+                const n = a.daysLeft;
+                const leftText =
+                  n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
 
-                {/* Right content */}
-                <div className="p-4 min-w-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm opacity-80 truncate">
-                      <span className="tracking-wider">{a.courseName}</span>
-                      {linked && a._link?.eventTitle ? (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                          {a._link.eventTitle}
-                        </span>
-                      ) : null}
+                const linked  = a._link?.linked;
+                const dayBg   = linked ? (a._link?.color || "bg-neutral-900") : "bg-neutral-900";
+                const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
+
+                return (
+                  <div
+                    key={a.id}
+                    className={`grid grid-cols-[10rem,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
+                  >
+                    {/* Left label (day color only when linked) */}
+                    <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
+                      <div className="text-center text-xl">{leftText}</div>
+                    </div>
+
+                    {/* Right content */}
+                    <div className="p-4 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm opacity-80 truncate">
+                          <span className="tracking-wider">{a.courseName}</span>
+                          {linked && a._link?.eventTitle ? (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                              {a._link.eventTitle}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* HW line only when linked */}
+                      {linked ? (
+                        <div className="mt-1 text-sm">
+                          <span className="opacity-80 mr-2">HW:</span>
+                          <span className="font-semibold">{a.title}</span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-sm opacity-50 italic">Not placed on timetable</div>
+                      )}
+
+                      <div className="mt-3 flex items-center gap-3">
+                        {a.altLink && (
+                          <a
+                            href={a.altLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                            title="Open in Classroom"
+                          >
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                            Classroom
+                          </a>
+                        )}
+                        <div className="ml-auto flex items-center gap-2">
+                          <span className="text-xs opacity-75">Status:</span>
+                          <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
+                            OPEN
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* HW line only when linked */}
-                  {linked ? (
-                    <div className="mt-1 text-sm">
-                      <span className="opacity-80 mr-2">HW:</span>
-                      <span className="font-semibold">{a.title}</span>
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-sm opacity-50 italic">Not placed on timetable</div>
-                  )}
-
-                  <div className="mt-3 flex items-center gap-3">
-                    {a.altLink && (
-                      <a
-                        href={a.altLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
-                        title="Open in Classroom"
-                      >
-                        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
-                        Classroom
-                      </a>
-                    )}
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-xs opacity-75">Status:</span>
-                      <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
-                        OPEN
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }
