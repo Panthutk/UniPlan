@@ -49,7 +49,21 @@ TEMPLATES = [{
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
 DATABASES = {
-    'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.getenv("DB_NAME", BASE_DIR / "db.sqlite3"),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", ""),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": (
+                "SET sql_mode="
+                "'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'"
+            ),
+        } if os.getenv("DB_ENGINE") == "django.db.backends.mysql" else {},
+    }
 }
 
 LANGUAGE_CODE = 'en-us'
