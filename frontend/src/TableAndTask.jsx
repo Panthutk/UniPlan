@@ -359,7 +359,7 @@ function AssignmentsBoard({ items }) {
   const groups = useMemo(() => {
     const m = new Map();
     for (const a of items || []) {
-      const key = a._link?.linked ? String(a._link.day ?? "unplaced") : "unplaced";
+      const key = a._link?.linked ? String(a._link.day ?? "Unassigned") : "Unassigned";
       if (!m.has(key)) m.set(key, []);
       m.get(key).push(a);
     }
@@ -375,7 +375,7 @@ function AssignmentsBoard({ items }) {
     return m;
   }, [items]);
 
-  const orderKeys = ["0","1","2","3","4","5","6","unplaced"].filter(k => groups.has(k));
+  const orderKeys = ["0","1","2","3","4","5","6","Unassigned"].filter(k => groups.has(k));
 
   if (orderKeys.length === 0) {
     return (
@@ -396,10 +396,10 @@ function AssignmentsBoard({ items }) {
 
       {orderKeys.map((key) => {
         const list = groups.get(key) || [];
-        const isUnplaced = key === "unplaced";
-        const dayIdx = isUnplaced ? null : Number(key);
-        const dayName = isUnplaced ? "Unplaced" : DAYS[dayIdx];
-        const headerChip = isUnplaced ? "bg-neutral-800" : colorForDay(dayIdx);
+        const isUnassigned = key === "Unassigned";
+        const dayIdx = isUnassigned ? null : Number(key);
+        const dayName = isUnassigned ? "Unassigned" : DAYS[dayIdx];
+        const headerChip = isUnassigned ? "bg-neutral-800" : colorForDay(dayIdx);
 
         return (
           <div key={key} className="space-y-3">
@@ -451,7 +451,7 @@ function AssignmentsBoard({ items }) {
                           <span className="font-semibold">{a.title}</span>
                         </div>
                       ) : (
-                        <div className="mt-1 text-sm opacity-50 italic">Not placed on timetable</div>
+                        <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
                       )}
 
                       <div className="mt-3 flex items-center gap-3">
