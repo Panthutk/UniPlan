@@ -12,7 +12,7 @@ function norm(s) {
 // returns { linked, day, color, eventTitle }
 function linkOneAssignmentToEvents(assignment, events) {
   const aCourse = norm(assignment.courseName);
-  const aTitle  = norm(assignment.title);
+  const aTitle = norm(assignment.title);
 
   // Best effort: match on courseName or assignment title being in event title (or vice versa)
   for (const ev of events || []) {
@@ -167,6 +167,18 @@ function fmtDate(s) {
   const d = new Date(s);
   return isNaN(d) ? "—" : d.toLocaleString();
 }
+function fmtDueDateObj(d) {
+  if (!d || isNaN(+d)) return "—";
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 
 /* ----------------- time/day ----------------- */
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -375,7 +387,7 @@ function AssignmentsBoard({ items }) {
     return m;
   }, [items]);
 
-  const orderKeys = ["0","1","2","3","4","5","6","Unassigned"].filter(k => groups.has(k));
+  const orderKeys = ["0", "1", "2", "3", "4", "5", "6", "Unassigned"].filter(k => groups.has(k));
 
   if (orderKeys.length === 0) {
     return (
@@ -417,8 +429,8 @@ function AssignmentsBoard({ items }) {
                 const leftText =
                   n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
 
-                const linked  = a._link?.linked;
-                const dayBg   = linked ? (a._link?.color || "bg-neutral-900") : "bg-neutral-900";
+                const linked = a._link?.linked;
+                const dayBg = linked ? (a._link?.color || "bg-neutral-900") : "bg-neutral-900";
                 const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
 
                 return (
@@ -444,7 +456,7 @@ function AssignmentsBoard({ items }) {
                         </div>
                       </div>
 
-                      {/* HW line only when linked */}
+                      {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
                       {linked ? (
                         <div className="mt-1 text-sm">
                           <span className="opacity-80 mr-2">HW:</span>
@@ -453,6 +465,15 @@ function AssignmentsBoard({ items }) {
                       ) : (
                         <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
                       )}
+
+                      {/* Due date & time (show when available) */}
+                      {a.due && (
+                        <div className="mt-1 text-xs opacity-80">
+                          <span className="font-semibold">Due:</span>{" "}
+                          {fmtDueDateObj(a.due)}
+                        </div>
+                      )}
+
 
                       <div className="mt-3 flex items-center gap-3">
                         {a.altLink && (
@@ -755,7 +776,7 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-// Link assignments to timetable events (so board knows which ones are placed)
+  // Link assignments to timetable events (so board knows which ones are placed)
   const linkedAssignments = useMemo(
     () => annotateAssignmentsWithEvents(liveAssignments, events),
     [liveAssignments, events]
@@ -922,11 +943,11 @@ export default function ClassroomTimetableDashboard() {
             </div>
 
 
-          
+
             <div ref={tasksRef} className="scroll-mt-[80px]">
-            <AssignmentsBoard
-              items={linkedAssignments}
-            />
+              <AssignmentsBoard
+                items={linkedAssignments}
+              />
             </div>
 
 
@@ -935,7 +956,7 @@ export default function ClassroomTimetableDashboard() {
 
 
             {/* Tasks */}
-            <section  className="scroll-mt-[80px]">
+            <section className="scroll-mt-[80px]">
               <h2 className="text-lg font-semibold mb-3">Api from google classroom </h2>
 
 
