@@ -48,6 +48,12 @@ class Subject(models.Model):
 
     def __str__(self): return f"{self.code or ''} {self.name}".strip()
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "code"], name="uq_subject_user_code")
+        ]
+        ordering = ["name"]
+
 class TimetableEntry(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="timetable_entries")
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="timetable_entries")
@@ -85,6 +91,9 @@ class Task(models.Model):
             models.Index(fields=["user", "due_at"]),
             models.Index(fields=["subject", "due_at"], name="idx_tasks_subject_due"),
         ]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "source", "external_id"], name="uq_task_user_source_extid")
+        ]
 
 class Reminder(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="reminders")
@@ -98,3 +107,45 @@ class Reminder(models.Model):
         indexes = [
             models.Index(fields=["notify_at", "status"]),
         ]
+
+class OAuthAccount(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="oauth_accounts")
+    provider = models.CharField(max_length=40)                      # e.g., "google"
+    provider_user_id = models.CharField(max_length=120)
+    refresh_token = models.TextField(blank=True)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "provider_user_id"],
+                name="uq_oauth_provider_user"
+            )
+        ]
+        indexes = [models.Index(fields=["user", "provider"])]
+
+    def __str__(self):
+        return f"{self.provider}:{self.provider_user_id}"
+
+class ClassroomCourse(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="classroom_courses")
+    google_course_id = models.CharField(max_length=120, unique=True)
+    name = models.CharField(max_length=240)
+    section = models.CharField(max_length=120, blank=True)
+    subject = models.ForeignKey("Subject", null=True, blank=True, on_delete=models.SET_NULL, related_name="classroom_courses")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.name
+
+class ClassroomAssignment(models.Model):
+    classroom_course = models.ForeignKey(ClassroomCourse, on_delete=models.CASCADE, related_name="assignments")
+    google_assignment_id = models.CharField(max_length=120, unique=True)
+    title = models.CharField(max_length=240)
+    description = models.TextField(blank=True)
+    due_at = models.DateTimeField(null=True, blank=True)
+    task = models.ForeignKey("Task", null=True, blank=True, on_delete=models.SET_NULL, related_name="classroom_assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.title
