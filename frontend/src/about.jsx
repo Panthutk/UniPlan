@@ -4,186 +4,172 @@ import Pic1 from "./assets/pic1.png";
 import Pic2 from "./assets/pic2.png";
 import Pic3 from "./assets/pic3.jpg";
 import Pic4 from "./assets/pic4.png";
-
+import company_logo from "./assets/TawanRapfa_logo2.svg";
+import {CustomeNavbar} from "./assets/NavBar";
 
 
 export default function About() {
-  const members = [
-    { id: 1, src: Pic1, name: "Pannawit Mahacharoensiri", email: "pannawit.m@ku.th" },
-    { id: 2, src: Pic2, name: "Jongchana Khachatrokphai", email: "jongchana.kh@ku.th" },
-    { id: 3, src: Pic3, name: "Panthut Ketphan", email: "panthut.k@ku.th" },
-    { id: 4, src: Pic4, name: "Sorasit Kateratorn", email: "sorasit.ka@ku.th" },
-  ];
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(0);
+  const tabs = ["Member no.1", "Member no.2", "Member no.3", "Member no.4"];
+  const members_info = [
+    { src: Pic1, first_name: "Pannawit", last_name:"Mahacharoensiri" ,email: "pannawit.m@ku.th", github_name: "PannawitMahacharoensiri", github:"https://github.com/PannawitMahacharoensiri" },
+    { src: Pic2, first_name: "Jongchana", last_name:"Khachatrokphai" ,email: "jongchana.kh@ku.th", github_name: "StewedDuck", github:"https://github.com/StewedDuck" },
+    { src: Pic3, first_name: "Panthut", last_name:"Ketphan" , email: "panthut.k@ku.th", github_name: "Panthutk", github:"https://github.com/Panthutk" },
+    { src: Pic4, first_name: "Sorasit", last_name:"Kateratorn" ,email: "sorasit.ka@ku.th", github_name: "Sorasit-Kateratorn", github:"https://github.com/Sorasit-Kateratorn" },
+  ];
 
   return (
-    // Background color
-    <div className="min-h-screen bg-zinc-900 text-zinc-100">
-      {/*Navbar copy from Login.jsx*/}
-      <header className="fixed top-0 inset-x-0 z-50 bg-zinc-900/70 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link to="/tableandtask" className="font-black tracking-wide text-3xl sm:text-4xl">LOGO</Link>
-              <nav className="flex items-center gap-3">
-                <NavLink
-                  to="/"
-                  className={({ isActive }) =>
-                    `rounded-md border border-white/15 px-3 py-1.5 text-sm ${isActive ? "bg-white/10 text-white" : "text-zinc-200 hover:bg-white/5"
-                    }`
-                  }
-                >
-                  Login
-                </NavLink>
-              </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Feature advertised block */}
-      <div className="flex justify-center w-full pt-16">
-        <div className="relative w-full min-h-[500px]">
-          {/* Shadow rectangle */}
-          <div 
-            className="absolute top-5 left-4 w-[calc(100%-1rem)] h-full rounded-3xl"
-            style={{ backgroundColor: "#3e6d4a" }}>
+    <div className=" min-h-screen min-w-screen bg-[#171717]">
+      <CustomeNavbar />
+      
+      {/* first section welcome message */}
+      <div className="w-auto h-auto">
+        {/* left side - first section  */}
+        <div className="mx-10 md:mx-auto w-auto md:h-[93vh] md:w-[93vw] flex flex-col md:flex-row ">
+          <div className="shrink-0 basis-3/5 mb-[12vh] md:mb-[20vh] ">
+            <div className="h-full mr-[10%]">
+              <span className="font-lexend text-white leading-snug text-[clamp(25px,4.5vw,45px)] xl:text-[clamp(20px,6.5vh,70px)] text-right flex justify-end py-[7%]">
+                Let’s Get to<br/> Know Our<br/> Developer at
+              </span>
+              <span className="font-lexend text-right flex text-[#69a064] font-medium text-[clamp(25px,4.5vw,45px)] xl:text-[clamp(25px,7.5vh,90px)] justify-end py-[2%]">
+                TarwanRapfa Co.
+              </span>
+              <span className="font-cousine flex justify-end text-right text-[#aeb0af] text-[clamp(12px,1.75vw,18px)] xl:text-[clamp(15px,3vh,20px)]">
+                *This cooperation only refers to the group name<br/>It is not real and does not actually exist 
+              </span>
             </div>
-            {/* Main card */}
-            <div
-              className="relative w-full h-full rounded-3xl flex flex-col items-center p-8"
-              style={{ backgroundColor: "#578f67" }}>
-                <p className="font-black tracking-wide sm:text-9xl text-white pt-[90px] z-10">
-                  UNIPLAN 
-                </p>
-                
-                <div className="mt-8 flex flex-col sm:flex-row items-center gap-6">
-                  <p className="font-bold text-xl">
-                    <span className="text-5xl text-[#fde68a]">INTER</span>
-                    <span className="text-5xl text-[#f472b6]">ACTIVE</span><br/>
-                    <span className="text-5xl text-[#34d399]">TIMETABLE</span>
-                    <span className="text-5xl text-[#fbbf24]"> & TASK</span>
-                  </p>
+          </div>
 
-                  <span className="bg-gradient-to-r from-[#fbdf24] to-[#60c3fa] font-bold text-9xl mx-4 
-                  bg-clip-text text-transparent transition delay-150 duration-300 ease-in-out hover:scale-150">+</span>
-                  
-                  <p className="font-bold text-xl">
-                    <span className="text-5xl text-[#60a5fa]">CLASS</span>
-                    <span className="text-5xl text-[#a78bfa]">ROOM</span><br/>
-                    <span className="text-5xl text-[#f87171]">SYNCHRONIZE</span>
-                  </p>
+          {/* right side - first section  */}
+          <div className="relative shrink-0 basis-2/5 flex items-center justify-center overflow-hidden">
+            {/* 4 vertical lines (behind the logo) */}
+            <div className="absolute inset-0 flex items-start justify-between">
+              <div className="w-[23%] rounded-sm h-full bg-[#5d936d] " />
+              <div className="w-[23%] rounded-sm h-full bg-[#518a61] "/>
+              <div className="w-[23%] rounded-sm h-full bg-[#41754f] " />
+              <div className="w-[23%] rounded-sm h-full bg-[#3b704a]" />
+              
+            </div>
+              <div className="absolute inset-0 z-10 flex items-start justify-between">
+                <div className="relative w-[23%] h-full">
+                  <div className="absolute top-0 left-0 w-full h-[3%] bg-[#171717] animate-slideDown" />
                 </div>
+                <div className="relative w-[23%] h-full">
+                  <div className="absolute top-0 left-0 w-full h-[2.6%] bg-[#171717] animate-slideDown" style={{ animationDelay: "8s" }} />
+                </div>
+                <div className="relative w-[23%] h-full">
+                  <div className="absolute top-0 left-0 w-full h-[2.3%] bg-[#171717] animate-slideDown" style={{ animationDelay: "2s" }}/>
+                </div>
+                <div className="relative w-[23%] h-full">
+                  <div className="absolute top-0 left-0 w-full h-[3%] bg-[#171717] animate-slideDown" style={{ animationDelay: "3.5s" }}/>
+                </div>
+              </div>
 
-            </div>
+            {/* Logo on top */}
+            <img
+              src={company_logo}
+              alt="TawanRapfa"
+              className="animate-zoomIn relative z-10 w-[clamp(50px,50vw,480px)] h-auto"
+            />
           </div>
         </div>
-
-      {/* First text box : What we do */}
-      <div className="mt-16 w-full px-3 sm:px-8">
-        <header className="bg-transparent p-5">
-          <h1 className="text-[#3e6d4a] text-5xl font-bold tracking-wide">
-            WHAT  WE  DO
-          </h1>
-        </header>
-        <p className="text-white my-10 text-xl w-full px-[100px] leading-normal">
-          We developed an "Integrated platform" that combines <br/>
-          task management with class timetables,<br />
-          designed to help users stay organized with ease.
-        </p>
-        <ul className=" list-disc list-inside mb-[130px] text-base w-full px-[100px] text-[#578f67] ">
-          <li className="leading-loose">Users will have the ability to add, remove, and modify classes directly within the timetable.</li>
-          <li className="leading-loose">Homework assignments can be created directly from a class block on the timetable.</li>
-          <li className="leading-loose">Users will receive email notifications via Gmail regarding upcoming task due dates.</li>
-          <li className="leading-loose">Classroom subjects and assignments will be automatically synced and available for selection on the website.</li>
-        </ul>
       </div>
 
-      {/* Second text box : Why we do*/}
-      <div className="w-full px-3 sm:px-8 min-h-[700px]" style={{ backgroundColor: "#212121" }}>
-          {/*Header*/}
-          <header className="bg-transparent p-5 text-center">
-            <h1 className="text-[#3e6d4a] mt-9 text-5xl font-bold tracking-wide">
-              WHY WE DO
-            </h1>
-          </header>
+      <div className="bg-transparent h-[12vh] md:h-[15vh] w-auto"/>
 
-          {/*Seperate each reason to be 3 reasons*/}
-            <div className="flex flex-col md:flex-row justify-center md:items-stretch items-center gap-20 mt-10 min-h-[400px]">
-              <ReasonCard info_text="Losing track of assignments because of due dates negatively impacts students’ performance and overall academic success, leading to more and more problems."/>
-              <ReasonCard info_text="Many students struggle to manage multiple timetables and assignment deadlines, which can lead to stress, panicky,disorganization, and overlooked tasks."/>
-              <ReasonCard info_text="There are currently no applications that integrate Google Classroom with timetables and task management, which is why we decided to develop one ourselves."/>
-            </div>
+
+      {/* second section : real info */}
+      <div className="flex w-auto ml-10 md:ml-16 mr-[5%] md:mr-[1.65%] flex-col md:flex-row">
+        {/* Left side of second section - Tabs */}
+        <div className=" rounded-2xl max-w-[700px] w-auto md:w-[30%] bg-[#212121] h-[clamp(100px,80vw,430px)] flex flex-col px-[8%] md:sticky md:top-[8%] md:px-[2%] py-[8%] md:py-[2%] my-[3%] gap-3 md:my-0">
+            <span className="text-center font-lexend text-[#aeb0af] mb-[1vh] text-[clamp(19px,1.7vw,27px)]">
+              OUR DEVELOPERS
+            </span> 
+            {tabs.map((tab, index) => (
+              <button key={index} onClick={() => setActiveTab(index)} className={`p-3  text-[clamp(19px,4vh,40px)] text-center font-cousine transition text-[#aeaeae] rounded-2xl
+                  ${activeTab === index ? "bg-[#395d44] text-[#ffffff]" : "hover:bg-[#5e5757] scale-75"}`}>
+                {tab}
+              </button>
+            ))}
+        </div>
+
+        {/* Right side of second section - Content */}
+        <div key={activeTab} className="flex flex-col flex-1 md:ml-[1.75%]">
+          <div className="h-auto rounded-sm text-xl px-[5.4%] bg-[#518b61] flex flex-row font-bold mb-[3vh]">
+            <span className="flex flex-col font-lexend py-[8%] md:py-[5%] text-[clamp(20px,2.5vw,45px)] xl:text-[clamp(20px,2.7vw,65px)] flex-1 min-w-0">
+              <p className="animate-slideInLeft sm:pb-[3%] md:pb-[8%] whitespace-normal break-words">
+                {members_info[activeTab].first_name}
+              </p> 
+              <p className="animate-slideIn_Leftdelay whitespace-normal break-words">
+                {members_info[activeTab].last_name}
+              </p> 
+            </span>
+
+            <img
+              src={members_info[activeTab].src}
+              alt="profile"
+              className=" animate-zoomIn ml-auto rounded-sm relative z-10 w-[18vw] max-w-[200px] h-auto object-contain"
+            />
+
+            
+          </div>
+
+          <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+            <span className="text-gray-300 flex flex-wrap tracking-widest">Email:</span>
+            <span className="animate-slideInLeft text-white flex flex-wrap">{members_info[activeTab].email}</span>
+          </div>
+
+          <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+            <span className=" text-gray-300 flex flex-wrap tracking-widest">GitHub:</span>
+            {members_info[activeTab] && (
+              <a href={members_info[activeTab].github} className="animate-slideInLeft text-[#364e3d] hover:underline" target="_blank" rel="noopener noreferrer">
+                {members_info[activeTab].github_name}
+              </a>
+            )}
+          </div>
+
+          <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+            <span className="text-gray-300 flex flex-wrap tracking-widest">University:</span>
+            <a href="https://www.ku.ac.th/en/community-home" className="animate-slideIn_Leftdelay text-[#364e3d] hover:underline">
+              Kasetsart University - Bangkhen campus
+            </a>
+          </div>
+
+          <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+            <span className="text-gray-300 flex flex-wrap tracking-widest">Faculty:</span>
+            <a href="https://cpe.ku.ac.th/index.php/ske/" className="animate-slideIn_Leftdelay text-[#364e3d] hover:underline">
+              Software and Knowledge Engineering
+            </a>
+          </div>
+
+
+        </div>
       </div>
-
       
-      {/* Third text box: Who are we */}
-      <div className="mt-8 w-full px-3 sm:px-8 min-h-[650px]">
-        <header className="bg-transparent p-5 flex justify-end">
-          <h1 className="text-[#3e6d4a] text-5xl font-bold tracking-wide">
-            WHO WE ARE
-          </h1>
-        </header>
-
-        {/* Flex container for left-right */}
-        <MemberInfo members={members} />
-
-      </div>
+      <div className="bg-transparent h-[12vh] w-auto"/>
       
-      <div className="w-full flex justify-center p-12">
-        <Link to="/" className="hover:scale-105 text-[#578f67] hover:text-[#709c7c] text-3xl px-6 py-3 rounded-lg transition">
-          &lt;LOGIN PAGE
-        </Link>
+        {/* Third section - back to login  */}
+        <div className=" md:mx-[6vw] flex flex-col md:flex-row">
+          <div className="flex tracking-widest flex-col px-[10vw] md:px-[2vw] py-[7vh] text-center md:py-[20vh] flex justify-center font-back items-center text-white font-lexend md:basis-[70%] md:h-[50vh] text-[clamp(19px,8vw,35px)]"> 
+            <p>Are you ready to start your 
+              <span class="ml-[2vw] tracking-widest md:ml-[2vw] bg-gradient-to-r from-[#6b9e7b] to-yellow-400 bg-clip-text text-transparent ">
+                Planning?
+              </span>
+            </p>
+          </div>
+
+
+          <div className="md:w-[30%] flex items-center justify-center py-[10vh]">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>`font-cousine rounded-md border border-white/15 bg-[#3a5e45] py-[3vh] px-[6vw] text-[clamp(8px,8vw,20px)] ${isActive ? "text-white " : " text-zinc-200 hover:bg-[#2bb75a] hover:text-white hover:scale-125 transition-transform duration-300 "}`}>
+              Login
+            </NavLink>
+          </div>
       </div>
 
     </div>
   );
 }
 
-function ReasonCard({info_text}) {
-  return (
-    <div className="p-6 flex rounded-2xl shadow-md transform items-center text-center justify-center transition-transform 
-    duration-300 bg-[#40704e] hover:scale-125 hover:bg-[#24452d] w-72 break-words" >
-      <h2 className="text-xl mb-2 leading-loose">{info_text}</h2>
-    </div>
-  )
-}
-
-function MemberInfo({ members }) {
-  const [active, setActive] = useState(members[3]?.id || null); // default first
-
-  return (
-    <div className=" pl-[100px] flex flex-col md:flex-row mt-8 gap-6 w-full min-h-[500px]">
-      {/* Left: stacked pictures */}
-      <div className="md:w-2/3 relative h-[500px] flex items-start justify-start">
-        {members.map((m, index) => (
-          <img
-            key={m.id}
-            src={m.src}
-            alt={m.name}
-            onClick={() => setActive(m.id)}
-            className={`absolute rounded-lg object-cover cursor-pointer transition-all duration-500
-              ${active === m.id ? "w-[40%] h-[90%]" : "w-[30%] h-[70%] contrast-50"}
-            `}
-            style={{
-              left: `${index * 150}px`,
-              top: `${index * 15}px`,
-              zIndex: active === m.id ? 50 : index,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Right: member info */}
-      <div className="md:w-1/3 flex flex-col">
-        <h2 className="px-6 text-3xl font-semibold text-[#578f67]">Name:</h2>
-        <p className="px-10 mt-6 mb-4 text-xl bg-transparent">
-          {members.find((m) => m.id === active)?.name}
-        </p>
-
-        <h2 className="px-6 text-3xl font-semibold text-[#578f67]">Email:</h2>
-        <p className="px-10 mt-6 mb-4 text-xl bg-transparent">
-          {members.find((m) => m.id === active)?.email}
-        </p>
-      </div>
-    </div>
-  );
-}

@@ -9,12 +9,39 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ["Manrope", "sans-serif"], // 👈 add Manrope
+				lexend: ["Lexend Zetta", "sans-serif"],
+				cousine: ["Cousine", "monospace"],
 			},
 			borderRadius: {
 				lg: "var(--radius)",
 				md: "calc(var(--radius) - 2px)",
 				sm: "calc(var(--radius) - 4px)",
 			},
+			keyframes: {
+				slideDown: {
+					'0%': { transform: 'translateY(-100%)' },
+					'100%': { transform: 'translateY(100vh)' },
+					},
+				slideInLeft: {
+					'0%': { transform: 'translateX(-50px)', opacity: '0' },
+					'100%': { transform: 'translateX(0)', opacity: '1' },
+					},
+				slideOutRight: {
+					'0%': { transform: 'translateX(0)', opacity: '1' },
+					'100%': { transform: 'translateX(50px)', opacity: '0' },
+					},
+				zoomIn: {
+					'0%': { transform: 'scale(0.9)', opacity: '0' },
+					'100%': { transform: 'scale(1)', opacity: '1' },
+					},
+				},
+			animation: {
+				slideDown: 'slideDown 15s linear infinite', 
+				slideInLeft: 'slideInLeft 0.5s ease-in-out forwards',
+        		slideOutRight: 'slideOutRight 0.5s ease-in-out forwards',
+				slideIn_Leftdelay: 'slideInLeft 0.7s ease-in-out forwards',
+        		zoomIn: 'zoomIn 0.5s ease-in-out forwards',
+				},
 			colors: {
 				background: "hsl(var(--background))",
 				foreground: "hsl(var(--foreground))",
