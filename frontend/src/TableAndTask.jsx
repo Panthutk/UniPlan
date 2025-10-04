@@ -203,6 +203,12 @@ function colorForDay(day) {
 }
 
 
+/* ----------------- ellipsis ------------------- */
+function trun8(s) {
+  if (!s) return "";
+  return s.length > 8 ? s.slice(0,8) + "...": s;
+}
+
 
 /* ----------------- UI: Timetable (clickable & shows events) ------------------- */
 const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
@@ -274,7 +280,9 @@ const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEvent
             }}
             title={`${e.title} — ${e.start}:00–${e.end}:00`}
           >
-            {e.title}
+            <div className="truncate whitespace-nowrap overflow-hidden">
+              {trun8(e.title)}
+            </div>
             <div className="text-[10px] opacity-80">
               {e.start}:00–{e.end}:00
             </div>
@@ -376,7 +384,7 @@ function AssignmentsBoard({ items }) {
       m.get(key).push(a);
     }
     // sort inside each group by due date (soonest first)
-    for (const [k, arr] of m) {
+    for (const [, arr] of m) {
       arr.sort((x, y) => {
         if (x.due && y.due) return x.due - y.due;
         if (x.due && !y.due) return -1;
