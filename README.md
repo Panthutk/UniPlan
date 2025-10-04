@@ -29,7 +29,7 @@ UniPlan aims to provide an **all-in-one application** that integrates both class
 
 - **Frontend**: React + Vite + Tailwind CSS + Shadcn/ui + MaterialUI
 - **Backend**: Django REST Framework (DRF)  
-- **Database**:
+- **Database**: SQL
 - **Project Management**: Jira  
 
 ## ⚙️ Installation & Running
