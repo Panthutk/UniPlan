@@ -20,6 +20,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly",
+    "https://www.googleapis.com/auth/classroom.coursework.me",
 ]
 
 def _client_config():
@@ -139,21 +140,55 @@ def list_courses(request):
 @require_GET
 def list_active_submissions(request, course_id: str):
     """
-    Return *my* active (pending) submissions for a given course.
+    Return *my* active (pending) submissions for a given course,
+    augmented with coursework title/due/link.
     Active states: NEW, CREATED, RECLAIMED_BY_STUDENT
     """
     auth, err = _require_auth(request)
-    if err: return err
+    if err:
+        return err
     _, creds = auth
 
     classroom = build("classroom", "v1", credentials=creds)
+
+    # fetch my active submissions
     data = classroom.courses().courseWork().studentSubmissions().list(
         courseId=course_id,
-        courseWorkId="-",  # across all coursework in the course
+        courseWorkId="-",  # all coursework in the course
         pageSize=100,
         states=["NEW", "CREATED", "RECLAIMED_BY_STUDENT"],
     ).execute()
-    return JsonResponse(data)
+
+    subs = data.get("studentSubmissions", [])
+    if not subs:
+        return JsonResponse({"studentSubmissions": []})
+
+    # fetch coursework objects once per ID (so we can attach title/due/link)
+    cw_ids = sorted({s.get("courseWorkId") for s in subs if s.get("courseWorkId")})
+    cw_map = {}
+    for cw_id in cw_ids:
+        try:
+            cw_map[cw_id] = classroom.courses().courseWork().get(
+                courseId=course_id, id=cw_id
+            ).execute()
+        except Exception:
+            pass  # ignore if missing
+
+    # merge coursework info into each submission
+    for s in subs:
+        cw = cw_map.get(s.get("courseWorkId"))
+        if not cw:
+            continue
+        if cw.get("title"):
+            s["title"] = cw["title"]
+        if cw.get("alternateLink"):
+            s["alternateLink"] = cw["alternateLink"]
+        if cw.get("dueDate"):
+            s["dueDate"] = cw["dueDate"]       # {year, month, day}
+        if cw.get("dueTime"):
+            s["dueTime"] = cw["dueTime"]       # {hours, minutes}
+
+    return JsonResponse({"studentSubmissions": subs})
 
 @require_GET
 def summary(request):
