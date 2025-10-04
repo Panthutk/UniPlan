@@ -12,6 +12,9 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
+from rest_framework import viewsets, permissions
+from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
+from .serializers import SubjectSerializer, TimetableEntrySerializer, TaskSerializer, ReminderSerializer, ClassroomCourseSerializer, ClassroomAssignmentSerializer, OAuthAccountSerializer
 
 # ---- Scopes----
 SCOPES = [
@@ -169,3 +172,43 @@ def summary(request):
         "courseCount": len(courses),
         "courses": [{"id": c.get("id"), "name": c.get("name"), "section": c.get("section")} for c in courses],
     })
+
+class SubjectViewSet(viewsets.ModelViewSet):
+    queryset = Subject.objects.all()
+    serializer_class = SubjectSerializer
+
+class TimetableEntryViewSet(viewsets.ModelViewSet):
+    queryset = TimetableEntry.objects.all()
+    serializer_class = TimetableEntrySerializer
+
+class TaskViewSet(viewsets.ModelViewSet):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+
+class ReminderViewSet(viewsets.ModelViewSet):
+    queryset = Reminder.objects.all()
+    serializer_class = ReminderSerializer
+
+class ClassroomCourseViewSet(viewsets.ModelViewSet):
+    queryset = ClassroomCourse.objects.all()
+    serializer_class = ClassroomCourseSerializer
+
+class ClassroomAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = ClassroomAssignment.objects.all()
+    serializer_class = ClassroomAssignmentSerializer
+
+class IsOwner(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return obj.user_id == request.user.id
+
+class OAuthAccountViewSet(viewsets.ModelViewSet):
+    queryset = OAuthAccount.objects.all() 
+    serializer_class = OAuthAccountSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
+
+    def get_queryset(self):
+        # only their own accounts
+        return OAuthAccount.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
