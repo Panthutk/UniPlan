@@ -3,6 +3,91 @@ import { useNavigate, Link } from "react-router-dom";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
+const API = BASE_URL;
+
+async function get(path) {
+  const r = await fetch(`${API}${path}`, { credentials: "include" });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    throw new Error(`GET ${path} failed (${r.status}): ${txt}`);
+  }
+  return r.json();
+}
+async function post(path, body) {
+  const r = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    throw new Error(`POST ${path} failed (${r.status}): ${txt}`);
+  }
+  return r.json();
+}
+async function patch(path, body) {
+  const r = await fetch(`${API}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`PATCH ${path} failed (${r.status})`);
+  return r.json();
+}
+async function del(path) {
+  const r = await fetch(`${API}${path}`, { method: "DELETE", credentials: "include" });
+  if (!r.ok && r.status !== 204) throw new Error(`DELETE ${path} failed (${r.status})`);
+}
+
+async function listSubjects(userId) {
+  return get(`/api/subjects/?user=${userId}`);
+}
+async function listTimetable() {
+  return get(`/api/timetable/?ordering=day_of_week,start_time`);
+}
+
+async function createSubject(row) {
+  // row: { user, name }
+  const subjectsNow = await listSubjects(row.user);
+  const code = uniqueCodeFromName(row.name, subjectsNow);
+  // send only required fields to avoid serializer issues
+  return post(`/api/subjects/`, { user: row.user, name: row.name, code });
+}
+async function createTimetableEntry(row) {
+  return post(`/api/timetable/`, row);
+}
+async function updateTimetableEntry(id, partial) {
+  return patch(`/api/timetable/${id}/`, partial);
+}
+async function deleteTimetableEntry(id) {
+  return del(`/api/timetable/${id}/`);
+}
+
+const HH = (n) => String(n).padStart(2, "0");
+const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
+
+const slugify = (s) =>
+  s.toLowerCase().trim()
+   .replace(/[^a-z0-9]+/g, "-")
+   .replace(/^-+|-+$/g, "")
+   .slice(0, 30);
+
+function uniqueCodeFromName(name, existingSubjects) {
+  const base = slugify(name) || "untitled";
+  let code = base;
+  let i = 1;
+  const taken = new Set(
+    (existingSubjects || []).map(s => (s.code || "").toLowerCase())
+  );
+  while (taken.has(code.toLowerCase())) {
+    i += 1;
+    code = `${base}-${i}`;
+  }
+  return code;
+}
+
 
 // --- Linking assignments to timetable events ---
 function norm(s) {
@@ -672,9 +757,45 @@ export default function ClassroomTimetableDashboard() {
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
   const [showRaw, setShowRaw] = useState(false);
+  // DB-backed subjects and user id (temp)
+  const uid = user?.id || 1; // TEMP: your user id until real auth is wired
+  const [subjects, setSubjects] = useState([]);
 
+  
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+  (async () => {
+    try {
+      // 1) load subjects and timetable rows from your DRF API
+      const [subj, tte] = await Promise.all([
+        listSubjects(uid),
+        listTimetable(), // no ?user=; server can filter by request.user
+      ]);
+      setSubjects(subj);
+
+      // 2) map DB rows → your UI events
+      const byId = Object.fromEntries(subj.map(s => [s.id, s]));
+      const evs = tte.map(t => ({
+        id: t.id,                           // numeric DB id
+        subjectId: t.subject,
+        title: byId[t.subject]?.name || "Untitled",
+        day: t.day_of_week,                 // 0..6
+        start: hourOnly(t.start_time),      // "09:00:00" -> 9
+        end: hourOnly(t.end_time),
+        desc: t.room || "",
+        color: colorForDay(t.day_of_week),
+      }));
+
+      console.log("Loaded from DB:", { subjects: subj.length, timetable: tte.length });
+      setEvents(evs);
+    } catch (e) {
+      console.error(e); // will include server message if GET fails
+    }
+  })();
+}, [uid]);
+
 
   // Refs + active-menu logic (center-closest)
   const timetableRef = useRef(null);
@@ -699,37 +820,106 @@ export default function ClassroomTimetableDashboard() {
     setModalOpen(true);
   };
 
-  const handleSaveEvent = (payload) => {
-    if (payload.id) {
-      // update existing
-      setEvents(prev =>
-        prev.map(e =>
-          e.id === payload.id ? { ...e, ...payload, color: colorForDay(payload.day) } : e
-        )
-      );
-    } else {
-      // create new
-      setEvents(prev => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          color: colorForDay(payload.day),
-          ...payload,
-        },
-      ]);
+  const handleSaveEvent = async (payload) => {
+    try {
+      const desiredName = (payload.title || "Untitled").trim();
+
+      // 1) find-or-create Subject by name (case-insensitive)
+      let subject = subjects.find(s => s.name.toLowerCase() === desiredName.toLowerCase());
+      if (!subject) {
+        subject = await createSubject({ user: uid, name: desiredName });
+        setSubjects(prev => [...prev, subject]);
+      }
+
+      // 2) normalize time
+      const s = Math.min(payload.start, payload.end);
+      const e = Math.max(payload.start, payload.end);
+      const startHH = String(s).padStart(2,"0");
+      const endHH   = String(e).padStart(2,"0");
+
+      if (payload.id && typeof payload.id === "number") {
+        // UPDATE existing timetable entry
+        const updated = await updateTimetableEntry(payload.id, {
+          subject: subject.id,
+          day_of_week: payload.day,
+          start_time: `${startHH}:00:00`,
+          end_time:   `${endHH}:00:00`,
+          room: payload.desc || "",
+        });
+
+        setEvents(prev => prev.map(ev =>
+          ev.id === payload.id
+            ? {
+                ...ev,
+                subjectId: subject.id,
+                title: subject.name,
+                day: updated.day_of_week,
+                start: s,
+                end: e,
+                desc: updated.room,
+                color: colorForDay(updated.day_of_week),
+              }
+            : ev
+        ));
+      } else {
+        // CREATE new timetable entry
+        const created = await createTimetableEntry({
+          user: uid,
+          subject: subject.id,
+          day_of_week: payload.day,
+          start_time: `${startHH}:00:00`,
+          end_time:   `${endHH}:00:00`,
+          room: payload.desc || "",
+        });
+
+        setEvents(prev => [
+          ...prev,
+          {
+            id: created.id,
+            subjectId: subject.id,
+            title: subject.name,
+            day: created.day_of_week,
+            start: s,
+            end: e,
+            desc: created.room,
+            color: colorForDay(created.day_of_week),
+          },
+        ]);
+      }
+
+      setModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(`Save failed: ${err.message || err}`);
     }
-    setModalOpen(false);
   };
 
 
-  const handleDeleteEvent = (id) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
-    setModalOpen(false);
+
+  const handleDeleteEvent = async (id) => {
+    try {
+      if (typeof id === "number") {
+        await deleteTimetableEntry(id);
+      }
+      setEvents(prev => prev.filter(e => e.id !== id));
+      setModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(`Delete failed: ${err.message || err}`);
+    }
   };
 
-  const handleClearEvents = () => {
-    setEvents([]);
-    setModalOpen(false);
+
+  const handleClearEvents = async () => {
+    try {
+      const ids = events.filter(e => typeof e.id === "number").map(e => e.id);
+      await Promise.allSettled(ids.map(id => deleteTimetableEntry(id)));
+      setEvents([]);
+      setModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(`Clear failed: ${err.message || err}`);
+    }
   };
 
 
