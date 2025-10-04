@@ -41,11 +41,11 @@ async function del(path) {
   if (!r.ok && r.status !== 204) throw new Error(`DELETE ${path} failed (${r.status})`);
 }
 
+async function listTimetable(userId) {
+  return get(`/api/timetable/?user=${userId}&ordering=day_of_week,start_time`);
+}
 async function listSubjects(userId) {
   return get(`/api/subjects/?user=${userId}`);
-}
-async function listTimetable() {
-  return get(`/api/timetable/?ordering=day_of_week,start_time`);
 }
 
 async function createSubject(row) {
@@ -67,6 +67,11 @@ async function deleteTimetableEntry(id) {
 
 const HH = (n) => String(n).padStart(2, "0");
 const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
+
+// UI uses 0=Mon..6=Sun, backend uses 0=Sun..6=Sat
+const uiToDbDay = (ui) => (ui + 1) % 7;  // Mon(0)->1 ... Sun(6)->0
+const dbToUiDay = (db) => (db + 6) % 7;  // Sun(0)->6 ... Mon(1)->0
+
 
 const slugify = (s) =>
   s.toLowerCase().trim()
@@ -771,21 +776,21 @@ export default function ClassroomTimetableDashboard() {
       // 1) load subjects and timetable rows from your DRF API
       const [subj, tte] = await Promise.all([
         listSubjects(uid),
-        listTimetable(), // no ?user=; server can filter by request.user
+        listTimetable(uid), // dev/no-auth: must include ?user=
       ]);
       setSubjects(subj);
 
       // 2) map DB rows → your UI events
       const byId = Object.fromEntries(subj.map(s => [s.id, s]));
       const evs = tte.map(t => ({
-        id: t.id,                           // numeric DB id
+        id: t.id,
         subjectId: t.subject,
         title: byId[t.subject]?.name || "Untitled",
-        day: t.day_of_week,                 // 0..6
-        start: hourOnly(t.start_time),      // "09:00:00" -> 9
+        day: dbToUiDay(t.day_of_week),                 // <-- was t.day_of_week
+        start: hourOnly(t.start_time),
         end: hourOnly(t.end_time),
         desc: t.room || "",
-        color: colorForDay(t.day_of_week),
+        color: colorForDay(dbToUiDay(t.day_of_week)),   // keep colors consistent with UI day
       }));
 
       console.log("Loaded from DB:", { subjects: subj.length, timetable: tte.length });
@@ -841,7 +846,7 @@ export default function ClassroomTimetableDashboard() {
         // UPDATE existing timetable entry
         const updated = await updateTimetableEntry(payload.id, {
           subject: subject.id,
-          day_of_week: payload.day,
+          day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
           start_time: `${startHH}:00:00`,
           end_time:   `${endHH}:00:00`,
           room: payload.desc || "",
@@ -853,11 +858,11 @@ export default function ClassroomTimetableDashboard() {
                 ...ev,
                 subjectId: subject.id,
                 title: subject.name,
-                day: updated.day_of_week,
+                day: dbToUiDay(updated.day_of_week),                 // map DB -> UI
                 start: s,
                 end: e,
                 desc: updated.room,
-                color: colorForDay(updated.day_of_week),
+                color: colorForDay(dbToUiDay(updated.day_of_week)),  // color for UI day
               }
             : ev
         ));
@@ -866,7 +871,7 @@ export default function ClassroomTimetableDashboard() {
         const created = await createTimetableEntry({
           user: uid,
           subject: subject.id,
-          day_of_week: payload.day,
+          day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
           start_time: `${startHH}:00:00`,
           end_time:   `${endHH}:00:00`,
           room: payload.desc || "",
@@ -878,11 +883,11 @@ export default function ClassroomTimetableDashboard() {
             id: created.id,
             subjectId: subject.id,
             title: subject.name,
-            day: created.day_of_week,
+            day: dbToUiDay(created.day_of_week),              // map DB -> UI
             start: s,
             end: e,
             desc: created.room,
-            color: colorForDay(created.day_of_week),
+            color: colorForDay(dbToUiDay(created.day_of_week)) // color for UI day
           },
         ]);
       }

@@ -211,10 +211,24 @@ def summary(request):
 class SubjectViewSet(viewsets.ModelViewSet):
     queryset = Subject.objects.all()
     serializer_class = SubjectSerializer
+    permission_classes = [permissions.AllowAny]   # dev
+    def get_queryset(self):
+        qs = super().get_queryset()
+        uid = self.request.query_params.get("user")
+        return qs.filter(user_id=uid) if uid else qs.none()
 
 class TimetableEntryViewSet(viewsets.ModelViewSet):
-    queryset = TimetableEntry.objects.all()
+    queryset = TimetableEntry.objects.all().order_by("day_of_week", "start_time")
     serializer_class = TimetableEntrySerializer
+    permission_classes = [permissions.AllowAny]  # dev
+
+    def get_queryset(self):
+        qs = super().get_queryset().order_by("day_of_week", "start_time")
+        # Only apply ?user= filter for LIST; let detail routes see the object by pk
+        if getattr(self, "action", None) == "list":
+            uid = self.request.query_params.get("user")
+            return qs.filter(user_id=uid) if uid else qs.none()
+        return qs
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
