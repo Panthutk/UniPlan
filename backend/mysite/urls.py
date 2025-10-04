@@ -16,8 +16,18 @@ Including another URLconf
 """
 # backend/mysite/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from rest_framework import routers
 from core import views
+
+router = routers.DefaultRouter()
+router.register(r"subjects", views.SubjectViewSet)
+router.register(r"timetable", views.TimetableEntryViewSet)
+router.register(r"tasks", views.TaskViewSet)
+router.register(r"reminders", views.ReminderViewSet)
+router.register(r"classroom-courses", views.ClassroomCourseViewSet)
+router.register(r"classroom-assignments", views.ClassroomAssignmentViewSet)
+router.register(r"oauth-accounts", views.OAuthAccountViewSet)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -33,4 +43,7 @@ urlpatterns = [
 
     # Ping
     path("api/hello/", views.hello),
+
+    # CRUD API
+    path("api/", include(router.urls)),
 ]
