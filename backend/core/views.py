@@ -12,6 +12,11 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
+from rest_framework import viewsets, permissions
+from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
+from .serializers import SubjectSerializer, TimetableEntrySerializer, TaskSerializer, ReminderSerializer, ClassroomCourseSerializer, ClassroomAssignmentSerializer, OAuthAccountSerializer
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 
 # ---- Scopes----
 SCOPES = [
@@ -204,3 +209,83 @@ def summary(request):
         "courseCount": len(courses),
         "courses": [{"id": c.get("id"), "name": c.get("name"), "section": c.get("section")} for c in courses],
     })
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])  # it will return id: null if not logged in
+def echo_auth(request):
+    return Response({
+        "auth_meta": request.META.get("HTTP_AUTHORIZATION"),
+        "auth_header": request.headers.get("Authorization"),  # DRF’s header helper
+        "is_authenticated": bool(getattr(request.user, "is_authenticated", False)),
+        "user": getattr(request.user, "username", None),
+    })
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def whoami(request):
+    u = request.user
+    if not u.is_authenticated:
+        return Response({"id": None})
+    return Response({"id": u.id, "email": u.email, "username": u.username})
+
+class SubjectViewSet(viewsets.ModelViewSet):
+    queryset = Subject.objects.none()
+    serializer_class = SubjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # only the caller's subjects
+        return Subject.objects.filter(user=self.request.user).order_by("name")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+        
+class TimetableEntryViewSet(viewsets.ModelViewSet):
+    queryset = TimetableEntry.objects.none()
+    serializer_class = TimetableEntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return TimetableEntry.objects.filter(user=self.request.user).order_by("day_of_week", "start_time")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TaskViewSet(viewsets.ModelViewSet):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+
+class ReminderViewSet(viewsets.ModelViewSet):
+    queryset = Reminder.objects.all()
+    serializer_class = ReminderSerializer
+
+class ClassroomCourseViewSet(viewsets.ModelViewSet):
+    queryset = ClassroomCourse.objects.all()
+    serializer_class = ClassroomCourseSerializer
+
+class ClassroomAssignmentViewSet(viewsets.ModelViewSet):
+    queryset = ClassroomAssignment.objects.all()
+    serializer_class = ClassroomAssignmentSerializer
+
+class IsOwner(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return obj.user_id == request.user.id
+
+class OAuthAccountViewSet(viewsets.ModelViewSet):
+    queryset = OAuthAccount.objects.all() 
+    serializer_class = OAuthAccountSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
+
+    def get_queryset(self):
+        # only their own accounts
+        return OAuthAccount.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
