@@ -5,56 +5,69 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const API = BASE_URL;
 
+const authHeader = () => {
+  const t = localStorage.getItem("jwt");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
 async function get(path) {
-  const r = await fetch(`${API}${path}`, { credentials: "include" });
-  if (!r.ok) {
-    const txt = await r.text().catch(() => "");
-    throw new Error(`GET ${path} failed (${r.status}): ${txt}`);
-  }
+  const r = await fetch(`${API}${path}`, {
+    credentials: "include",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok) throw new Error(`GET ${path} failed (${r.status}): ${await r.text().catch(()=> "")}`);
   return r.json();
 }
+
 async function post(path, body) {
   const r = await fetch(`${API}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const txt = await r.text().catch(() => "");
-    throw new Error(`POST ${path} failed (${r.status}): ${txt}`);
-  }
+  if (!r.ok) throw new Error(`POST ${path} failed (${r.status}): ${await r.text().catch(()=> "")}`);
   return r.json();
 }
+
 async function patch(path, body) {
   const r = await fetch(`${API}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`PATCH ${path} failed (${r.status})`);
   return r.json();
 }
+
 async function del(path) {
-  const r = await fetch(`${API}${path}`, { method: "DELETE", credentials: "include" });
+  const r = await fetch(`${API}${path}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { ...authHeader() },
+  });
   if (!r.ok && r.status !== 204) throw new Error(`DELETE ${path} failed (${r.status})`);
 }
 
-async function listTimetable(userId) {
-  return get(`/api/timetable/?user=${userId}&ordering=day_of_week,start_time`);
+async function listTimetable() {
+  return get(`/api/timetable/?ordering=day_of_week,start_time`);
 }
-async function listSubjects(userId) {
-  return get(`/api/subjects/?user=${userId}`);
+async function listSubjects() {
+  return get(`/api/subjects/`);
 }
 
-async function createSubject(row) {
-  // row: { user, name }
-  const subjectsNow = await listSubjects(row.user);
-  const code = uniqueCodeFromName(row.name, subjectsNow);
-  // send only required fields to avoid serializer issues
-  return post(`/api/subjects/`, { user: row.user, name: row.name, code });
+async function whoami() {
+  // returns { id, username, email, ... } when logged in, or {} if anonymous
+  return get(`/api/whoami/`);
 }
+
+async function createSubject(name) {
+  const subjectsNow = await listSubjects();
+  const code = uniqueCodeFromName(name, subjectsNow);
+  return post(`/api/subjects/`, { name, code }); // server sets user
+}
+
 async function createTimetableEntry(row) {
   return post(`/api/timetable/`, row);
 }
@@ -763,7 +776,8 @@ export default function ClassroomTimetableDashboard() {
   const [subsByCourse, setSubsByCourse] = useState({});
   const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
-  const uid = user?.id || 1; // TEMP: your user id until real auth is wired
+  const [me, setMe] = useState(null);
+  const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
 
   
@@ -771,35 +785,46 @@ export default function ClassroomTimetableDashboard() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-  (async () => {
-    try {
-      // 1) load subjects and timetable rows from your DRF API
-      const [subj, tte] = await Promise.all([
-        listSubjects(uid),
-        listTimetable(uid), // dev/no-auth: must include ?user=
-      ]);
-      setSubjects(subj);
+    (async () => {
+      try {
+        const data = await whoami();        // { id, ... } when logged in
+        if (data && data.id) setMe(data);
+      } catch (e) {
+        console.error("whoami failed:", e);
+      } finally {
+        setMeLoading(false);
+      }
+    })();
+  }, []);
 
-      // 2) map DB rows → your UI events
-      const byId = Object.fromEntries(subj.map(s => [s.id, s]));
-      const evs = tte.map(t => ({
-        id: t.id,
-        subjectId: t.subject,
-        title: byId[t.subject]?.name || "Untitled",
-        day: dbToUiDay(t.day_of_week),                 // <-- was t.day_of_week
-        start: hourOnly(t.start_time),
-        end: hourOnly(t.end_time),
-        desc: t.room || "",
-        color: colorForDay(dbToUiDay(t.day_of_week)),   // keep colors consistent with UI day
-      }));
 
-      console.log("Loaded from DB:", { subjects: subj.length, timetable: tte.length });
-      setEvents(evs);
-    } catch (e) {
-      console.error(e); // will include server message if GET fails
-    }
-  })();
-}, [uid]);
+  useEffect(() => {
+    if (!me || !me.id || meLoading) return;   // wait until we know who the user is
+    (async () => {
+      try {
+        const [subj, tte] = await Promise.all([
+          listSubjects(me.id),
+          listTimetable(me.id),
+        ]);
+        setSubjects(subj);
+
+        const byId = Object.fromEntries(subj.map(s => [s.id, s]));
+        const evs = tte.map(t => ({
+          id: t.id,
+          subjectId: t.subject,
+          title: byId[t.subject]?.name || "Untitled",
+          day: dbToUiDay(t.day_of_week),
+          start: hourOnly(t.start_time),
+          end: hourOnly(t.end_time),
+          desc: t.room || "",
+          color: colorForDay(dbToUiDay(t.day_of_week)),
+        }));
+        setEvents(evs);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [me?.id, meLoading]);
 
 
   // Refs + active-menu logic (center-closest)
@@ -832,7 +857,7 @@ export default function ClassroomTimetableDashboard() {
       // 1) find-or-create Subject by name (case-insensitive)
       let subject = subjects.find(s => s.name.toLowerCase() === desiredName.toLowerCase());
       if (!subject) {
-        subject = await createSubject({ user: uid, name: desiredName });
+        subject = await createSubject(desiredName);
         setSubjects(prev => [...prev, subject]);
       }
 
@@ -869,9 +894,8 @@ export default function ClassroomTimetableDashboard() {
       } else {
         // CREATE new timetable entry
         const created = await createTimetableEntry({
-          user: uid,
           subject: subject.id,
-          day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
+          day_of_week: uiToDbDay(payload.day),
           start_time: `${startHH}:00:00`,
           end_time:   `${endHH}:00:00`,
           room: payload.desc || "",

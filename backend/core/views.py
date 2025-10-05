@@ -15,6 +15,8 @@ from .models import GoogleAccount
 from rest_framework import viewsets, permissions
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
 from .serializers import SubjectSerializer, TimetableEntrySerializer, TaskSerializer, ReminderSerializer, ClassroomCourseSerializer, ClassroomAssignmentSerializer, OAuthAccountSerializer
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 
 # ---- Scopes----
 SCOPES = [
@@ -208,27 +210,53 @@ def summary(request):
         "courses": [{"id": c.get("id"), "name": c.get("name"), "section": c.get("section")} for c in courses],
     })
 
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])  # it will return id: null if not logged in
+def echo_auth(request):
+    return Response({
+        "auth_meta": request.META.get("HTTP_AUTHORIZATION"),
+        "auth_header": request.headers.get("Authorization"),  # DRF’s header helper
+        "is_authenticated": bool(getattr(request.user, "is_authenticated", False)),
+        "user": getattr(request.user, "username", None),
+    })
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def whoami(request):
+    u = request.user
+    if not u.is_authenticated:
+        return Response({"id": None})
+    return Response({"id": u.id, "email": u.email, "username": u.username})
+
 class SubjectViewSet(viewsets.ModelViewSet):
-    queryset = Subject.objects.all()
+    queryset = Subject.objects.none()
     serializer_class = SubjectSerializer
-    permission_classes = [permissions.AllowAny]   # dev
-    def get_queryset(self):
-        qs = super().get_queryset()
-        uid = self.request.query_params.get("user")
-        return qs.filter(user_id=uid) if uid else qs.none()
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        # only the caller's subjects
+        return Subject.objects.filter(user=self.request.user).order_by("name")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+        
 class TimetableEntryViewSet(viewsets.ModelViewSet):
-    queryset = TimetableEntry.objects.all().order_by("day_of_week", "start_time")
+    queryset = TimetableEntry.objects.none()
     serializer_class = TimetableEntrySerializer
-    permission_classes = [permissions.AllowAny]  # dev
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = super().get_queryset().order_by("day_of_week", "start_time")
-        # Only apply ?user= filter for LIST; let detail routes see the object by pk
-        if getattr(self, "action", None) == "list":
-            uid = self.request.query_params.get("user")
-            return qs.filter(user_id=uid) if uid else qs.none()
-        return qs
+        return TimetableEntry.objects.filter(user=self.request.user).order_by("day_of_week", "start_time")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()

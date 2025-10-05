@@ -5,10 +5,12 @@ import re
 HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 class SubjectSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
+        user = serializers.PrimaryKeyRelatedField(read_only=True)  # <- explicit
         model = Subject
         fields = "__all__"
-        read_only_fields = ("created_at", "updated_at")
+        read_only_fields = ("id", "user", "created_at", "updated_at")
 
     def validate_color_hex(self, value):
         if value == "":
@@ -21,6 +23,7 @@ class TimetableEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableEntry
         fields = "__all__"
+        read_only_fields = ("user",)
 
     def validate(self, attrs):
         """
