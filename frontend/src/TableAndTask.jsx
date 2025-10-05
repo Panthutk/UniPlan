@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import Uniplan_logo from "./assets/Uniplan_logo.svg";
+import uniplanLogo from "./assets/uniplanLogo.svg";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -16,7 +16,7 @@ async function get(path) {
     credentials: "include",
     headers: { ...authHeader() },
   });
-  if (!r.ok) throw new Error(`GET ${path} failed (${r.status}): ${await r.text().catch(()=> "")}`);
+  if (!r.ok) throw new Error(`GET ${path} failed (${r.status}): ${await r.text().catch(() => "")}`);
   return r.json();
 }
 
@@ -27,7 +27,7 @@ async function post(path, body) {
     headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`POST ${path} failed (${r.status}): ${await r.text().catch(()=> "")}`);
+  if (!r.ok) throw new Error(`POST ${path} failed (${r.status}): ${await r.text().catch(() => "")}`);
   return r.json();
 }
 
@@ -89,9 +89,9 @@ const dbToUiDay = (db) => (db + 6) % 7;  // Sun(0)->6 ... Mon(1)->0
 
 const slugify = (s) =>
   s.toLowerCase().trim()
-   .replace(/[^a-z0-9]+/g, "-")
-   .replace(/^-+|-+$/g, "")
-   .slice(0, 30);
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
 
 function uniqueCodeFromName(name, existingSubjects) {
   const base = slugify(name) || "untitled";
@@ -310,7 +310,7 @@ function colorForDay(day) {
 /* ----------------- ellipsis ------------------- */
 function trun8(s) {
   if (!s) return "";
-  return s.length > 8 ? s.slice(0,8) + "...": s;
+  return s.length > 8 ? s.slice(0, 8) + "..." : s;
 }
 
 
@@ -781,7 +781,7 @@ export default function ClassroomTimetableDashboard() {
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
 
-  
+
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
 
@@ -865,8 +865,8 @@ export default function ClassroomTimetableDashboard() {
       // 2) normalize time
       const s = Math.min(payload.start, payload.end);
       const e = Math.max(payload.start, payload.end);
-      const startHH = String(s).padStart(2,"0");
-      const endHH   = String(e).padStart(2,"0");
+      const startHH = String(s).padStart(2, "0");
+      const endHH = String(e).padStart(2, "0");
 
       if (payload.id && typeof payload.id === "number") {
         // UPDATE existing timetable entry
@@ -874,22 +874,22 @@ export default function ClassroomTimetableDashboard() {
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
           start_time: `${startHH}:00:00`,
-          end_time:   `${endHH}:00:00`,
+          end_time: `${endHH}:00:00`,
           room: payload.desc || "",
         });
 
         setEvents(prev => prev.map(ev =>
           ev.id === payload.id
             ? {
-                ...ev,
-                subjectId: subject.id,
-                title: subject.name,
-                day: dbToUiDay(updated.day_of_week),                 // map DB -> UI
-                start: s,
-                end: e,
-                desc: updated.room,
-                color: colorForDay(dbToUiDay(updated.day_of_week)),  // color for UI day
-              }
+              ...ev,
+              subjectId: subject.id,
+              title: subject.name,
+              day: dbToUiDay(updated.day_of_week),                 // map DB -> UI
+              start: s,
+              end: e,
+              desc: updated.room,
+              color: colorForDay(dbToUiDay(updated.day_of_week)),  // color for UI day
+            }
             : ev
         ));
       } else {
@@ -898,7 +898,7 @@ export default function ClassroomTimetableDashboard() {
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),
           start_time: `${startHH}:00:00`,
-          end_time:   `${endHH}:00:00`,
+          end_time: `${endHH}:00:00`,
           room: payload.desc || "",
         });
 
@@ -1063,7 +1063,7 @@ export default function ClassroomTimetableDashboard() {
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
         <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
-          <img src={Uniplan_logo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto"/>
+          <img src={uniplanLogo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto" />
           <div className="ml-auto flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
