@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import Uniplan_logo from "./assets/Uniplan_logo.svg";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -843,8 +844,7 @@ export default function ClassroomTimetableDashboard() {
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
         <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
-          <div className="font-bold tracking-wide text-lg">LOGO</div>
-
+          <img src={Uniplan_logo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto"/>
           <div className="ml-auto flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
