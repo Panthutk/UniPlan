@@ -13,7 +13,8 @@ services:
     # ports:
     #   - "3306:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -29,7 +30,7 @@ services:
       DB_NAME: uniplan
       DB_USER: uniplan
       DB_PASSWORD: uniplan
-      DB_HOST: db        # IMPORTANT: service name, not localhost
+      DB_HOST: db # IMPORTANT: service name, not localhost
       DB_PORT: "3306"
 
       # Common Django envs – tweak as you like
