@@ -1,0 +1,10 @@
+# don't send these to the build context
+.git
+**/node_modules
+**/dist
+**/build
+**/.next
+**/.cache
+**/.DS_Store
+**/coverage
+**/*.log

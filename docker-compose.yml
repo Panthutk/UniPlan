@@ -1,0 +1,74 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: uniplan_db
+    environment:
+      MYSQL_DATABASE: uniplan
+      MYSQL_USER: uniplan
+      MYSQL_PASSWORD: uniplan
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - db_data:/var/lib/mysql
+    # expose to host ONLY if you need to connect with a local GUI client:
+    # ports:
+    #   - "3306:3306"
+    healthcheck:
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: uniplan_backend
+    environment:
+      # Django DB settings (your settings.py already reads these)
+      DB_NAME: uniplan
+      DB_USER: uniplan
+      DB_PASSWORD: uniplan
+      DB_HOST: db # IMPORTANT: service name, not localhost
+      DB_PORT: "3306"
+
+      # Common Django envs – tweak as you like
+      DJANGO_SECRET: "dev-only-please-change"
+      DEBUG: "1"
+      ALLOWED_HOSTS: "*"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    working_dir: /app
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: uniplan_frontend
+    environment:
+      # make the SPA talk to backend on your host
+      VITE_API_BASE_URL: "http://localhost:8000"
+    ports:
+      - "5173:5173"
+    # If you want hot-reload from your host files, uncomment the volume below.
+    # On Windows this is usually fine.
+    # volumes:
+    #   - ./frontend:/app
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:
