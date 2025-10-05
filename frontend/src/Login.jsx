@@ -5,7 +5,7 @@ import EventIcon from "@mui/icons-material/Event";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import SchoolIcon from "@mui/icons-material/School";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import Uniplan_logo from "./assets/Uniplan_logo.svg";
+import uniplanLogo from "./assets/uniplanLogo.svg";
 const auth = {
   get token() { return localStorage.getItem("jwt"); },
   set token(v) { v ? localStorage.setItem("jwt", v) : localStorage.removeItem("jwt"); },
@@ -57,10 +57,10 @@ export default function Login() {
       <header className="fixed top-0 inset-x-0 z-50 bg-zinc-900/70 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <img 
-            src={Uniplan_logo} 
-            alt="Uniplan Logo" 
-            className="h-[clamp(30px,6vh,70px)] w-auto"
+            <img
+              src={uniplanLogo}
+              alt="Uniplan Logo"
+              className="h-[clamp(30px,6vh,70px)] w-auto"
             />
 
             <nav className="flex items-center gap-3">
