@@ -542,7 +542,14 @@ function AssignmentsBoard({ items }) {
                   n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
 
                 const linked = a._link?.linked;
-                const dayBg = n != null && n <=2 ? "bg-red-500" : "bg-green-500";
+                const dayBg =
+                  n != null
+                    ? n < 3
+                      ? "bg-red-500"     // urgent (<3 days)
+                      : n < 7
+                        ? "bg-yellow-400"  // moderate (<7 days)
+                        : "bg-green-500"   // safe (>7 days)
+                    : "";
                 const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
 
                 return (
