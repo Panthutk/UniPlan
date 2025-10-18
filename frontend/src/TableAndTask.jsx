@@ -153,17 +153,6 @@ function annotateAssignmentsWithEvents(items, events) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 /* ----------------- Assignment helpers (no API changes) ----------------- */
 
 // Try to read a due date from various shapes the Classroom JSON might use.
@@ -555,7 +544,7 @@ function AssignmentsBoard({ items }) {
                 return (
                   <div
                     key={a.id}
-                    className={`grid grid-cols-[10rem,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
+                    className={`grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
                   >
                     {/* Left label (day color only when linked) */}
                     <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
@@ -788,9 +777,12 @@ export default function ClassroomTimetableDashboard() {
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
 
-
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
+
+
+  // desktop: push slide + collapse
+  const [sideOpen, setSideOpen] = useState(true);       // show/hide (push layout)
 
   useEffect(() => {
     (async () => {
@@ -1085,10 +1077,26 @@ export default function ClassroomTimetableDashboard() {
             <button
               className="border rounded-lg px-3 py-2"
               onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}
+              title="Logout"
             >
               Logout
             </button>
           </div>
+
+          <div className="hidden ml-2 md:flex items-center gap-2">
+            {!sideOpen && (
+              <button
+                onClick={() => setSideOpen(true)}
+                className="border rounded-lg px-3 py-2"
+                title="Show sidebar"
+              >
+                Show Menu
+              </button>
+            )}
+          </div>
+
+
+
         </div>
       </header>
 
@@ -1097,57 +1105,89 @@ export default function ClassroomTimetableDashboard() {
 
       {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
       <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 md:grid-cols-[minmax(320px,360px),minmax(0,1fr)] xl:grid-cols-[minmax(300px,340px),minmax(0,1fr)] 2xl:grid-cols-[minmax(320px,360px),minmax(0,1fr)] gap-y-6 md:gap-x-10 items-start min-w-0">
+        <div
+          className="
+              pb-10 grid grid-cols-1                /* mobile: single column */
+              md:[grid-template-columns:var(--sidebar)_minmax(0,1fr)]  /* desktop: push */
+              gap-y-6 md:gap-x-10 items-start min-w-0
+              transition-[grid-template-columns] duration-300
+            "
+          style={{ '--sidebar': sideOpen ? '352px' : '0px' }}
+        >
 
           {/* CENTER — sticky/tall menu card */}
-          <section
-            className="
-              bg-neutral-800 rounded-2xl p-4
-              flex flex-col
-              md:sticky md:top-[72px] md:z-40 self-start
-              min-h-[60vh] md:min-h-0
-              md:max-h-[calc(100vh-72px-16px)]
-              md:overflow-auto
-            "
+          {/* DESKTOP SIDEBAR ONLY */}
+          <aside
+            className={[
+              "hidden md:flex md:flex-col",
+              "bg-neutral-800 rounded-2xl",
+              sideOpen ? "w-[352px] p-4" : "w-0 p-0",
+              "md:sticky md:top-[72px] md:z-40 self-start",
+              "md:max-h-[calc(100vh-72px-16px)] md:overflow-auto",
+              "transition-[width,padding] duration-300",
+            ].join(" ")}
+            aria-label="Sidebar"
           >
             {/* user chip */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-4 w-4 rounded-full bg-emerald-500" />
-              <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
-                {user?.email || "student@gmail.com"}
+            {sideOpen && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-4 w-4 rounded-full bg-emerald-500" />
+                <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
+                  {user?.email || "student@gmail.com"}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* buttons */}
+            {sideOpen && (
+              <>
 
 
-            {/* Active buttons */}
-            <div className="space-y-3">
-              <button
-                onClick={() => timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                aria-current={activeMenu === "timetable" ? "page" : undefined}
-                className={[
-                  "w-full py-4 rounded-full font-semibold transition-colors",
-                  activeMenu === "timetable"
-                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                    : "bg-neutral-700 hover:bg-neutral-600",
-                ].join(" ")}
-              >
-                TimeTable
-              </button>
+                {/* Active buttons */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    aria-current={activeMenu === "timetable" ? "page" : undefined}
+                    className={[
+                      "w-full py-4 rounded-full font-semibold transition-colors",
+                      activeMenu === "timetable"
+                        ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                        : "bg-neutral-700 hover:bg-neutral-600",
+                    ].join(" ")}
+                    title="TimeTable"
+                  >
+                    TimeTable
+                  </button>
 
-              <button
-                onClick={() => tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                aria-current={activeMenu === "tasks" ? "page" : undefined}
-                className={[
-                  "w-full py-4 rounded-full font-semibold transition-colors",
-                  activeMenu === "tasks"
-                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                    : "bg-neutral-700 hover:bg-neutral-600",
-                ].join(" ")}
-              >
-                Tasks
-              </button>
-            </div>
-          </section>
+                  <button
+                    onClick={() => tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    aria-current={activeMenu === "tasks" ? "page" : undefined}
+                    className={[
+                      "w-full py-4 rounded-full font-semibold transition-colors",
+                      activeMenu === "tasks"
+                        ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                        : "bg-neutral-700 hover:bg-neutral-600",
+                    ].join(" ")}
+                    title="Tasks"
+                  >
+                    Tasks
+                  </button>
+                </div>
+
+                {/* footer: Hide button */}
+                <div className="mt-6">
+                  <button
+                    onClick={() => setSideOpen(false)}
+                    className="w-full rounded-lg bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-sm font-semibold"
+                    title="Hide sidebar"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
+
 
           {/* RIGHT — timetable + tasks */}
           <main className="space-y-6 min-w-0">
@@ -1156,13 +1196,16 @@ export default function ClassroomTimetableDashboard() {
               <button
                 onClick={handleClearEvents}
                 className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
+                title="Clear"
               >
                 Clear
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+                title="Import">
                 Import
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+                title="Export">
                 Export
               </button>
             </div>
