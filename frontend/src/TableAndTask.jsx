@@ -79,6 +79,27 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
+// Create a scheduled email reminder for an assignment
+async function createReminder({
+  assignmentId,
+  courseName,
+  title,
+  dueISO,
+  remindAtISO,
+  offsetDays,
+  link,
+}) {
+  return post(`/api/reminders/`, {
+    assignmentId,
+    courseName,
+    title,
+    dueISO,
+    remindAtISO,
+    offsetDays,
+    link,
+  });
+}
+
 const HH = (n) => String(n).padStart(2, "0");
 const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
 
@@ -480,6 +501,12 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
 
 /* -----------------Assignments Board----------------- */
 function AssignmentsBoard({ items }) {
+  // --- reminder UI state ---
+  const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
+  const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
+  const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+
+  // Group assignments by linked day
   const groups = useMemo(() => {
     const m = new Map();
     for (const a of items || []) {
@@ -500,6 +527,39 @@ function AssignmentsBoard({ items }) {
   }, [items]);
 
   const orderKeys = ["0", "1", "2", "3", "4", "5", "6", "Unassigned"].filter(k => groups.has(k));
+
+  // --- post a reminder to backend ---
+  const scheduleReminder = async (a) => {
+    if (!a?.due) { alert("No due date for this task."); return; }
+
+    const id = a.id;
+    const due = a.due instanceof Date ? a.due : new Date(a.due);
+    if (isNaN(+due)) { alert("Invalid due date."); return; }
+
+    const offset = Number(choice[id] ?? 3); // default 3 days
+    const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
+
+    try {
+      setPending(p => ({ ...p, [id]: true }));
+      await createReminder({
+        assignmentId: id,
+        courseName: a.courseName,
+        title: a.title,
+        dueISO: due.toISOString(),
+        remindAtISO: remindAt.toISOString(),
+        offsetDays: offset,
+        link: a.altLink || null,
+      });
+      setScheduled(s => ({ ...s, [id]: true }));
+      alert(`Reminder set: ${offset} day(s) before due date.`);
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to schedule reminder: ${e?.message || e}`);
+    } finally {
+      setPending(p => ({ ...p, [id]: false }));
+    }
+  };
+
 
   if (orderKeys.length === 0) {
     return (
@@ -600,6 +660,34 @@ function AssignmentsBoard({ items }) {
                             Classroom
                           </a>
                         )}
+
+                        {/* Reminder controls */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs opacity-75">Remind me:</label>
+                          <select
+                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+                            value={(choice[a.id] ?? 3)}
+                            onChange={(e) => setChoice(c => ({ ...c, [a.id]: Number(e.target.value) }))}
+                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
+                            title={a.due ? "Choose how many days before due date" : "No due date"}
+                          >
+                            <option value={1}>1 day before</option>
+                            <option value={3}>3 days before</option>
+                            <option value={7}>7 days before</option>
+                          </select>
+                          <button
+                            onClick={() => scheduleReminder(a)}
+                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
+                            className={[
+                              "text-xs px-3 py-1.5 rounded-full font-semibold",
+                              scheduled[a.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+                            ].join(" ")}
+                            title={!a.due ? "No due date" : (scheduled[a.id] ? "Already scheduled" : "Schedule email reminder")}
+                          >
+                            {scheduled[a.id] ? "Scheduled" : (pending[a.id] ? "Scheduling..." : "Remind")}
+                          </button>
+                        </div>
+
                         <div className="ml-auto flex items-center gap-2">
                           <span className="text-xs opacity-75">Status:</span>
                           <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
@@ -607,6 +695,7 @@ function AssignmentsBoard({ items }) {
                           </span>
                         </div>
                       </div>
+
                     </div>
                   </div>
                 );
@@ -1065,15 +1154,6 @@ export default function ClassroomTimetableDashboard() {
         <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
           <img src={uniplanLogo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto" />
           <div className="ml-auto flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm opacity-80">
-              <input
-                type="checkbox"
-                className="accent-current"
-                checked={showRaw}
-                onChange={(e) => setShowRaw(e.target.checked)}
-              />
-              Show raw JSON
-            </label>
             <Link to="/about" className="opacity-90 text-sm hover:underline">Contact</Link>
             <button
               className="border rounded-lg px-3 py-2"
@@ -1181,31 +1261,6 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-
-            {/* Tasks */}
-            <section className="scroll-mt-[80px]">
-              <h2 className="text-lg font-semibold mb-3">Api from google classroom </h2>
-
-
-              {/* Status moved here */}
-              {loading && (
-                <div className="text-sm opacity-70 mb-3">
-                  Loading active classes & active assignments…
-                </div>
-              )}
-              {err && (
-                <div className="text-sm text-rose-400 mb-3">
-                  Error: {err}
-                </div>
-              )}
-
-
-              <TasksSection
-                courses={courses}
-                subsByCourse={subsByCourse}
-                showRaw={showRaw}
-              />
-            </section>
           </main>
         </div>
       </div>
