@@ -14,9 +14,21 @@ from google.auth.transport.requests import Request
 from .models import GoogleAccount
 from rest_framework import viewsets, permissions
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
-from .serializers import SubjectSerializer, TimetableEntrySerializer, TaskSerializer, ReminderSerializer, ClassroomCourseSerializer, ClassroomAssignmentSerializer, OAuthAccountSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+
+from rest_framework import mixins
+from .serializers import (
+    SubjectSerializer,
+    TimetableEntrySerializer,
+    TaskSerializer,
+    ReminderSerializer,
+    ClassroomCourseSerializer,
+    ClassroomAssignmentSerializer,
+    OAuthAccountSerializer,
+    ReminderIntakeSerializer,  # <-- add this here
+)
+
 
 # ---- Scopes----
 SCOPES = [
@@ -259,12 +271,25 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()
+    queryset = Task.objects.none()            # <-- add this
     serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return Task.objects.filter(user=self.request.user).order_by("-created_at")
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 class ReminderViewSet(viewsets.ModelViewSet):
-    queryset = Reminder.objects.all()
+    queryset = Reminder.objects.none()        # <-- add this
     serializer_class = ReminderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return (Reminder.objects
+                .filter(task__user=self.request.user)
+                .select_related("task")
+                .order_by("-notify_at"))
+
+
 
 class ClassroomCourseViewSet(viewsets.ModelViewSet):
     queryset = ClassroomCourse.objects.all()
@@ -289,3 +314,18 @@ class OAuthAccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        
+        
+class ReminderIntakeViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    """
+    POST /api/reminders/intake/
+    Body: { assignmentId, courseName?, title, dueISO, remindAtISO, offsetDays?, link? }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ReminderIntakeSerializer
+    queryset = Reminder.objects.none()  # <-- instead of []
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx

@@ -3,13 +3,13 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
 from core import views   # keep only this import
+from core.views import ReminderIntakeViewSet
 
 router = routers.DefaultRouter()
 router.register(r"subjects", views.SubjectViewSet)
 router.register(r"timetable", views.TimetableEntryViewSet)
-router.register(r"tasks", views.TaskViewSet)
-router.register(r"reminders", views.ReminderViewSet)
-router.register(r"classroom-courses", views.ClassroomCourseViewSet)
+router.register(r"tasks", views.TaskViewSet, basename="task")
+router.register(r"reminders", views.ReminderViewSet, basename="reminder")
 router.register(r"classroom-assignments", views.ClassroomAssignmentViewSet)
 router.register(r"oauth-accounts", views.OAuthAccountViewSet)
 
@@ -29,6 +29,13 @@ urlpatterns = [
     path("api/hello/", views.hello),
     path("api/echo-auth/", views.echo_auth),  # <-- add this line
     path("api/whoami/", views.whoami),        # <-- and ensure this is here
+    
+    # create-only reminder intake (frontend posts here)
+    path(
+        "api/reminders/intake/",
+        ReminderIntakeViewSet.as_view({"post": "create"}),
+        name="reminders-intake",
+    ),
 
     # CRUD
     path("api/", include(router.urls)),

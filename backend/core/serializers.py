@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
 import re
 
@@ -91,3 +92,81 @@ class OAuthAccountSerializer(serializers.ModelSerializer):
         # never leak refresh tokens
         data["refresh_token"] = "********"
         return data
+    
+    
+
+# === Create-only serializer used by POST /api/reminders/ ===
+class ReminderIntakeSerializer(serializers.Serializer):
+    # matches the payload from the React UI
+    assignmentId = serializers.CharField(max_length=128)
+    courseName   = serializers.CharField(max_length=255, allow_blank=True, required=False)
+    title        = serializers.CharField(max_length=255)
+    link         = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    offsetDays   = serializers.IntegerField(default=3)
+    dueISO       = serializers.DateTimeField()
+    remindAtISO  = serializers.DateTimeField()
+
+    def create(self, validated):
+        """
+        - Upsert a Task for this classroom assignment (per user).
+        - Create a Reminder pointing to that Task with notify_at = remindAtISO.
+        """
+        user = self.context["request"].user
+
+        assignment_id = validated["assignmentId"]
+        title         = validated["title"]
+        course_name   = validated.get("courseName", "")
+        link          = validated.get("link")
+        due_at        = validated["dueISO"]
+        remind_at     = validated["remindAtISO"]
+
+        # 1) Find-or-create Task for this classroom item
+        task, created = Task.objects.get_or_create(
+            user=user,
+            source="classroom",               # consistent key for classroom tasks
+            external_id=assignment_id,        # prevents duplicates
+            defaults={
+                "title": title,
+                "description": (f"{course_name}\n{link}" if link else course_name).strip(),
+                "due_at": due_at,
+            },
+        )
+
+        # Keep Task fresh if details changed
+        dirty = False
+        if task.title != title:
+            task.title = title; dirty = True
+        if not task.due_at or task.due_at != due_at:
+            task.due_at = due_at; dirty = True
+
+        # Append course/link to description if not already present
+        desc = (task.description or "")
+        extra_bits = []
+        if course_name and course_name not in desc:
+            extra_bits.append(course_name)
+        if link and (link not in desc):
+            extra_bits.append(link)
+        if extra_bits:
+            task.description = (desc + ("\n" if desc else "") + "\n".join(extra_bits)).strip()
+            dirty = True
+
+        if dirty:
+            task.save(update_fields=["title", "due_at", "description"])
+
+        # 2) Create the reminder (email channel default from your model choices)
+        reminder = Reminder.objects.create(
+            task=task,
+            channel="email",
+            notify_at=remind_at,
+            status="pending",
+        )
+        return reminder
+
+    def to_representation(self, instance):
+        t = instance.task
+        return {
+            "id": instance.id,
+            "notify_at": instance.notify_at,
+            "status": instance.status,
+            "task": { "id": t.id, "title": t.title, "due_at": t.due_at },
+        }

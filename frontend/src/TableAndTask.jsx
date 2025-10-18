@@ -89,7 +89,7 @@ async function createReminder({
   offsetDays,
   link,
 }) {
-  return post(`/api/reminders/`, {
+  return post(`/api/reminders/intake/`, {
     assignmentId,
     courseName,
     title,
