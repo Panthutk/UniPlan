@@ -1074,7 +1074,7 @@ export default function ClassroomTimetableDashboard() {
               />
               Show raw JSON
             </label>
-            <Link to="/about" className="opacity-90 text-sm hover:underline">Contact</Link>
+            <Link to="/about" state={{ from: "/tableandtask" }} className="opacity-90 text-sm hover:underline">Contact</Link>
             <button
               className="border rounded-lg px-3 py-2"
               onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}
