@@ -153,17 +153,6 @@ function annotateAssignmentsWithEvents(items, events) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 /* ----------------- Assignment helpers (no API changes) ----------------- */
 
 // Try to read a due date from various shapes the Classroom JSON might use.
@@ -542,13 +531,20 @@ function AssignmentsBoard({ items }) {
                   n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
 
                 const linked = a._link?.linked;
-                const dayBg = linked ? (a._link?.color || "bg-neutral-900") : "bg-neutral-900";
+                const dayBg =
+                  n != null
+                    ? n < 3
+                      ? "bg-red-500"     // urgent (<3 days)
+                      : n < 7
+                        ? "bg-yellow-400"  // moderate (<7 days)
+                        : "bg-green-500"   // safe (>7 days)
+                    : "";
                 const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
 
                 return (
                   <div
                     key={a.id}
-                    className={`grid grid-cols-[10rem,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
+                    className={`grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
                   >
                     {/* Left label (day color only when linked) */}
                     <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
@@ -781,9 +777,12 @@ export default function ClassroomTimetableDashboard() {
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
 
-
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
+
+
+  // hamburger drawer
+  const [menuOpen, setMenuOpen] = useState(false); // false = hidden, true = visible
 
   useEffect(() => {
     (async () => {
@@ -1062,9 +1061,31 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
-          <img src={uniplanLogo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto" />
-          <div className="ml-auto flex items-center gap-6">
+        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center justify-between">
+
+          {/* LEFT: Logo on top, Menu under it */}
+          <div className="flex flex-col items-start gap-2">
+            <img
+              src={uniplanLogo}
+              alt="Uniplan Logo"
+              className="h-[clamp(20px,6vh,50px)] w-auto"
+            />
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
+              aria-expanded={menuOpen}
+              aria-controls="app-drawer"
+              title="Menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+              </svg>
+            </button>
+          </div>
+
+
+          <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
                 type="checkbox"
@@ -1090,32 +1111,63 @@ export default function ClassroomTimetableDashboard() {
 
       {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
       <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 md:grid-cols-[minmax(320px,360px),minmax(0,1fr)] xl:grid-cols-[minmax(300px,340px),minmax(0,1fr)] 2xl:grid-cols-[minmax(320px,360px),minmax(0,1fr)] gap-y-6 md:gap-x-10 items-start min-w-0">
+        <div className="pb-10 grid grid-cols-1 gap-y-6 items-start min-w-0">
+          <main className="space-y-6 min-w-0">
+            {/* actions / timetable / assignments / tasks*/}
 
-          {/* CENTER — sticky/tall menu card */}
-          <section
-            className="
-              bg-neutral-800 rounded-2xl p-4
-              flex flex-col
-              md:sticky md:top-[72px] md:z-40 self-start
-              min-h-[60vh] md:min-h-0
-              md:max-h-[calc(100vh-72px-16px)]
-              md:overflow-auto
-            "
+
+          </main>
+
+
+
+          {/* Drawer overlay */}
+          <div
+            className={`fixed inset-0 z-50 ${menuOpen ? 'visible bg-black/50' : 'invisible bg-black/0'} transition-colors`}
+            onClick={() => setMenuOpen(false)}
+          />
+
+          {/* Drawer panel */}
+          <aside
+            id="app-drawer"
+            className={[
+              "fixed inset-y-0 left-0 z-50 w-[352px] max-w-[85vw]",
+              "bg-neutral-800 text-white shadow-2xl",
+              "transform transition-transform duration-300",
+              menuOpen ? "translate-x-0" : "-translate-x-full",
+              "flex flex-col p-4"
+            ].join(" ")}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sidebar menu"
           >
-            {/* user chip */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-4 w-4 rounded-full bg-emerald-500" />
-              <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
-                {user?.email || "student@gmail.com"}
+            {/* Header inside drawer */}
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 truncate">
+                <div className="h-4 w-4 rounded-full bg-emerald-500" />
+                <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
+                  {user?.email || "student@gmail.com"}
+                </div>
               </div>
+
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center justify-center rounded-md border px-3 py-2"
+                aria-label="Close menu"
+              >
+                {/* X icon */}
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.6 10.6l6.29-6.3z" />
+                </svg>
+              </button>
             </div>
 
-
-            {/* Active buttons */}
-            <div className="space-y-3">
+            {/* Nav buttons*/}
+            <nav className="space-y-3">
               <button
-                onClick={() => timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={() => {
+                  timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setMenuOpen(false);
+                }}
                 aria-current={activeMenu === "timetable" ? "page" : undefined}
                 className={[
                   "w-full py-4 rounded-full font-semibold transition-colors",
@@ -1128,7 +1180,10 @@ export default function ClassroomTimetableDashboard() {
               </button>
 
               <button
-                onClick={() => tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={() => {
+                  tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setMenuOpen(false);
+                }}
                 aria-current={activeMenu === "tasks" ? "page" : undefined}
                 className={[
                   "w-full py-4 rounded-full font-semibold transition-colors",
@@ -1139,8 +1194,12 @@ export default function ClassroomTimetableDashboard() {
               >
                 Tasks
               </button>
-            </div>
-          </section>
+            </nav>
+
+          </aside>
+
+
+
 
           {/* RIGHT — timetable + tasks */}
           <main className="space-y-6 min-w-0">
@@ -1149,13 +1208,16 @@ export default function ClassroomTimetableDashboard() {
               <button
                 onClick={handleClearEvents}
                 className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
+                title="Clear"
               >
                 Clear
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+                title="Import">
                 Import
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+                title="Export">
                 Export
               </button>
             </div>
