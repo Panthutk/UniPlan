@@ -781,8 +781,8 @@ export default function ClassroomTimetableDashboard() {
   const [events, setEvents] = useState([]);
 
 
-  // desktop: push slide + collapse
-  const [sideOpen, setSideOpen] = useState(true);       // show/hide (push layout)
+  // hamburger drawer
+  const [menuOpen, setMenuOpen] = useState(false); // false = hidden, true = visible
 
   useEffect(() => {
     (async () => {
@@ -1061,9 +1061,31 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
-          <img src={uniplanLogo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto" />
-          <div className="ml-auto flex items-center gap-6">
+        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center justify-between">
+
+          {/* LEFT: Logo on top, Menu under it */}
+          <div className="flex flex-col items-start gap-2">
+            <img
+              src={uniplanLogo}
+              alt="Uniplan Logo"
+              className="h-[clamp(20px,6vh,50px)] w-auto"
+            />
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
+              aria-expanded={menuOpen}
+              aria-controls="app-drawer"
+              title="Menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+              </svg>
+            </button>
+          </div>
+
+
+          <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm opacity-80">
               <input
                 type="checkbox"
@@ -1077,26 +1099,10 @@ export default function ClassroomTimetableDashboard() {
             <button
               className="border rounded-lg px-3 py-2"
               onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}
-              title="Logout"
             >
               Logout
             </button>
           </div>
-
-          <div className="hidden ml-2 md:flex items-center gap-2">
-            {!sideOpen && (
-              <button
-                onClick={() => setSideOpen(true)}
-                className="border rounded-lg px-3 py-2"
-                title="Show sidebar"
-              >
-                Show Menu
-              </button>
-            )}
-          </div>
-
-
-
         </div>
       </header>
 
@@ -1105,88 +1111,94 @@ export default function ClassroomTimetableDashboard() {
 
       {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
       <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
-        <div
-          className="
-              pb-10 grid grid-cols-1                /* mobile: single column */
-              md:[grid-template-columns:var(--sidebar)_minmax(0,1fr)]  /* desktop: push */
-              gap-y-6 md:gap-x-10 items-start min-w-0
-              transition-[grid-template-columns] duration-300
-            "
-          style={{ '--sidebar': sideOpen ? '352px' : '0px' }}
-        >
+        <div className="pb-10 grid grid-cols-1 gap-y-6 items-start min-w-0">
+          <main className="space-y-6 min-w-0">
+            {/* actions / timetable / assignments / tasks*/}
 
-          {/* CENTER — sticky/tall menu card */}
-          {/* DESKTOP SIDEBAR ONLY */}
+
+          </main>
+
+
+
+          {/* Drawer overlay */}
+          <div
+            className={`fixed inset-0 z-50 ${menuOpen ? 'visible bg-black/50' : 'invisible bg-black/0'} transition-colors`}
+            onClick={() => setMenuOpen(false)}
+          />
+
+          {/* Drawer panel */}
           <aside
+            id="app-drawer"
             className={[
-              "hidden md:flex md:flex-col",
-              "bg-neutral-800 rounded-2xl",
-              sideOpen ? "w-[352px] p-4" : "w-0 p-0",
-              "md:sticky md:top-[72px] md:z-40 self-start",
-              "md:max-h-[calc(100vh-72px-16px)] md:overflow-auto",
-              "transition-[width,padding] duration-300",
+              "fixed inset-y-0 left-0 z-50 w-[352px] max-w-[85vw]",
+              "bg-neutral-800 text-white shadow-2xl",
+              "transform transition-transform duration-300",
+              menuOpen ? "translate-x-0" : "-translate-x-full",
+              "flex flex-col p-4"
             ].join(" ")}
-            aria-label="Sidebar"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sidebar menu"
           >
-            {/* user chip */}
-            {sideOpen && (
-              <div className="flex items-center gap-3 mb-4">
+            {/* Header inside drawer */}
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 truncate">
                 <div className="h-4 w-4 rounded-full bg-emerald-500" />
                 <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
                   {user?.email || "student@gmail.com"}
                 </div>
               </div>
-            )}
 
-            {/* buttons */}
-            {sideOpen && (
-              <>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center justify-center rounded-md border px-3 py-2"
+                aria-label="Close menu"
+              >
+                {/* X icon */}
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.6 10.6l6.29-6.3z" />
+                </svg>
+              </button>
+            </div>
 
+            {/* Nav buttons*/}
+            <nav className="space-y-3">
+              <button
+                onClick={() => {
+                  timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setMenuOpen(false);
+                }}
+                aria-current={activeMenu === "timetable" ? "page" : undefined}
+                className={[
+                  "w-full py-4 rounded-full font-semibold transition-colors",
+                  activeMenu === "timetable"
+                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                    : "bg-neutral-700 hover:bg-neutral-600",
+                ].join(" ")}
+              >
+                TimeTable
+              </button>
 
-                {/* Active buttons */}
-                <div className="space-y-3">
-                  <button
-                    onClick={() => timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    aria-current={activeMenu === "timetable" ? "page" : undefined}
-                    className={[
-                      "w-full py-4 rounded-full font-semibold transition-colors",
-                      activeMenu === "timetable"
-                        ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                        : "bg-neutral-700 hover:bg-neutral-600",
-                    ].join(" ")}
-                    title="TimeTable"
-                  >
-                    TimeTable
-                  </button>
+              <button
+                onClick={() => {
+                  tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setMenuOpen(false);
+                }}
+                aria-current={activeMenu === "tasks" ? "page" : undefined}
+                className={[
+                  "w-full py-4 rounded-full font-semibold transition-colors",
+                  activeMenu === "tasks"
+                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
+                    : "bg-neutral-700 hover:bg-neutral-600",
+                ].join(" ")}
+              >
+                Tasks
+              </button>
+            </nav>
 
-                  <button
-                    onClick={() => tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    aria-current={activeMenu === "tasks" ? "page" : undefined}
-                    className={[
-                      "w-full py-4 rounded-full font-semibold transition-colors",
-                      activeMenu === "tasks"
-                        ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                        : "bg-neutral-700 hover:bg-neutral-600",
-                    ].join(" ")}
-                    title="Tasks"
-                  >
-                    Tasks
-                  </button>
-                </div>
-
-                {/* footer: Hide button */}
-                <div className="mt-6">
-                  <button
-                    onClick={() => setSideOpen(false)}
-                    className="w-full rounded-lg bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-sm font-semibold"
-                    title="Hide sidebar"
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            )}
           </aside>
+
+
 
 
           {/* RIGHT — timetable + tasks */}
