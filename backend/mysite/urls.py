@@ -36,6 +36,8 @@ urlpatterns = [
         ReminderIntakeViewSet.as_view({"post": "create"}),
         name="reminders-intake",
     ),
+    path("api/test-email/", views.send_test_email),
+
 
     # CRUD
     path("api/", include(router.urls)),

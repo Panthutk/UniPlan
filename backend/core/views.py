@@ -16,7 +16,7 @@ from rest_framework import viewsets, permissions
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-
+from django.core.mail import send_mail
 from rest_framework import mixins
 from .serializers import (
     SubjectSerializer,
@@ -329,3 +329,25 @@ class ReminderIntakeViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
         return ctx
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def send_test_email(request):
+    """
+    Sends a test email to the currently logged-in user.
+    """
+    user = request.user
+    if not user.email:
+        return Response({"detail": "User has no email"}, status=400)
+
+    subject = "UniPlan Test Email"
+    message = f"Hello {user.username or user.email},\n\nThis is a test email from UniPlan!"
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+    return Response({"detail": f"Email sent to {user.email}!"})

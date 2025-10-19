@@ -79,6 +79,18 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
+async function sendTestEmail() {
+  const r = await fetch(`${API}/api/test-email/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.detail || `POST /api/test-email/ failed (${r.status})`);
+  return data;
+}
+
+
 // Create a scheduled email reminder for an assignment
 async function createReminder({
   assignmentId,
@@ -1232,13 +1244,33 @@ export default function ClassroomTimetableDashboard() {
               >
                 Clear
               </button>
+
               <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
                 Import
               </button>
+
               <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
                 Export
               </button>
+
+              {/* NEW: Send a test email */}
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await sendTestEmail(); // <- uses the helper you added earlier
+                    alert(res.detail || "Test email sent!");
+                  } catch (e) {
+                    console.error(e);
+                    alert(e.message || "Failed to send test email");
+                  }
+                }}
+                className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
+                title="Send a test email to your account email"
+              >
+                Send Test Email
+              </button>
             </div>
+
 
             {/* Timetable (click cells to add; click events to edit) */}
             <div ref={timetableRef} className="scroll-mt-[80px] min-w-0">
