@@ -1144,7 +1144,7 @@ export default function ClassroomTimetableDashboard() {
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3 truncate">
                 <div className="h-4 w-4 rounded-full bg-emerald-500" />
-                <div className="font-semibold text-lg sm:text-xl md:text-2xl leading-tight truncate">
+                <div className="font-semibold text-lg leading-tight truncate">
                   {user?.email || "student@gmail.com"}
                 </div>
               </div>
