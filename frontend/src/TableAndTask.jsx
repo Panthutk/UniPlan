@@ -1162,9 +1162,31 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center">
-          <img src={uniplanLogo} alt="Uniplan Logo" className="h-[clamp(20px,6vh,50px)] w-auto" />
-          <div className="ml-auto flex items-center gap-6">
+        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center justify-between">
+
+          {/* LEFT: Logo on top, Menu under it */}
+          <div className="flex flex-col items-start gap-2">
+            <img
+              src={uniplanLogo}
+              alt="Uniplan Logo"
+              className="h-[clamp(20px,6vh,50px)] w-auto"
+            />
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
+              aria-expanded={menuOpen}
+              aria-controls="app-drawer"
+              title="Menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+              </svg>
+            </button>
+          </div>
+
+
+          <div className="flex items-center gap-6">
             <Link to="/about" className="opacity-90 text-sm hover:underline">Contact</Link>
             <button
               className="border rounded-lg px-3 py-2"
