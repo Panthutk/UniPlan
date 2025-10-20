@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import uniplanLogo from "./assets/uniplanLogo.svg";
+import { Link, NavLink, useNavigate, useLocation} from "react-router-dom";
 import Pic1 from "./assets/pic1.png";
 import Pic2 from "./assets/pic2.png";
 import Pic3 from "./assets/pic3.jpg";
 import Pic4 from "./assets/pic4.png";
 import company_logo from "./assets/TawanRapfa_logo2.svg";
-import {CustomeNavbar} from "./assets/NavBar";
 
 
 export default function About() {
   const navigate = useNavigate();
+  const location = useLocation();
+  console.log(location.state);
   const [activeTab, setActiveTab] = useState(0);
   const tabs = ["Member no.1", "Member no.2", "Member no.3", "Member no.4"];
   const members_info = [
@@ -20,9 +22,29 @@ export default function About() {
   ];
 
   return (
+
     <div className=" min-h-screen min-w-screen bg-[#171717]">
-      <CustomeNavbar />
-      
+        {/* NAVBAR */}
+        <header className="sticky top-0 flex items-center z-50 h-[clamp(34px,8.5vh,58px)] py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
+          <div className="container flex mx-auto max-w-[1600px] px-5 sm:px-6 lg:px-8 items-center justify-between">
+            <img
+              src={uniplanLogo}
+              alt="Uniplan Logo"
+              className="h-[clamp(30px,6vh,50px)] w-auto"
+            />
+            <nav className="flex items-center gap-3">
+              <NavLink
+                to={location.state?.from === "/tableandtask" ? "/tableandtask" : "/"}
+                className= {
+                  ({ isActive }) => `rounded-md border border-white/15 px-3 py-1.5 text-[clamp(12px,2vh,20px)] ${isActive ? "bg-white/10 text-white" : "text-zinc-200 hover:bg-white/5"}`
+                }
+              >
+                {location.state?.from === "/tableandtask" ? "Home" : "login" }
+              </NavLink>
+            </nav>
+          </div>
+        </header>     
+
       {/* first section welcome message */}
       <div className="w-auto h-auto">
         {/* left side - first section  */}
@@ -82,7 +104,7 @@ export default function About() {
       {/* second section : real info */}
       <div className="flex w-auto ml-10 md:ml-16 mr-[5%] md:mr-[1.65%] flex-col md:flex-row">
         {/* Left side of second section - Tabs */}
-        <div className=" rounded-2xl max-w-[700px] w-auto md:w-[30%] bg-[#212121] h-[clamp(100px,80vw,430px)] flex flex-col px-[8%] md:sticky md:top-[8%] md:px-[2%] py-[8%] md:py-[2%] my-[3%] gap-3 md:my-0">
+        <div className=" rounded-2xl max-w-[700px] w-auto md:w-[30%] bg-[#212121] h-[50%] flex flex-col px-[8%] md:sticky md:top-[8%] md:px-[2%] py-[8%] md:py-[2%] my-[3%] gap-3 md:my-0">
             <span className="text-center font-lexend text-[#aeb0af] mb-[1vh] text-[clamp(19px,1.7vw,27px)]">
               OUR DEVELOPERS
             </span> 
@@ -152,7 +174,7 @@ export default function About() {
         {/* Third section - back to login  */}
         <div className=" md:mx-[6vw] flex flex-col md:flex-row">
           <div className="flex tracking-widest flex-col px-[10vw] md:px-[2vw] py-[7vh] text-center md:py-[20vh] flex justify-center font-back items-center text-white font-lexend md:basis-[70%] md:h-[50vh] text-[clamp(19px,8vw,35px)]"> 
-            <p>Are you ready to start your 
+            <p>Are you ready to <span> {location.state?.from === "/tableandtask" ? "continue" : "start" } </span> your 
               <span class="ml-[2vw] tracking-widest md:ml-[2vw] bg-gradient-to-r from-[#6b9e7b] to-yellow-400 bg-clip-text text-transparent ">
                 Planning?
               </span>
@@ -162,9 +184,9 @@ export default function About() {
 
           <div className="md:w-[30%] flex items-center justify-center py-[10vh]">
             <NavLink
-              to="/"
+              to={location.state?.from === "/tableandtask" ? "/tableandtask" : "/"}
               className={({ isActive }) =>`font-cousine rounded-md border border-white/15 bg-[#3a5e45] py-[3vh] px-[6vw] text-[clamp(8px,8vw,20px)] ${isActive ? "text-white " : " text-zinc-200 hover:bg-[#2bb75a] hover:text-white hover:scale-125 transition-transform duration-300 "}`}>
-              Login
+              Return
             </NavLink>
           </div>
       </div>

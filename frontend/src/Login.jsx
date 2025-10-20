@@ -74,6 +74,7 @@ export default function Login() {
 
               <NavLink
                 to="/about"
+                state={{ from: "/login" }}
                 className={({ isActive }) =>
                   `rounded-md border border-white/15 px-3 py-1.5 text-sm ${isActive ? "bg-white/10 text-white" : "text-zinc-200 hover:bg-white/5"
                   }`
