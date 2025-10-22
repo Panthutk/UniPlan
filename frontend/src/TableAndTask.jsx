@@ -1110,6 +1110,8 @@ export default function ClassroomTimetableDashboard() {
     [liveAssignments, events]
   );
 
+  
+
 
   // Active menu (closest section center)
   useEffect(() => {

@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class GoogleAccount(models.Model):
     email = models.EmailField(primary_key=True)
@@ -100,12 +101,16 @@ class Reminder(models.Model):
     channel = models.CharField(max_length=20, choices=ReminderChannel.choices, default=ReminderChannel.EMAIL)
     notify_at = models.DateTimeField()
     delivered_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, blank=True)  # pending, sent, failed (free text for now)
+    status = models.CharField(max_length=20, blank=True)  # pending, sent, failed
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        indexes = [
-            models.Index(fields=["notify_at", "status"]),
+        indexes = [models.Index(fields=["notify_at", "status"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "channel", "notify_at"],
+                name="uq_reminder_task_channel_time",
+            )
         ]
 
 class OAuthAccount(models.Model):
@@ -149,3 +154,4 @@ class ClassroomAssignment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self): return self.title
+

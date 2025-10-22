@@ -37,7 +37,7 @@ urlpatterns = [
         name="reminders-intake",
     ),
     path("api/test-email/", views.send_test_email),
-
+    path("api/reminders/summary/", views.reminders_summary),
 
     # CRUD
     path("api/", include(router.urls)),
