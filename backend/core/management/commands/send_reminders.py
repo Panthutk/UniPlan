@@ -45,7 +45,7 @@ class Command(BaseCommand):
                     r.save(update_fields=["status", "delivered_at"])
                     continue
 
-                # race-safe claim
+                # send the reminder
                 with transaction.atomic():
                     locked = (
                         Reminder.objects
@@ -56,7 +56,6 @@ class Command(BaseCommand):
                     if not locked:
                         continue
 
-                    # ----- build plain, no-emoji email (keeps Priority) -----
                     # subject: prefer "due in X days" when we have a due date
                     subject = f"UniPlan reminder — {t.title}"
 
@@ -72,7 +71,7 @@ class Command(BaseCommand):
                         plural = "" if days_left == 1 else "s"
                         subject = f'Reminder: "{t.title}" due in {days_left} day{plural}'
 
-                    # body (keeps Priority line)
+                    # body of the email context
                     lines = [
                         f"Hello {t.user.username or t.user.email},",
                         "",
@@ -92,7 +91,7 @@ class Command(BaseCommand):
                         send_mail(
                             subject,
                             body,
-                            settings.DEFAULT_FROM_EMAIL,   # use your configured From
+                            settings.DEFAULT_FROM_EMAIL,
                             [t.user.email],
                             fail_silently=False,
                         )
