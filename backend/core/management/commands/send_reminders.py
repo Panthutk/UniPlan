@@ -3,7 +3,9 @@ from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from django.conf import settings
 from core.models import Reminder, ReminderChannel, TaskStatus
+
 
 class Command(BaseCommand):
     help = "Send due task reminders (email) once and mark delivered."
@@ -16,12 +18,16 @@ class Command(BaseCommand):
     def handle(self, *args, **opt):
         def tick():
             now = timezone.now()
-            qs = (Reminder.objects
-                  .select_related("task", "task__user")
-                  .filter(channel=ReminderChannel.EMAIL,
-                          delivered_at__isnull=True,
-                          status__in=["", "pending"],
-                          notify_at__lte=now))
+            qs = (
+                Reminder.objects
+                .select_related("task", "task__user")
+                .filter(
+                    channel=ReminderChannel.EMAIL,
+                    delivered_at__isnull=True,
+                    status__in=["", "pending"],
+                    notify_at__lte=now,
+                )
+            )
 
             for r in qs:
                 t = r.task
@@ -41,26 +47,55 @@ class Command(BaseCommand):
 
                 # race-safe claim
                 with transaction.atomic():
-                    locked = (Reminder.objects
-                              .select_for_update(skip_locked=True)
-                              .filter(pk=r.pk, delivered_at__isnull=True)
-                              .first())
+                    locked = (
+                        Reminder.objects
+                        .select_for_update(skip_locked=True)
+                        .filter(pk=r.pk, delivered_at__isnull=True)
+                        .first()
+                    )
                     if not locked:
                         continue
 
+                    # ----- build plain, no-emoji email (keeps Priority) -----
+                    # subject: prefer "due in X days" when we have a due date
+                    subject = f"UniPlan reminder — {t.title}"
+
+                    due_local_txt = "—"
+                    days_left = None
+                    if t.due_at:
+                        due = t.due_at
+                        if timezone.is_naive(due):
+                            due = timezone.make_aware(due, timezone.get_current_timezone())
+                        due_local = timezone.localtime(due)
+                        due_local_txt = due_local.strftime("%A, %B %d, %Y at %H:%M")
+                        days_left = max((due_local.date() - timezone.localdate()).days, 0)
+                        plural = "" if days_left == 1 else "s"
+                        subject = f'Reminder: "{t.title}" due in {days_left} day{plural}'
+
+                    # body (keeps Priority line)
+                    lines = [
+                        f"Hello {t.user.username or t.user.email},",
+                        "",
+                        f"This is a reminder for your assignment: {t.title}",
+                        f"Priority: {t.get_priority_display()}",
+                    ]
+                    if t.due_at:
+                        lines.append(f"Due date: {due_local_txt}")
+                    if (t.description or "").strip():
+                        lines += ["", "Details:", t.description.strip()]
+                    lines += ["", "— UniPlan"]
+                    body = "\n".join(lines)
+
                     if opt["dry_run"]:
-                        self.stdout.write(f"[dry] would email {t.user.email}: {t.title}")
+                        self.stdout.write(f"[dry] would email {t.user.email}: {subject}")
                     else:
-                        subject = f"UniPlan reminder — {t.title}"
-                        due_txt = t.due_at.astimezone().strftime("%Y-%m-%d %H:%M") if t.due_at else "—"
-                        body = (
-                            f"Hi {t.user.username or t.user.email},\n\n"
-                            f"Task: {t.title}\n"
-                            f"Priority: {t.get_priority_display()}\n"
-                            f"Due: {due_txt}\n\n"
-                            "Good luck!\n— UniPlan"
+                        send_mail(
+                            subject,
+                            body,
+                            settings.DEFAULT_FROM_EMAIL,   # use your configured From
+                            [t.user.email],
+                            fail_silently=False,
                         )
-                        send_mail(subject, body, None, [t.user.email], fail_silently=False)
 
                     locked.status = "sent"
                     locked.delivered_at = timezone.now()
