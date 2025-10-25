@@ -725,12 +725,13 @@ function AssignmentsBoard({ items }) {
 
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
-function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
+function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
   const [start, setStart] = useState(initial.start ?? 8);
   const [end, setEnd] = useState(initial.end ?? 9);
   const [desc, setDesc] = useState(initial.desc || "");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -739,7 +740,41 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
     setStart(initial.start ?? 8);
     setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
     setDesc(initial.desc || "");
+    setError("");
   }, [open, initial]);
+
+  // Derived validations
+  const timeError = end <= start; // strictly after required (raw values)
+  const s = Math.min(start, end);
+  const e = Math.max(start, end);
+  const normalizedTitle = (title || "Untitled").trim().toLowerCase(); // Converts everything to lowercase so comparisons don’t care about capitalization.
+
+
+
+  // Exact duplicate (same day+time+title; ignore current when editing)
+
+  const duplicateError = existingEvents.some(ev =>
+    ev.day === day &&
+    ev.start === s &&
+    ev.end === e &&
+    ev.title?.trim()?.toLowerCase() === normalizedTitle &&
+    (!initial?.id || ev.id !== initial.id)
+  );
+
+  // Time overlap with another event on same day (if you want to prevent overlaps)
+  const overlapError = existingEvents.some(ev =>
+    ev.day === day &&
+    (!initial?.id || ev.id !== initial.id) &&
+    // overlap if start < other.end AND end > other.start
+    s < ev.end && e > ev.start
+  );
+
+  const firstError = (timeError && "End time must be after start time.") ||
+    (duplicateError && "This subject already exists with the same day and time.") ||
+    (overlapError && "This time overlaps another subject on the same day.");
+
+
+
 
   if (!open) return null;
 
@@ -785,7 +820,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
           <div>
             <div className="text-sm mb-1">End Class</div>
             <select
-              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+              className={["w-full rounded-md bg-neutral-800 px-3 py-2 outline-none", timeError ? "ring-2 ring-rose-500" : "focus:ring-2 ring-emerald-500/50"].join("")}
               value={end}
               onChange={(e) => setEnd(Number(e.target.value))}
             >
@@ -820,6 +855,9 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
           />
         </div>
 
+        {/*Show the alert text*/}
+        {firstError && (<div className="mt-3 text-sm text-rose-400" role="alert" aria-live="assertive">Alert: {firstError} </div>)}
+
         <div className="mt-5 flex items-center justify-between gap-3">
           {/* DELETE only when editing */}
           {isEditing ? (
@@ -838,10 +876,16 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
             >
               Cancel
             </button>
+
             <button
               onClick={() => {
                 const s = Math.min(start, end);
                 const e = Math.max(start, end);
+                //run validations again
+                if (firstError) {
+                  setError(firstError);
+                }
+
                 onSave({
                   ...(isEditing ? { id: initial.id } : {}),
                   title: title || "Untitled",
@@ -851,7 +895,9 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
                   desc,
                 });
               }}
-              className="px-6 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+              className={["px-6 py-2 rounded-full font-semibold", firstError ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800"].join(" ")}
+              disabled={Boolean(firstError)}
+
             >
               Save
             </button>
@@ -872,7 +918,6 @@ export default function ClassroomTimetableDashboard() {
   const [err, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
-  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -1110,7 +1155,7 @@ export default function ClassroomTimetableDashboard() {
     [liveAssignments, events]
   );
 
-  
+
 
 
   // Active menu (closest section center)
@@ -1365,6 +1410,7 @@ export default function ClassroomTimetableDashboard() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         subjectOptions={subjectOptions}
+        existingEvents={events}
       />
     </div>
   );
