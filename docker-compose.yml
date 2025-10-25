@@ -70,5 +70,34 @@ services:
       - backend
     restart: unless-stopped
 
+  reminder_worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: uniplan_reminder_worker
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      DB_NAME: uniplan
+      DB_USER: uniplan
+      DB_PASSWORD: uniplan
+      DB_HOST: db
+      DB_PORT: "3306"
+      DJANGO_SECRET: "dev-only-please-change"
+      DEBUG: "1"
+      ALLOWED_HOSTS: "*"
+    volumes:
+      - ./backend:/app
+    working_dir: /app
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py send_reminders --loop --interval=60
+      "
+    restart: unless-stopped
+
 volumes:
   db_data:

@@ -79,6 +79,39 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
+async function sendTestEmail() {
+  const r = await fetch(`${API}/api/test-email/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.detail || `POST /api/test-email/ failed (${r.status})`);
+  return data;
+}
+
+
+// Create a scheduled email reminder for an assignment
+async function createReminder({
+  assignmentId,
+  courseName,
+  title,
+  dueISO,
+  remindAtISO,
+  offsetDays,
+  link,
+}) {
+  return post(`/api/reminders/intake/`, {
+    assignmentId,
+    courseName,
+    title,
+    dueISO,
+    remindAtISO,
+    offsetDays,
+    link,
+  });
+}
+
 const HH = (n) => String(n).padStart(2, "0");
 const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
 
@@ -469,6 +502,12 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
 
 /* -----------------Assignments Board----------------- */
 function AssignmentsBoard({ items }) {
+  // --- reminder UI state ---
+  const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
+  const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
+  const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+
+  // Group assignments by linked day
   const groups = useMemo(() => {
     const m = new Map();
     for (const a of items || []) {
@@ -489,6 +528,39 @@ function AssignmentsBoard({ items }) {
   }, [items]);
 
   const orderKeys = ["0", "1", "2", "3", "4", "5", "6", "Unassigned"].filter(k => groups.has(k));
+
+  // --- post a reminder to backend ---
+  const scheduleReminder = async (a) => {
+    if (!a?.due) { alert("No due date for this task."); return; }
+
+    const id = a.id;
+    const due = a.due instanceof Date ? a.due : new Date(a.due);
+    if (isNaN(+due)) { alert("Invalid due date."); return; }
+
+    const offset = Number(choice[id] ?? 3); // default 3 days
+    const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
+
+    try {
+      setPending(p => ({ ...p, [id]: true }));
+      await createReminder({
+        assignmentId: id,
+        courseName: a.courseName,
+        title: a.title,
+        dueISO: due.toISOString(),
+        remindAtISO: remindAt.toISOString(),
+        offsetDays: offset,
+        link: a.altLink || null,
+      });
+      setScheduled(s => ({ ...s, [id]: true }));
+      alert(`Reminder set: ${offset} day(s) before due date.`);
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to schedule reminder: ${e?.message || e}`);
+    } finally {
+      setPending(p => ({ ...p, [id]: false }));
+    }
+  };
+
 
   if (orderKeys.length === 0) {
     return (
@@ -596,6 +668,34 @@ function AssignmentsBoard({ items }) {
                             Classroom
                           </a>
                         )}
+
+                        {/* Reminder controls */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs opacity-75">Remind me:</label>
+                          <select
+                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+                            value={(choice[a.id] ?? 3)}
+                            onChange={(e) => setChoice(c => ({ ...c, [a.id]: Number(e.target.value) }))}
+                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
+                            title={a.due ? "Choose how many days before due date" : "No due date"}
+                          >
+                            <option value={1}>1 day before</option>
+                            <option value={3}>3 days before</option>
+                            <option value={7}>7 days before</option>
+                          </select>
+                          <button
+                            onClick={() => scheduleReminder(a)}
+                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
+                            className={[
+                              "text-xs px-3 py-1.5 rounded-full font-semibold",
+                              scheduled[a.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+                            ].join(" ")}
+                            title={!a.due ? "No due date" : (scheduled[a.id] ? "Already scheduled" : "Schedule email reminder")}
+                          >
+                            {scheduled[a.id] ? "Scheduled" : (pending[a.id] ? "Scheduling..." : "Remind")}
+                          </button>
+                        </div>
+
                         <div className="ml-auto flex items-center gap-2">
                           <span className="text-xs opacity-75">Status:</span>
                           <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
@@ -603,6 +703,7 @@ function AssignmentsBoard({ items }) {
                           </span>
                         </div>
                       </div>
+
                     </div>
                   </div>
                 );
@@ -624,12 +725,13 @@ function AssignmentsBoard({ items }) {
 
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
-function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
+function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
   const [start, setStart] = useState(initial.start ?? 8);
   const [end, setEnd] = useState(initial.end ?? 9);
   const [desc, setDesc] = useState(initial.desc || "");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -638,7 +740,41 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
     setStart(initial.start ?? 8);
     setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
     setDesc(initial.desc || "");
+    setError("");
   }, [open, initial]);
+
+  // Derived validations
+  const timeError = end <= start; // strictly after required (raw values)
+  const s = Math.min(start, end);
+  const e = Math.max(start, end);
+  const normalizedTitle = (title || "Untitled").trim().toLowerCase(); // Converts everything to lowercase so comparisons don’t care about capitalization.
+
+
+
+  // Exact duplicate (same day+time+title; ignore current when editing)
+
+  const duplicateError = existingEvents.some(ev =>
+    ev.day === day &&
+    ev.start === s &&
+    ev.end === e &&
+    ev.title?.trim()?.toLowerCase() === normalizedTitle &&
+    (!initial?.id || ev.id !== initial.id)
+  );
+
+  // Time overlap with another event on same day (if you want to prevent overlaps)
+  const overlapError = existingEvents.some(ev =>
+    ev.day === day &&
+    (!initial?.id || ev.id !== initial.id) &&
+    // overlap if start < other.end AND end > other.start
+    s < ev.end && e > ev.start
+  );
+
+  const firstError = (timeError && "End time must be after start time.") ||
+    (duplicateError && "This subject already exists with the same day and time.") ||
+    (overlapError && "This time overlaps another subject on the same day.");
+
+
+
 
   if (!open) return null;
 
@@ -684,7 +820,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
           <div>
             <div className="text-sm mb-1">End Class</div>
             <select
-              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
+              className={["w-full rounded-md bg-neutral-800 px-3 py-2 outline-none", timeError ? "ring-2 ring-rose-500" : "focus:ring-2 ring-emerald-500/50"].join("")}
               value={end}
               onChange={(e) => setEnd(Number(e.target.value))}
             >
@@ -719,6 +855,9 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
           />
         </div>
 
+        {/*Show the alert text*/}
+        {firstError && (<div className="mt-3 text-sm text-rose-400" role="alert" aria-live="assertive">Alert: {firstError} </div>)}
+
         <div className="mt-5 flex items-center justify-between gap-3">
           {/* DELETE only when editing */}
           {isEditing ? (
@@ -737,10 +876,16 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
             >
               Cancel
             </button>
+
             <button
               onClick={() => {
                 const s = Math.min(start, end);
                 const e = Math.max(start, end);
+                //run validations again
+                if (firstError) {
+                  setError(firstError);
+                }
+
                 onSave({
                   ...(isEditing ? { id: initial.id } : {}),
                   title: title || "Untitled",
@@ -750,7 +895,9 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
                   desc,
                 });
               }}
-              className="px-6 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+              className={["px-6 py-2 rounded-full font-semibold", firstError ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800"].join(" ")}
+              disabled={Boolean(firstError)}
+
             >
               Save
             </button>
@@ -771,7 +918,6 @@ export default function ClassroomTimetableDashboard() {
   const [err, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
-  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -1010,6 +1156,8 @@ export default function ClassroomTimetableDashboard() {
   );
 
 
+
+
   // Active menu (closest section center)
   useEffect(() => {
     let raf = 0;
@@ -1086,15 +1234,6 @@ export default function ClassroomTimetableDashboard() {
 
 
           <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm opacity-80">
-              <input
-                type="checkbox"
-                className="accent-current"
-                checked={showRaw}
-                onChange={(e) => setShowRaw(e.target.checked)}
-              />
-              Show raw JSON
-            </label>
             <Link to="/about" state={{ from: "/tableandtask" }} className="opacity-90 text-sm hover:underline">Contact</Link>
             <button
               className="border rounded-lg px-3 py-2"
@@ -1212,15 +1351,31 @@ export default function ClassroomTimetableDashboard() {
               >
                 Clear
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
-                title="Import">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
                 Import
               </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
-                title="Export">
+              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
                 Export
               </button>
+
+              {/* NEW: Send a test email */}
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await sendTestEmail(); // <- uses the helper you added earlier
+                    alert(res.detail || "Test email sent!");
+                  } catch (e) {
+                    console.error(e);
+                    alert(e.message || "Failed to send test email");
+                  }
+                }}
+                className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
+                title="Send a test email to your account email"
+              >
+                Send Test Email
+              </button>
             </div>
+
 
             {/* Timetable (click cells to add; click events to edit) */}
             <div ref={timetableRef} className="scroll-mt-[80px] min-w-0">
@@ -1243,31 +1398,6 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-
-            {/* Tasks */}
-            <section className="scroll-mt-[80px]">
-              <h2 className="text-lg font-semibold mb-3">Api from google classroom </h2>
-
-
-              {/* Status moved here */}
-              {loading && (
-                <div className="text-sm opacity-70 mb-3">
-                  Loading active classes & active assignments…
-                </div>
-              )}
-              {err && (
-                <div className="text-sm text-rose-400 mb-3">
-                  Error: {err}
-                </div>
-              )}
-
-
-              <TasksSection
-                courses={courses}
-                subsByCourse={subsByCourse}
-                showRaw={showRaw}
-              />
-            </section>
           </main>
         </div>
       </div>
@@ -1280,6 +1410,7 @@ export default function ClassroomTimetableDashboard() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         subjectOptions={subjectOptions}
+        existingEvents={events}
       />
     </div>
   );

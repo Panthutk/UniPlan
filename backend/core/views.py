@@ -12,11 +12,26 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
-from .serializers import SubjectSerializer, TimetableEntrySerializer, TaskSerializer, ReminderSerializer, ClassroomCourseSerializer, ClassroomAssignmentSerializer, OAuthAccountSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from django.core.mail import send_mail
+from rest_framework import mixins
+from .serializers import (
+    SubjectSerializer,
+    TimetableEntrySerializer,
+    TaskSerializer,
+    ReminderSerializer,
+    ClassroomCourseSerializer,
+    ClassroomAssignmentSerializer,
+    OAuthAccountSerializer,
+    ReminderIntakeSerializer,  # <-- add this here
+)
+from rest_framework.permissions import IsAuthenticated
+
+from django.utils.dateparse import parse_datetime
+
 
 # ---- Scopes----
 SCOPES = [
@@ -259,12 +274,27 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()
+    queryset = Task.objects.none()
     serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return Task.objects.filter(user=self.request.user).select_related("subject").order_by("-created_at")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
 
 class ReminderViewSet(viewsets.ModelViewSet):
-    queryset = Reminder.objects.all()
+    queryset = Reminder.objects.none()        # <-- add this
     serializer_class = ReminderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        return (Reminder.objects
+                .filter(task__user=self.request.user)
+                .select_related("task")
+                .order_by("-notify_at"))
 
 class ClassroomCourseViewSet(viewsets.ModelViewSet):
     queryset = ClassroomCourse.objects.all()
@@ -289,3 +319,65 @@ class OAuthAccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        
+        
+class ReminderIntakeViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    """
+    POST /api/reminders/intake/
+    Body: { assignmentId, courseName?, title, dueISO, remindAtISO, offsetDays?, link? }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ReminderIntakeSerializer
+    queryset = Reminder.objects.none()  # <-- instead of []
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def send_test_email(request):
+    """
+    Sends a test email to the currently logged-in user.
+    """
+    user = request.user
+    if not user.email:
+        return Response({"detail": "User has no email"}, status=400)
+
+    subject = "UniPlan Test Email"
+    message = f"Hello {user.username or user.email},\n\nThis is a test email from UniPlan!"
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+    return Response({"detail": f"Email sent to {user.email}!"})
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def reminders_summary(request):
+    qs = (Reminder.objects
+          .select_related("task")
+          .filter(task__user=request.user,
+                  delivered_at__isnull=True,
+                  status__in=["", "pending"]))
+    data = {}
+    for r in qs:
+        ext = r.task.external_id
+        if not ext:
+            continue
+        offset = None
+        if r.task.due_at:
+            offset = max(0, (r.task.due_at.date() - r.notify_at.date()).days)
+        # keep earliest reminder if multiple
+        prev = data.get(ext)
+        if not prev or r.notify_at < prev["notify_at"]:
+            data[ext] = {
+                "notify_at": r.notify_at.isoformat(),
+                "offset_days": offset,
+            }
+    return Response(data)
