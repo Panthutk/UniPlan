@@ -340,80 +340,92 @@ function trun8(s) {
 const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
   const HEADER_H = 52;
   const ROW_H = 92;
-  const LABEL_W = 132;
-  const GRID_MIN_W = 0;
+  const LABEL_W = 132; // first column day label
+  const GAP = 2; // space between each grid cell(px)
+  const COL_W = 120; // fixed column width of each time column (px)
+
+  // Fixed total size (so it never shrinks)
+  const TOTAL_W = LABEL_W + 12 * COL_W + 13 * GAP; // 13 columns, 12 gaps
+  const TOTAL_H = HEADER_H + 7 * ROW_H + 8 * GAP; // 8 rows, 7 gaps
 
   return (
-    <div className="rounded-xl bg-neutral-800 p-2 overflow-hidden w-full">
-      <div
-        className="relative grid gap-[2px] select-none w-full"
-        style={{
-          minWidth: `${GRID_MIN_W}px`,
-          gridTemplateRows: `${HEADER_H}px repeat(7, ${ROW_H}px)`,
-          gridTemplateColumns: `${LABEL_W}px repeat(12, minmax(0, 1fr))`,
-        }}
-      >
-        {/* Corner */}
-        <div className="bg-neutral-900/60 flex items-center justify-center text-xs">
-          Day/Time
+    <div className="rounded-xl bg-neutral-800 p-2  w-full h-full">
+      {/* scroll container (adds scrollbars when needed) */}
+      <div className="relative overflow-auto w-full h-full max-h-[75vh] scrollbar-transparent" style={{ WebkitOverflowScrolling: "touch" }}>
+        {/* fixed-size grid that does NOT shrink */}
+        <div
+          className="relative grid gap-[2px] select-none w-full"
+          style={{
+            width: `${TOTAL_W}px`,
+            height: `${TOTAL_H}px`,
+            gridTemplateRows: `${HEADER_H}px repeat(7, ${ROW_H}px)`,
+            gridTemplateColumns: `${LABEL_W}px repeat(12, ${COL_W}px)`, // fixed px columns (no fr)
+          }}
+          role="grid"
+          aria-label="Weekly timetable"
+        >
+          {/* Corner */}
+          <div className="bg-neutral-900/60 flex items-center justify-center text-xs">
+            Day/Time
+          </div>
+
+          {/* Time headers */}
+          {TIMES.map((h) => (
+            <div
+              key={h}
+              className="bg-neutral-900/60 flex items-center justify-center text-xs"
+            >
+              {h}:00
+            </div>
+          ))}
+
+          {/* Day labels */}
+          {DAYS.map((d, i) => (
+            <div
+              key={d}
+              className="bg-neutral-900/60 flex items-center justify-center text-xs"
+              style={{ gridRow: i + 2, gridColumn: 1 }}
+            >
+              {d}
+            </div>
+          ))}
+
+          {/* Background cells*/}
+          {DAYS.map((_, di) =>
+            TIMES.map((h, ti) => (
+              <button
+                key={`bg-${di}-${ti}`}
+                type="button"
+                onClick={() => onCellClick(di, h)}
+                className="bg-neutral-900/20 hover:bg-neutral-900/30 transition-colors"
+                style={{ gridRow: di + 2, gridColumn: ti + 2, cursor: "pointer" }}
+                aria-label={`Add on ${DAYS[di]} at ${h}:00`}
+              />
+            ))
+          )}
+
+          {/* Events layer*/}
+          {events.map((e) => (
+            <div
+              key={e.id}
+              onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
+              className={`rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90`}
+              style={{
+                gridRow: rowFromDay(e.day),
+                gridColumn: `${colFromTime(e.start)} / ${colFromTime(e.end)}`,
+                zIndex: 10,
+              }}
+              title={`${e.title} — ${e.start}:00–${e.end}:00`}
+            >
+              <div className="truncate whitespace-nowrap overflow-hidden">
+                {trun8(e.title)}
+              </div>
+              <div className="text-[10px] opacity-80">
+                {e.start}:00–{e.end}:00
+              </div>
+            </div>
+          ))}
         </div>
-
-        {/* Time headers */}
-        {TIMES.map((h) => (
-          <div
-            key={h}
-            className="bg-neutral-900/60 flex items-center justify-center text-xs"
-          >
-            {h}:00
-          </div>
-        ))}
-
-        {/* Day labels */}
-        {DAYS.map((d, i) => (
-          <div
-            key={d}
-            className="bg-neutral-900/60 flex items-center justify-center text-xs"
-            style={{ gridRow: i + 2, gridColumn: 1 }}
-          >
-            {d}
-          </div>
-        ))}
-
-        {/* Background cells*/}
-        {DAYS.map((_, di) =>
-          TIMES.map((h, ti) => (
-            <button
-              key={`bg-${di}-${ti}`}
-              type="button"
-              onClick={() => onCellClick(di, h)}
-              className="bg-neutral-900/20 hover:bg-neutral-900/30 transition-colors"
-              style={{ gridRow: di + 2, gridColumn: ti + 2, cursor: "pointer" }}
-              aria-label={`Add on ${DAYS[di]} at ${h}:00`}
-            />
-          ))
-        )}
-
-        {/* Events layer*/}
-        {events.map((e) => (
-          <div
-            key={e.id}
-            onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
-            className={`rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90`}
-            style={{
-              gridRow: rowFromDay(e.day),
-              gridColumn: `${colFromTime(e.start)} / ${colFromTime(e.end)}`,
-              zIndex: 10,
-            }}
-            title={`${e.title} — ${e.start}:00–${e.end}:00`}
-          >
-            <div className="truncate whitespace-nowrap overflow-hidden">
-              {trun8(e.title)}
-            </div>
-            <div className="text-[10px] opacity-80">
-              {e.start}:00–{e.end}:00
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -1236,8 +1248,8 @@ export default function ClassroomTimetableDashboard() {
           <div className="flex items-center gap-6">
             <Link to="/about" state={{ from: "/tableandtask" }} className="opacity-90 text-sm hover:underline">Contact</Link>
             <button
-              className="border rounded-lg px-3 py-2"
-              onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}
+              className="border rounded-lg px-3 py-2" //  clear local data
+              onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}  // go to home and replace current history entry
             >
               Logout
             </button>

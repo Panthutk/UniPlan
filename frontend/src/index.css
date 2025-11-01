@@ -73,3 +73,42 @@
 body {
     @apply font-sans;
 }
+
+
+@layer utilities {
+  .scrollbar-transparent {
+    /* iOS momentum scroll */
+    -webkit-overflow-scrolling: touch;
+
+    /* Firefox: hide by default */
+    scrollbar-width: none;
+    scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+  }
+
+  /* Show thin scrollbar when hovering */
+  .scrollbar-transparent:hover {
+    scrollbar-width: thin; /* Firefox */
+  }
+
+  /* Chrome / Safari / Edge */
+  .scrollbar-transparent::-webkit-scrollbar {
+    width: 0; /* hidden by default */
+    height: 0;
+  }
+  .scrollbar-transparent:hover::-webkit-scrollbar {
+    width: 8px; /* show when hover */
+    height: 8px;
+  }
+
+  .scrollbar-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-transparent::-webkit-scrollbar-thumb {
+    background-color: transparent; /* hidden by default */
+    border-radius: 8px;
+  }
+  .scrollbar-transparent:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.4); /* visible on hover */
+  }
+}
+
