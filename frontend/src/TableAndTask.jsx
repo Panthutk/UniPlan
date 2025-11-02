@@ -1231,17 +1231,6 @@ export default function ClassroomTimetableDashboard() {
               className="h-[clamp(20px,6vh,50px)] w-auto"
             />
 
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
-              aria-expanded={menuOpen}
-              aria-controls="app-drawer"
-              title="Menu"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
-              </svg>
-            </button>
           </div>
 
 
@@ -1257,6 +1246,26 @@ export default function ClassroomTimetableDashboard() {
         </div>
       </header>
 
+      <div className="sticky z-50 pl-2"
+        style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlapp with header
+
+      >
+        <div className="pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2">
+
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
+            aria-expanded={menuOpen}
+            aria-controls="app-drawer"
+            title="Menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+            </svg>
+          </button>
+
+        </div>
+      </div>
 
 
 
