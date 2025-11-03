@@ -86,11 +86,19 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Classroom linkage & UI tag
+    is_classroom_linked = models.BooleanField(default=False)
+    classroom_course_id = models.CharField(max_length=120, blank=True)
+    classroom_work_id   = models.CharField(max_length=120, blank=True)
+    classroom_alt_link  = models.URLField(blank=True)
+    color_tag           = models.CharField(max_length=40, blank=True)  # e.g. 'bg-green-400'
+    course_name         = models.CharField(max_length=240, blank=True) # optional convenience
 
     class Meta:
         indexes = [
             models.Index(fields=["user", "due_at"]),
-            models.Index(fields=["subject", "due_at"], name="idx_tasks_subject_due"),
+            models.Index(fields=["source", "external_id"]),
+            models.Index(fields=["classroom_course_id", "classroom_work_id"]),
         ]
         constraints = [
             models.UniqueConstraint(fields=["user", "source", "external_id"], name="uq_task_user_source_extid")
