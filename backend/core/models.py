@@ -88,7 +88,9 @@ class Task(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     # Classroom linkage & UI tag
+    is_archived = models.BooleanField(default=False)
     assignment_alt_link  = models.URLField(blank=True)
+
 
 
     class Meta:

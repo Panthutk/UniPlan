@@ -79,7 +79,7 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = [
             "id","user","subject","title","description",
             "status","priority","due_at","rrule","source","external_id",
-            "assignment_alt_link","created_at","updated_at","completed_at",
+            "assignment_alt_link","created_at","updated_at","completed_at", "is_archived",
             "reminder_days_before","next_reminder_at","days_left","day_of_week",
         ]
         read_only_fields = ["user","created_at","updated_at","completed_at","days_left","day_of_week"]
