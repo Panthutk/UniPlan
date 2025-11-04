@@ -181,6 +181,62 @@ function annotateAssignmentsWithEvents(items, events) {
   });
 }
 
+async function getSubjectKeyByCourse(courseName, setSubjects) {
+  // get all subjects from backend
+  const subjects = await listSubjects();
+  // look for an existing subject by name
+  const match = subjects.find(sub => sub.name === courseName);
+
+  if (match) {
+    // found tell user the Key
+    return match.id;
+  } else {
+    // not found create new Subject obj
+    const newSubject = await createSubject(courseName);
+    setSubjects(prev => [...prev, newSubject]);
+    return newSubject.id;
+  }
+}
+
+
+// Send new assignment to tasks DB
+async function syncAssignmentsToTasks(assignments, setSubjects) {
+  try {
+    const existingTasks = await get("/api/tasks/");
+    const classroomIds = new Set(assignments.map(a => a.id));
+    const existingClassroomTasks = existingTasks.filter(t => t.source === "classroom");
+    const existingIds = new Set(existingClassroomTasks.map(t => t.external_id));
+
+    // Find new assignments from classroom API
+    const newAssignments = assignments.filter(a => !existingIds.has(a.id));
+
+    // check assignments that not appear in classroom API anymore
+    const removedTasks = existingClassroomTasks.filter(t => !classroomIds.has(t.external_id));
+
+    // Add new assignments
+    for (const a of newAssignments) {
+      const subjectKey = await getSubjectKeyByCourse(a.courseName, setSubjects);
+
+      const body = {
+        title: a.title,
+        subject: subjectKey,
+        due_at: a.due ? new Date(a.due).toISOString() : null,
+        source: "classroom",
+        external_id: a.id,
+        assignment_alt_link: a.altLink
+      };
+      await post("/api/tasks/", body);
+    }
+
+    // Delete finished assignments
+    for (const t of removedTasks) {
+      await del(`/api/tasks/${t.id}/`);
+    }
+
+  } catch (e) {
+    console.error("Sync failed:", e);
+  }
+}
 
 
 
@@ -267,6 +323,19 @@ function buildAssignments(courses, subsByCourse) {
   return items;
 }
 
+async function SetupTasks(courses, subsByCourse, setSubjects) {
+  // Build live assignments from classroom API
+  const liveAssignments = buildAssignments(courses, subsByCourse);
+
+  // push to Task DB
+  if (liveAssignments?.length) {
+    await syncAssignmentsToTasks(liveAssignments, setSubjects);
+  }
+
+  // Get task data from DB
+  const tasksObject = await get("/api/tasks/");
+  return tasksObject;
+}
 
 
 
@@ -431,6 +500,7 @@ const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEvent
   );
 });
 
+// !! Didn't Use !!
 /* ----------------- UI: Tasks (from API) -------------------- */
 function CourseTasksCard({ course, submissions, showRaw }) {
   const id = course.id || course.courseId;
@@ -493,6 +563,7 @@ function CourseTasksCard({ course, submissions, showRaw }) {
   );
 }
 
+// !! Didn't Use !!
 const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw }) {
   if (!courses?.length) return <div className="text-sm opacity-70">No active classes found.</div>;
   return (
@@ -509,16 +580,15 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
   );
 });
 
-
-
-
+// Fully be interact point for task function : print the frontend, then wait and receive the data to send to backend/database
 /* -----------------Assignments Board----------------- */
-function AssignmentsBoard({ items }) {
+function AssignmentsBoard({ items, onUpdateTask, TaskSubjects }) {
   // --- reminder UI state ---
   const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
   const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
   const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
+  // NOTE: separate tasks to be 2 group print 2 group different place
   // Group assignments by linked day
   const groups = useMemo(() => {
     const m = new Map();
@@ -573,6 +643,12 @@ function AssignmentsBoard({ items }) {
     }
   };
 
+  // find the data of subject we want from the data that task has
+  const subjectMap = useMemo(() => {
+    const map = new Map();
+    for (const s of TaskSubjects || []) map.set(s.id, s);
+    return map;
+  }, [TaskSubjects]);
 
   if (orderKeys.length === 0) {
     return (
@@ -591,6 +667,7 @@ function AssignmentsBoard({ items }) {
         <h3 className="text-lg font-semibold">Tasks</h3>
       </div>
 
+      {/*TODO : Go to each group*/}
       {orderKeys.map((key) => {
         const list = groups.get(key) || [];
         const isUnassigned = key === "Unassigned";
@@ -607,12 +684,16 @@ function AssignmentsBoard({ items }) {
               <span className="text-xs opacity-60">({list.length})</span>
             </div>
 
+            {/*TODO: create each card elements*/}
             {/* Cards */}
             <div className="space-y-4">
               {list.map((a) => {
                 const n = a.daysLeft;
+                // TODO: n = -891 (pure number use under this)
+
                 const leftText =
                   n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
+                // TODO: leftText = 0 Days Left
 
                 const linked = a._link?.linked;
                 const dayBg =
@@ -624,6 +705,10 @@ function AssignmentsBoard({ items }) {
                         : "bg-green-500"   // safe (>7 days)
                     : "";
                 const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
+                // TODO: ringCls = ring-neutral-700
+
+                // get object that has the same key with this task
+                const subject = subjectMap.get(a.subject);
 
                 return (
                   <div
@@ -639,7 +724,7 @@ function AssignmentsBoard({ items }) {
                     <div className="p-4 min-w-0">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-sm opacity-80 truncate">
-                          <span className="tracking-wider">{a.courseName}</span>
+                          <span className="tracking-wider">{subject.name || "Loading..."}</span>
                           {linked && a._link?.eventTitle ? (
                             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
                               {a._link.eventTitle}
@@ -649,7 +734,7 @@ function AssignmentsBoard({ items }) {
                       </div>
 
                       {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
-                      {linked ? (
+                      {a.external_id ? (
                         <div className="mt-1 text-sm">
                           <span className="opacity-80 mr-2">HW:</span>
                           <span className="font-semibold">{a.title}</span>
@@ -709,10 +794,18 @@ function AssignmentsBoard({ items }) {
                         </div>
 
                         <div className="ml-auto flex items-center gap-2">
-                          <span className="text-xs opacity-75">Status:</span>
-                          <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
-                            OPEN
-                          </span>
+                          <span className="text-xs opacity-75">priority:</span>
+                          <select
+                            className="bg-neutral-800 border border-white/10 text-xs opacity-75"
+                            value={a.priority ?? "none"}
+                            onChange={(e) => onUpdateTask(a.id, { priority: e.target.value })}
+                          >
+                            <option value="none">-</option>
+                            <option value="low">Low</option>
+                            <option value="normal">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+
                         </div>
                       </div>
 
@@ -737,13 +830,12 @@ function AssignmentsBoard({ items }) {
 
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
-function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
+function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
   const [start, setStart] = useState(initial.start ?? 8);
   const [end, setEnd] = useState(initial.end ?? 9);
   const [desc, setDesc] = useState(initial.desc || "");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -752,41 +844,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
     setStart(initial.start ?? 8);
     setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
     setDesc(initial.desc || "");
-    setError("");
   }, [open, initial]);
-
-  // Derived validations
-  const timeError = end <= start; // strictly after required (raw values)
-  const s = Math.min(start, end);
-  const e = Math.max(start, end);
-  const normalizedTitle = (title || "Untitled").trim().toLowerCase(); // Converts everything to lowercase so comparisons don’t care about capitalization.
-
-
-
-  // Exact duplicate (same day+time+title; ignore current when editing)
-
-  const duplicateError = existingEvents.some(ev =>
-    ev.day === day &&
-    ev.start === s &&
-    ev.end === e &&
-    ev.title?.trim()?.toLowerCase() === normalizedTitle &&
-    (!initial?.id || ev.id !== initial.id)
-  );
-
-  // Time overlap with another event on same day (if you want to prevent overlaps)
-  const overlapError = existingEvents.some(ev =>
-    ev.day === day &&
-    (!initial?.id || ev.id !== initial.id) &&
-    // overlap if start < other.end AND end > other.start
-    s < ev.end && e > ev.start
-  );
-
-  const firstError = (timeError && "End time must be after start time.") ||
-    (duplicateError && "This subject already exists with the same day and time.") ||
-    (overlapError && "This time overlaps another subject on the same day.");
-
-
-
 
   if (!open) return null;
 
@@ -832,7 +890,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
           <div>
             <div className="text-sm mb-1">End Class</div>
             <select
-              className={["w-full rounded-md bg-neutral-800 px-3 py-2 outline-none", timeError ? "ring-2 ring-rose-500" : "focus:ring-2 ring-emerald-500/50"].join("")}
+              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
               value={end}
               onChange={(e) => setEnd(Number(e.target.value))}
             >
@@ -867,9 +925,6 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
           />
         </div>
 
-        {/*Show the alert text*/}
-        {firstError && (<div className="mt-3 text-sm text-rose-400" role="alert" aria-live="assertive">Alert: {firstError} </div>)}
-
         <div className="mt-5 flex items-center justify-between gap-3">
           {/* DELETE only when editing */}
           {isEditing ? (
@@ -888,16 +943,10 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
             >
               Cancel
             </button>
-
             <button
               onClick={() => {
                 const s = Math.min(start, end);
                 const e = Math.max(start, end);
-                //run validations again
-                if (firstError) {
-                  setError(firstError);
-                }
-
                 onSave({
                   ...(isEditing ? { id: initial.id } : {}),
                   title: title || "Untitled",
@@ -907,9 +956,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
                   desc,
                 });
               }}
-              className={["px-6 py-2 rounded-full font-semibold", firstError ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800"].join(" ")}
-              disabled={Boolean(firstError)}
-
+              className="px-6 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
             >
               Save
             </button>
@@ -930,6 +977,7 @@ export default function ClassroomTimetableDashboard() {
   const [err, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
+  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -941,6 +989,10 @@ export default function ClassroomTimetableDashboard() {
 
   // hamburger drawer
   const [menuOpen, setMenuOpen] = useState(false); // false = hidden, true = visible
+
+  // task
+  const [tasksObject, setTasksObject] = useState([]);
+
 
   useEffect(() => {
     (async () => {
@@ -1152,22 +1204,56 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-  const liveAssignments = useMemo(
-    () => buildAssignments(courses, subsByCourse),
-    [courses, subsByCourse]
-  );
+  // const liveAssignments = useMemo(
+  //     () => buildAssignments(courses, subsByCourse),
+  //     [courses, subsByCourse]
+  // );
+  //
+
+  // // Link assignments to timetable events (so board knows which ones are placed)
+  // const linkedAssignments = useMemo(
+  //     () => annotateAssignmentsWithEvents(liveAssignments, events),
+  //     [liveAssignments, events]
+  // );
 
 
+  // // Sync(push) assignments to DB
+  // useEffect(() => {
+  //     if (!liveAssignments?.length) return;
+  //     syncAssignmentsToTasks(liveAssignments, setSubjects);
+  // }, [liveAssignments]);
+  //
+  //
+  // // Fetch assignments data from DB to use later
+  // useEffect(() => {
+  //     (async () => {
+  //         try {
+  //             const res = await get("/api/tasks/");
+  //             setTasksFromDB(res);
+  //         } catch (e) {
+  //             console.error("Failed to fetch tasks:", e);
+  //         }
+  //     })();
+  // }, [liveAssignments]);
 
+  useEffect(() => {
+    (async () => {
+      if (!courses.length || !Object.keys(subsByCourse).length) return;
+      try {
+        const tasks = await SetupTasks(courses, subsByCourse, setSubjects);
+        setTasksObject(tasks);
+      } catch (err) {
+        console.error("Failed to fetch or sync tasks:", err);
+      }
+    })();
+  }, [courses, subsByCourse]);
 
-
-  // Link assignments to timetable events (so board knows which ones are placed)
-  const linkedAssignments = useMemo(
-    () => annotateAssignmentsWithEvents(liveAssignments, events),
-    [liveAssignments, events]
-  );
-
-
+  async function handleUpdateTask(id, newData) {
+    await patch(`/api/tasks/${id}/`, newData);
+    setTasksObject(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...newData } : t))
+    );
+  }
 
 
   // Active menu (closest section center)
@@ -1411,7 +1497,10 @@ export default function ClassroomTimetableDashboard() {
 
             <div ref={tasksRef} className="scroll-mt-[80px]">
               <AssignmentsBoard
-                items={linkedAssignments}
+                // items={linkedAssignments}
+                items={tasksObject}
+                onUpdateTask={handleUpdateTask}
+                TaskSubjects={subjects}
               />
             </div>
 
@@ -1431,7 +1520,6 @@ export default function ClassroomTimetableDashboard() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         subjectOptions={subjectOptions}
-        existingEvents={events}
       />
     </div>
   );

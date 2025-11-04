@@ -22,6 +22,7 @@ class ReminderChannel(models.TextChoices):
     IN_APP = "in_app", "In-app"
 
 class Priority(models.TextChoices):
+    NONE = "none", "None"
     LOW = "low", "Low"
     NORMAL = "normal", "Normal"
     HIGH = "high", "High"
@@ -78,19 +79,22 @@ class Task(models.Model):
     title = models.CharField(max_length=240)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=TaskStatus.choices, default=TaskStatus.NOT_STARTED)
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NONE)
     due_at = models.DateTimeField(null=True, blank=True)
     rrule = models.CharField(max_length=400, blank=True)  # recurrence rule (text)
     source = models.CharField(max_length=40, blank=True)  # manual, classroom_import, etc.
-    external_id = models.CharField(max_length=120, blank=True)
+    external_id = models.CharField(max_length=120, blank=True) # assignment ID that come from Google Classroom
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Classroom linkage & UI tag
+    assignment_alt_link  = models.URLField(blank=True)
+
 
     class Meta:
         indexes = [
             models.Index(fields=["user", "due_at"]),
-            models.Index(fields=["subject", "due_at"], name="idx_tasks_subject_due"),
+            models.Index(fields=["source", "external_id"]),
         ]
         constraints = [
             models.UniqueConstraint(fields=["user", "source", "external_id"], name="uq_task_user_source_extid")

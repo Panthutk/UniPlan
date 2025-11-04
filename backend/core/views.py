@@ -249,7 +249,6 @@ class SubjectViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # only the caller's subjects
         return Subject.objects.filter(user=self.request.user).order_by("name")
 
     def perform_create(self, serializer):
@@ -278,7 +277,18 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
-        return Task.objects.filter(user=self.request.user).select_related("subject").order_by("-created_at")
+        qs = (Task.objects
+              .filter(user=self.request.user)
+              .select_related("subject")
+              .order_by("due_at", "priority"))
+        # Optional filters
+        source = self.request.query_params.get("source")
+        if source:
+            qs = qs.filter(source=source)
+        open_only = self.request.query_params.get("open", "true").lower() == "true"
+        if open_only:
+            qs = qs.exclude(status="COMPLETED")
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
