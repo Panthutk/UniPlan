@@ -97,7 +97,7 @@ class TaskSerializer(serializers.ModelSerializer):
         if not obj.due_at:
             return None
         return timezone.localtime(obj.due_at).weekday()  # 0=Mon ... 6=Sun
-    
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         # surface the “next” pending email reminder (if any)
@@ -187,83 +187,39 @@ class OAuthAccountSerializer(serializers.ModelSerializer):
         # never leak refresh tokens
         data["refresh_token"] = "********"
         return data
-    
-    
+
+
 
 class ReminderIntakeSerializer(serializers.Serializer):
-    assignmentId = serializers.CharField(max_length=128)
-    courseName   = serializers.CharField(max_length=255, allow_blank=True, required=False)
-    title        = serializers.CharField(max_length=255)
-    link         = serializers.URLField(required=False, allow_blank=True, allow_null=True)
-    # was: serializers.IntegerField(default=3)
-    offsetDays   = serializers.IntegerField(required=False, allow_null=True)
-    dueISO       = serializers.DateTimeField()
+    # Support both new and old fields
+    assignmentId = serializers.IntegerField(required=False)
     remindAtISO  = serializers.DateTimeField()
+    offsetDays   = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     def create(self, validated):
-        user       = self.context["request"].user
-        assignment = validated["assignmentId"]                  # string from frontend
-        title      = validated["title"]
-        course     = validated.get("courseName", "")            # optional
-        link       = validated.get("link") or ""                # optional
-        due_at     = validated["dueISO"]                        # datetime
-        remind_at  = validated["remindAtISO"]                   # datetime
-        offset     = validated.get("offsetDays")
-    
-        # 1) Upsert Task for this classroom item
-        # Use assignmentId as the canonical classroom work id in external_id
-        task, _ = Task.objects.get_or_create(
-            user=user,
-            source="classroom",
-            external_id=assignment,          # prevents duplicates
-            defaults={
-                "title": title,
-                "description": (f"{course}\n{link}" if link else course).strip(),
-                "due_at": due_at,
-                "is_classroom_linked": True,
-                "classroom_course_id": "",   # fill if you later send it from FE
-                "classroom_work_id": assignment,
-                "classroom_alt_link": link,
-                "color_tag": "bg-green-400",
-                "course_name": course,
-            },
-        )
-    
-        # keep task fresh if details change
-        dirty = False
-        updates = {}
-    
-        if task.title != title:
-            updates["title"] = title
-        if task.due_at != due_at:
-            updates["due_at"] = due_at
-        if course and task.course_name != course:
-            updates["course_name"] = course
-        if link and task.classroom_alt_link != link:
-            updates["classroom_alt_link"] = link
-        if not task.is_classroom_linked:
-            updates["is_classroom_linked"] = True
-    
-        if updates:
-            for k, v in updates.items():
-                setattr(task, k, v)
-            task.save(update_fields=list(updates.keys()))
-    
-        # optional: store chosen offset on the task for convenience
-        if offset is None:
-            # derive from due_at - remind_at (days)
-            offset = max(0, int(round((due_at - remind_at).total_seconds() / 86400)))
-        if getattr(task, "reminder_days_before", None) != offset:
-            task.reminder_days_before = offset
-            task.save(update_fields=["reminder_days_before"])
-    
-        # 2) De-dupe reminder by (task, channel, notify_at)
+        user = self.context["request"].user
+        task = None
+
+        if "assignmentId" in validated:
+            assignment_id = validated["assignmentId"]
+            task = Task.objects.filter(id=assignment_id, user=user).first()
+
+        if not task:
+            raise serializers.ValidationError(
+                {"assignmentId": "Task not found or invalid assignmentId."}
+            )
+
+        remind_at = validated["remindAtISO"]
+        offset = validated.get("offsetDays")
+
+        # Create or get reminder
         reminder, _ = Reminder.objects.get_or_create(
             task=task,
             channel="email",
             notify_at=remind_at,
             defaults={"status": "pending"},
         )
+
         return reminder
 
     def to_representation(self, instance):
@@ -272,7 +228,13 @@ class ReminderIntakeSerializer(serializers.Serializer):
             "id": instance.id,
             "notify_at": instance.notify_at,
             "status": instance.status,
-            "task": { "id": t.id, "title": t.title, "due_at": t.due_at },
+            "task": {
+                "id": t.id,
+                "title": t.title,
+                "due_at": t.due_at,
+                "assignment_alt_link": getattr(t, "assignment_alt_link", None),
+            },
         }
-    
+
+
     
