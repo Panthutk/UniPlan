@@ -596,45 +596,76 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events })
     const [searchTerm, setSearchTerm] = useState("");
 
     //4 Filters option (React Hook)
-    const [priorityFilters, setPriorityFilters] = useState([]);
-    const [subjectFilters, setSubjectFilters] = useState([]);
-    const [sourceFilters, setSourceFilters] = useState([]);
-    const [daysLeftFilters, setDaysLeftFilters] = useState([]);
+    const [appliedPriorityFilters, setAppliedPriorityFilters] = useState([]);
+    const [appliedSubjectFilters, setAppliedSubjectFilters] = useState([]);
+    const [appliedSourceFilters, setAppliedSourceFilters] = useState([]);
 
     //Group by dropdown (React Hook)
     const [groupByOption, setGroupByOption] = useState("");
 
     //Data filtered by Search Bar & Filter Button
     const filteredTasks = useMemo(() => {
-        // FIXME: each test work separately make the data smaller when data doesn't has both condition but intentionally has either one is enough
-        let result = TaskObjects;
-        result = result.filter(task => !task.is_archived);
+        let result = [...TaskObjects];
 
+        //  Search filter
         if (searchTerm) {
             result = result.filter(task =>
                 task.title.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
 
-        if (priorityFilters.length > 0) {
-            result = result.filter((task) => priorityFilters.includes(task.priority));
+        // Get data from each filter then merge later
+        let matches = [];
+
+        if (appliedPriorityFilters.length > 0) {
+            matches.push(
+                ...TaskObjects.filter(task => appliedPriorityFilters.includes(task.priority))
+            );
         }
-        if (subjectFilters.length > 0) {
-            result = result.filter((task) => subjectFilters.includes(task.subject));
+        if (appliedSubjectFilters.length > 0) {
+            matches.push(
+                ...TaskObjects.filter(task => appliedSubjectFilters.includes(task.subject))
+            );
         }
-        if (sourceFilters.length > 0) {
-            result = result.filter((task) => sourceFilters.includes(task.source));
+        if (appliedSourceFilters.length > 0) {
+            matches.push(
+                ...TaskObjects.filter(task => appliedSourceFilters.includes(task.source))
+            );
         }
 
+        // check do any checkbox got marked
+        const hasActiveFilters = appliedPriorityFilters.length > 0 || appliedSubjectFilters.length > 0 ||
+                                          appliedSourceFilters.length > 0;
+
+        if (hasActiveFilters) {
+            if (matches.length > 0) {
+                // merge & remove duplicates by id
+                const unique = {};
+                matches.forEach(task => (unique[task.id] = task));
+                result = Object.values(unique);
+            } else {
+                // filters active but no matches => show nothing
+                result = [];
+            }
+        } else {
+            // no filters checked => show all
+            result = [...TaskObjects];
+        }
+
+        // Filter out archived tasks
+        result = result.filter(task => !task.is_archived);
+
         return result;
-    }, [TaskObjects, searchTerm, priorityFilters, subjectFilters, sourceFilters]);
+    }, [TaskObjects, searchTerm, appliedPriorityFilters, appliedSubjectFilters, appliedSourceFilters]);
+
+
 
     //Create Separate Group each one has it own set of data
     const groupedTasks = useMemo(() => {
         if (groupByOption === "") return { "": filteredTasks };
 
         const group = (taskValue) => Object.fromEntries(groupBy(filteredTasks, taskValue));
-        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
         switch (groupByOption) {
             case "timetable":
@@ -662,17 +693,12 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events })
             <TaskFilterElements
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
-                priorityFilters={priorityFilters}
-                subjectFilters={subjectFilters}
-                sourceFilters={sourceFilters}
-                daysLeftFilters={daysLeftFilters}
-                setPriorityFilters={setPriorityFilters}
-                setSubjectFilters={setSubjectFilters}
-                setSourceFilters={setSourceFilters}
-                setDaysLeftFilters={setDaysLeftFilters}
                 groupByOption={groupByOption}
                 setGroupByOption={setGroupByOption}
                 SubjectObjects={SubjectObjects}
+                setAppliedPriorityFilters={setAppliedPriorityFilters}
+                setAppliedSubjectFilters={setAppliedSubjectFilters}
+                setAppliedSourceFilters={setAppliedSourceFilters}
             />
 
 
@@ -687,7 +713,6 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events })
             </div>
 
 
-            {/* TODO: Call each card*/}
             <div>
                 {Object.entries(groupedTasks).map(([label, tasks]) => (
                     <AssignmentsGroup key={label} label={label} GroupedTasks={tasks} SubjectMap={SubjectMap}
@@ -706,7 +731,7 @@ function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, event
     if (GroupedTasks.length === 0) {
         return (
             <section className="space-y-6">
-                <div className="text-sm opacity-70">No tasks to show.</div>
+                <div className="text-lg opacity-70 py-2">No tasks to show.</div>
             </section>
         );
     }
@@ -777,6 +802,7 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
     const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
     const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
+    const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
     // get object that has the same key with this task
     const subject = SubjectMap[task.subject];
 
@@ -824,9 +850,9 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
                 <div className="flex items-center justify-between gap-3">
                     <div className="text-sm opacity-80 truncate">
                         <span className="tracking-wider">{subject.name || "Loading..."}</span>
-                        {task.assignment_alt_link && task._link?.eventTitle ? (
+                        {task.assignment_alt_link && linked? (
                             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                              {task._link.eventTitle}
+                              {task.title}
                             </span>
                         ) : null}
                     </div>
@@ -843,10 +869,10 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
                 )}
 
                 {/* Due date & time (show when available) */}
-                {task.due && (
+                {format_due && (
                     <div className="mt-1 text-xs opacity-80">
                         <span className="font-semibold">Due:</span>{" "}
-                        {fmtDueDateObj(task.due)}
+                        {fmtDueDateObj(format_due)}
                     </div>
                 )}
 
@@ -865,7 +891,7 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
                         </a>
                     )}
 
-                     {/*Reminder controls */}
+                    {/*Reminder controls */}
                     <div className="flex items-center gap-2">
                         <label className="text-xs opacity-75">Remind me:</label>
                         <select
@@ -892,6 +918,7 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
                         </button>
                     </div>
 
+                    {/*Priority controls*/}
                     <div className="ml-auto flex items-center gap-2">
                         <span className="text-xs opacity-75">priority:</span>
                         <select
@@ -914,9 +941,14 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
 }
 
 
-function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subjectFilters, sourceFilters,
-                                daysLeftFilters, setPriorityFilters, setSubjectFilters, setSourceFilters,
-                                setDaysLeftFilters, groupByOption, setGroupByOption, SubjectObjects}) {
+function TaskFilterElements({searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
+                                setAppliedPriorityFilters, setAppliedSubjectFilters, setAppliedSourceFilters}) {
+
+    const [priorityFilters, setPriorityFilters] = useState([]);
+    const [subjectFilters, setSubjectFilters] = useState([]);
+    const [sourceFilters, setSourceFilters] = useState([]);
+    const [daysLeftFilters, setDaysLeftFilters] = useState([]);
+
 
     // Filter Button Utility
     const toggleDropdown = () => setIsOpen(!isOpen);
@@ -953,9 +985,17 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
         setSubjectFilters([]);
         setSourceFilters([]);
         setDaysLeftFilters([]);
+        setAppliedPriorityFilters([]);
+        setAppliedSubjectFilters([]);
+        setAppliedSourceFilters([]);
         setGroupByOption("");
     };
 
+    useEffect(() => {
+        const handleClickOutside = () => setIsOpen(false);
+        if (isOpen) document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, [isOpen]);
 
     return (
         <div className="flex flex-col md:flex-row items-center justify-start gap-4 py-3">
@@ -972,7 +1012,10 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
 
             {/*Filter Button*/}
             <button
-                onClick={toggleDropdown}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen((prev) => !prev);
+                }}
                 className="relative px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition"
             >
                 Filter
@@ -980,7 +1023,8 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
 
                 {/*Logic when the pop-up open*/}
                 {isOpen && (
-                    <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10">
+                    <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10"
+                         onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-col items-start ps-2 pb-5">
                             {["none", "low", "normal", "high"].map((priority_value) => (
                                 <label
@@ -998,7 +1042,7 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
                             ))}
                         </div>
 
-                        <div className="flex flex-col items-start ps-2">
+                        <div className="flex flex-col items-start ps-2 pb-5">
                             {SubjectObjects.map((subject) => (
                                 <label
                                     key={subject.id}
@@ -1015,7 +1059,7 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
                             ))}
                         </div>
 
-                        <div className="flex flex-col items-start ps-2">
+                        <div className="flex flex-col items-start ps-2 pb-5">
                             {["classroom", "create"].map((source_value) => (
                                 <label
                                     key={source_value}
@@ -1032,6 +1076,18 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
                             ))}
                         </div>
 
+                        <button
+                            onClick={() => {
+                                setAppliedPriorityFilters(priorityFilters);
+                                setAppliedSubjectFilters(subjectFilters);
+                                setAppliedSourceFilters(sourceFilters);
+                                toggleDropdown();
+                            }}
+                            className="m-3 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
+                        >
+                            Apply Filter
+                        </button>
+
                     </div>
                 )}
             </button>
@@ -1044,7 +1100,7 @@ function TaskFilterElements({searchTerm, setSearchTerm, priorityFilters, subject
                 className="p-2 rounded bg-red-400 shadow"
             >
                 <option value="none">-</option>
-                <option value="day">By day of the week</option>
+                <option value="day">By Due on</option>
                 <option value="subject">By Subject</option>
                 <option value="priority">By Urgency</option>
             </select>
