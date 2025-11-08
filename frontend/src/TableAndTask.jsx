@@ -656,13 +656,6 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events })
     const filteredTasks = useMemo(() => {
         let result = [...TaskObjects];
 
-        //  Search filter
-        if (searchTerm) {
-            result = result.filter(task =>
-                task.title.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-        }
-
         // Get data from each filter then merge later
         let matches = [];
 
@@ -703,6 +696,14 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events })
 
         // Filter out archived tasks
         result = result.filter(task => !task.is_archived);
+
+        //  Search filter
+        if (searchTerm) {
+            result = result.filter(task =>
+                task.title.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
 
         return result;
     }, [TaskObjects, searchTerm, appliedPriorityFilters, appliedSubjectFilters, appliedSourceFilters]);
