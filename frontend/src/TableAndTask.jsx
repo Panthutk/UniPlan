@@ -928,9 +928,9 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
 
 
                 <div className="mt-3 flex items-center gap-3">
-                    {task.altLink && (
+                    {task.assignment_alt_link && (
                         <a
-                            href={task.altLink}
+                            href={task.assignment_alt_link}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
