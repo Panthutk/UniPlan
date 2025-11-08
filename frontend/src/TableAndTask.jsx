@@ -112,8 +112,6 @@ async function createReminder({
   });
 }
 
-const HH = (n) => String(n).padStart(2, "0");
-const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
 
 // UI uses 0=Mon..6=Sun, backend uses 0=Sun..6=Sat
 const uiToDbDay = (ui) => (ui + 1) % 7;  // Mon(0)->1 ... Sun(6)->0
@@ -139,6 +137,50 @@ function uniqueCodeFromName(name, existingSubjects) {
   }
   return code;
 }
+
+
+// helper for timetable in  minute
+
+const STEP_MIN = 15;
+const DAY_START_H = 8;
+const DAY_END_H = 20;
+
+
+const toHHMM = (m) => {
+  const hh = String(Math.floor(m / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}; // It converts a number of minutes since midnight into “HH:MM” for dropdown label also on eventcard
+
+const toLabelSS = (m) => `${toHHMM(m)}:00`;   // "HH:MM:SS" (08.15.00) for Django
+
+// For hour-based grid snapping(grid still the same for hr)
+const startHour = (m) => Math.floor(m / 60);                 // e.g. 08:15 -> 8
+const endHour = (mStart, mEnd) =>
+  Math.max(Math.ceil(mEnd / 60), Math.floor(mStart / 60) + 1); // at least 1h wide
+
+
+const parseHHMM = (s) => {
+  if (!s) return 0;
+  const [H, M] = String(s).split(":").map(Number);
+  return (H || 0) * 60 + (M || 0);  // convert hours/minutes to total minutes for easy math
+}
+
+
+// split hour and min
+const getHour = (m) => Math.floor(m / 60);
+const getMinute = (m) => m % 60;
+
+// options for hour/minute selects
+const HOURS = Array.from({ length: DAY_END_H - DAY_START_H + 1 }, (_, i) => DAY_START_H + i);
+const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
+
+
+// help for adjust the column card
+const COL_W = 120;
+const startOffsetPx = (mStart) => ((mStart % 60) / 60) * COL_W;
+const endTrimPx = (mEnd) =>
+  (mEnd % 60 === 0 ? 0 : (1 - (mEnd % 60) / 60) * COL_W);
 
 
 // --- Linking assignments to timetable events ---
@@ -398,11 +440,6 @@ function colorForDay(day) {
 }
 
 
-/* ----------------- ellipsis ------------------- */
-function trun8(s) {
-  if (!s) return "";
-  return s.length > 8 ? s.slice(0, 8) + "..." : s;
-}
 
 
 /* ----------------- UI: Timetable (clickable & shows events) ------------------- */
@@ -478,19 +515,31 @@ const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEvent
             <div
               key={e.id}
               onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
-              className={`rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90`}
+              className="relative" // ahchor for absolute child
               style={{
                 gridRow: rowFromDay(e.day),
-                gridColumn: `${colFromTime(e.start)} / ${colFromTime(e.end)}`,
+                // keep grid hour-based (snap to hours)
+                gridColumn: `${colFromTime(startHour(e.start))} / ${colFromTime(endHour(e.start, e.end))}`,
                 zIndex: 10,
+                overflow: "hidden", // keeps the card clipped inside the span
               }}
-              title={`${e.title} — ${e.start}:00–${e.end}:00`}
+              // show real minutes
+              title={`${e.title} — ${toHHMM(e.start)}–${toHHMM(e.end)}`}
             >
-              <div className="truncate whitespace-nowrap overflow-hidden">
-                {trun8(e.title)}
-              </div>
-              <div className="text-[10px] opacity-80">
-                {e.start}:00–{e.end}:00
+              {/* the card inside slide it on horizontal*/}
+              <div
+                className={`absolute top-0 bottom-0 rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90 overflow-hidden`}
+                style={{
+                  left: `${startOffsetPx(e.start)}px`,   // e.g., 30/60/90 px for :15/:30/:45
+                  right: `${endTrimPx(e.end)}px`,         // trim right side if ends mid-hour
+                }}>
+
+                <div className="truncate whitespace-nowrap overflow-hidden">
+                  {(e.title)}
+                </div>
+                <div className="text-[10px] opacity-80">
+                  {toHHMM(e.start)}–{toHHMM(e.end)}
+                </div>
               </div>
             </div>
           ))}
@@ -830,21 +879,53 @@ function AssignmentsBoard({ items, onUpdateTask, TaskSubjects }) {
 
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
-function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }) {
+function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
-  const [start, setStart] = useState(initial.start ?? 8);
-  const [end, setEnd] = useState(initial.end ?? 9);
+  const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
+  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + STEP_MIN)); // 495 minutes (8:15 am)
   const [desc, setDesc] = useState(initial.desc || "");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
-    setStart(initial.start ?? 8);
-    setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
+    setStart(initial.startMin ?? DAY_START_H * 60);
+    setEnd(initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + STEP_MIN, DAY_END_H * 60));
     setDesc(initial.desc || "");
+    setError("");
   }, [open, initial]);
+
+  // Derived validations
+  const timeError = end <= start; // strictly after required (raw values)
+  const s = Math.min(start, end);
+  const e = Math.max(start, end);
+  const normalizedTitle = (title || "Untitled").trim().toLowerCase(); // Converts everything to lowercase so comparisons don’t care about capitalization.
+
+
+
+  // Exact duplicate (same day+time+title; ignore current when editing)
+
+  const duplicateError = existingEvents.some(ev =>
+    ev.day === day &&
+    ev.start === s &&
+    ev.end === e &&
+    ev.title?.trim()?.toLowerCase() === normalizedTitle &&
+    (!initial?.id || ev.id !== initial.id)
+  );
+
+  // Time overlap with another event on same day (if you want to prevent overlaps)
+  const overlapError = existingEvents.some(ev =>
+    ev.day === day &&
+    (!initial?.id || ev.id !== initial.id) &&
+    // overlap if start < other.end AND end > other.start
+    s < ev.end && e > ev.start
+  );
+
+  const firstError = (timeError && "End time must be after start time.") ||
+    (duplicateError && "This subject already exists with the same day and time.") ||
+    (overlapError && "This time overlaps another subject on the same day.");
 
   if (!open) return null;
 
@@ -877,27 +958,76 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="text-sm mb-1">Start Class</div>
-            <select
-              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-              value={start}
-              onChange={(e) => setStart(Number(e.target.value))}
-            >
-              {TIMES.map((h) => (
-                <option key={h} value={h}>{h}:00</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              {/* Hour */}
+              <select
+                aria-label="Start hour"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getHour(start)}
+                onChange={(e) => {
+                  const h = parseInt(e.target.value, 10);
+                  setStart(h * 60 + getMinute(start));
+                }}
+              >
+                {HOURS.map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                ))}
+              </select>
+
+              <div className="text-neutral-400">:</div>
+
+              {/* Minute */}
+              <select
+                aria-label="Start minute"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getMinute(start)}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setStart(getHour(start) * 60 + m);
+                }}
+              >
+                {MINUTES.filter(m => getHour(start) < DAY_END_H || m == 0).map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <div className="text-sm mb-1">End Class</div>
-            <select
-              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-              value={end}
-              onChange={(e) => setEnd(Number(e.target.value))}
-            >
-              {TIMES.map((h) => (
-                <option key={h} value={h}>{h}:00</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              {/* Hour */}
+              <select
+                aria-label="End hour"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getHour(end)}
+                onChange={(e) => {
+                  const h = parseInt(e.target.value, 10);
+                  const newEnd = h * 60 + getMinute(end);
+                  setEnd(Math.min(newEnd, DAY_END_H * 60));
+                }}
+              >
+                {HOURS.map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                ))}
+              </select>
+
+              <div className="text-neutral-400">:</div>
+
+              {/* Minute */}
+              <select
+                aria-label="End minute"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getMinute(end)}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setEnd(Math.min(getHour(end) * 60 + m, DAY_END_H * 60));
+                }}
+              >
+                {MINUTES.filter(m => getHour(end) < DAY_END_H || m == 0).map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -925,6 +1055,9 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
           />
         </div>
 
+        {/*Show the alert text*/}
+        {firstError && (<div className="mt-3 text-sm text-rose-400" role="alert" aria-live="assertive">Alert: {firstError} </div>)}
+
         <div className="mt-5 flex items-center justify-between gap-3">
           {/* DELETE only when editing */}
           {isEditing ? (
@@ -947,16 +1080,25 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions }
               onClick={() => {
                 const s = Math.min(start, end);
                 const e = Math.max(start, end);
+                // run validation again
+                if (firstError) {
+
+                  setError(firstError);
+
+                }
+
+                // call back parent function ClassroomTimetableDashboard
                 onSave({
                   ...(isEditing ? { id: initial.id } : {}),
                   title: title || "Untitled",
                   day,
-                  start: s,
-                  end: Math.max(e, s + 1),
+                  startMin: s,
+                  endMin: Math.max(e, s + STEP_MIN), //send minute outward
                   desc,
                 });
               }}
-              className="px-6 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold"
+              className={["px-6 py-2 rounded-full font-semibold", firstError ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800"].join(" ")}
+              disabled={Boolean(firstError)}
             >
               Save
             </button>
@@ -1014,7 +1156,7 @@ export default function ClassroomTimetableDashboard() {
       try {
         const [subj, tte] = await Promise.all([
           listSubjects(me.id),
-          listTimetable(me.id),
+          listTimetable(me.id), //UI after refresh it, api call backend will return data from db
         ]);
         setSubjects(subj);
 
@@ -1024,8 +1166,8 @@ export default function ClassroomTimetableDashboard() {
           subjectId: t.subject,
           title: byId[t.subject]?.name || "Untitled",
           day: dbToUiDay(t.day_of_week),
-          start: hourOnly(t.start_time),
-          end: hourOnly(t.end_time),
+          start: parseHHMM(t.start_time),
+          end: parseHHMM(t.end_time),
           desc: t.room || "",
           color: colorForDay(dbToUiDay(t.day_of_week)),
         }));
@@ -1050,16 +1192,16 @@ export default function ClassroomTimetableDashboard() {
 
   // Initialize from grid (create)
   const handleCellClick = (dayIdx, hour) => {
-    setModalInitial({ day: dayIdx, start: hour, end: Math.min(hour + 1, 20), title: "", desc: "" });
+    setModalInitial({ day: dayIdx, startMin: hour * 60, endMin: Math.min(hour * 60 + STEP_MIN, DAY_END_H * 60), title: "", desc: "" });
     setModalOpen(true);
   };
 
   // Initialize from event (edit)
   const handleEventClick = (evt) => {
-    setModalInitial({ ...evt }); // contains id, title, day, start, end, desc, color
+    setModalInitial({ ...evt, startMin: evt.start, endMin: evt.end }); // contains id, title, day, start, end, desc, color
     setModalOpen(true);
   };
-
+  // take modal data then sends a POST or PUT request to /api/timetable/
   const handleSaveEvent = async (payload) => {
     try {
       const desiredName = (payload.title || "Untitled").trim();
@@ -1072,18 +1214,21 @@ export default function ClassroomTimetableDashboard() {
       }
 
       // 2) normalize time
-      const s = Math.min(payload.start, payload.end);
-      const e = Math.max(payload.start, payload.end);
-      const startHH = String(s).padStart(2, "0");
-      const endHH = String(e).padStart(2, "0");
+      const sMin = Math.min(payload.startMin ?? payload.start, payload.endMin ?? payload.end);
+      const eMin = Math.max(payload.startMin ?? payload.start, payload.endMin ?? payload.end);
+
+      // for api
+      const start_time = toLabelSS(sMin);  // "HH:MM:SS"
+      const end_time = toLabelSS(eMin);
+
 
       if (payload.id && typeof payload.id === "number") {
         // UPDATE existing timetable entry
         const updated = await updateTimetableEntry(payload.id, {
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
-          start_time: `${startHH}:00:00`,
-          end_time: `${endHH}:00:00`,
+          start_time,
+          end_time,
           room: payload.desc || "",
         });
 
@@ -1094,8 +1239,8 @@ export default function ClassroomTimetableDashboard() {
               subjectId: subject.id,
               title: subject.name,
               day: dbToUiDay(updated.day_of_week),                 // map DB -> UI
-              start: s,
-              end: e,
+              start: sMin,
+              end: eMin,
               desc: updated.room,
               color: colorForDay(dbToUiDay(updated.day_of_week)),  // color for UI day
             }
@@ -1106,8 +1251,8 @@ export default function ClassroomTimetableDashboard() {
         const created = await createTimetableEntry({
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),
-          start_time: `${startHH}:00:00`,
-          end_time: `${endHH}:00:00`,
+          start_time,
+          end_time,
           room: payload.desc || "",
         });
 
@@ -1118,8 +1263,8 @@ export default function ClassroomTimetableDashboard() {
             subjectId: subject.id,
             title: subject.name,
             day: dbToUiDay(created.day_of_week),              // map DB -> UI
-            start: s,
-            end: e,
+            start: sMin,
+            end: eMin,
             desc: created.room,
             color: colorForDay(dbToUiDay(created.day_of_week)) // color for UI day
           },
@@ -1520,6 +1665,7 @@ export default function ClassroomTimetableDashboard() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
         subjectOptions={subjectOptions}
+        existingEvents={events}
       />
     </div>
   );
