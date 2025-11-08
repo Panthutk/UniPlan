@@ -620,570 +620,570 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
 
 function AssignmentsBoard({ TaskObjects, onUpdateTask, SubjectObjects, events }) {
 
-    // console.log("-------------------------------------------------------");
-    // console.log(TaskObjects);
-    // console.log(SubjectObjects);
-    // console.log("-------------------------------------------------------");
+  // console.log("-------------------------------------------------------");
+  // console.log(TaskObjects);
+  // console.log(SubjectObjects);
+  // console.log("-------------------------------------------------------");
 
-    //Legend Deadline indicator (Array)
-    const legends = [
-        { color: "bg-red-600", label: "less than 3 days" },
-        { color: "bg-amber-400", label: "less than 7 days" },
-        { color: "bg-green-400", label: "more than 7 days" },
-    ];
-    // Make Subject ID to be Key for easier to use Subject data
-    const SubjectMap = useMemo(() => {
-        const map = {};
-        SubjectObjects.forEach(subj => {
-            map[subj.id] = subj;
+  //Legend Deadline indicator (Array)
+  const legends = [
+    { color: "bg-red-600", label: "less than 3 days" },
+    { color: "bg-amber-400", label: "less than 7 days" },
+    { color: "bg-green-400", label: "more than 7 days" },
+  ];
+  // Make Subject ID to be Key for easier to use Subject data
+  const SubjectMap = useMemo(() => {
+    const map = {};
+    SubjectObjects.forEach(subj => {
+      map[subj.id] = subj;
+    });
+    return map;
+  }, [SubjectObjects]);
+
+
+  //Search Bar (React Hook)
+  const [searchTerm, setSearchTerm] = useState("");
+
+  //4 Filters option (React Hook)
+  const [appliedPriorityFilters, setAppliedPriorityFilters] = useState([]);
+  const [appliedSubjectFilters, setAppliedSubjectFilters] = useState([]);
+  const [appliedSourceFilters, setAppliedSourceFilters] = useState([]);
+
+  //Group by dropdown (React Hook)
+  const [groupByOption, setGroupByOption] = useState("");
+
+  //Data filtered by Search Bar & Filter Button
+  const filteredTasks = useMemo(() => {
+    let result = [...TaskObjects];
+
+    // Get data from each filter then merge later
+    let matches = [];
+
+    if (appliedPriorityFilters.length > 0) {
+      matches.push(
+        ...TaskObjects.filter(task => appliedPriorityFilters.includes(task.priority))
+      );
+    }
+    if (appliedSubjectFilters.length > 0) {
+      matches.push(
+        ...TaskObjects.filter(task => appliedSubjectFilters.includes(task.subject))
+      );
+    }
+    if (appliedSourceFilters.length > 0) {
+      matches.push(
+        ...TaskObjects.filter(task => appliedSourceFilters.includes(task.source))
+      );
+    }
+
+    // check do any checkbox got marked
+    const hasActiveFilters = appliedPriorityFilters.length > 0 || appliedSubjectFilters.length > 0 ||
+      appliedSourceFilters.length > 0;
+
+    if (hasActiveFilters) {
+      if (matches.length > 0) {
+        // merge & remove duplicates by id
+        const unique = {};
+        matches.forEach(task => (unique[task.id] = task));
+        result = Object.values(unique);
+      } else {
+        // filters active but no matches => show nothing
+        result = [];
+      }
+    } else {
+      // no filters checked => show all
+      result = [...TaskObjects];
+    }
+
+    // Filter out archived tasks
+    result = result.filter(task => !task.is_archived);
+
+    //  Search filter
+    if (searchTerm) {
+      result = result.filter(task =>
+        task.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+
+    return result;
+  }, [TaskObjects, searchTerm, appliedPriorityFilters, appliedSubjectFilters, appliedSourceFilters]);
+
+
+
+  //Create Separate Group each one has it own set of data
+  const groupedTasks = useMemo(() => {
+    if (groupByOption === "") return { "": filteredTasks };
+
+    const group = (taskValue) => Object.fromEntries(groupBy(filteredTasks, taskValue));
+    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    switch (groupByOption) {
+      case "timetable":
+        return group();
+
+
+      case "day":
+        return group((t) => dayNames[t.day_of_week] || "Unassigned");
+      case "subject":
+        return group((t) => {
+          const subj = SubjectMap[t.subject];
+          return subj ? subj.name : "Unknown Subject";
         });
-        return map;
-    }, [SubjectObjects]);
+      case "priority":
+        return group((t) => t.priority || "Unknown");
+      default:
+        return { "": filteredTasks };
+    }
+  }, [filteredTasks, groupByOption, SubjectMap]);
+
+  return (
+    <div>
+
+      {/*Utility buttons: Search bar + Filter + Group*/}
+      <TaskFilterElements
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        groupByOption={groupByOption}
+        setGroupByOption={setGroupByOption}
+        SubjectObjects={SubjectObjects}
+        setAppliedPriorityFilters={setAppliedPriorityFilters}
+        setAppliedSubjectFilters={setAppliedSubjectFilters}
+        setAppliedSourceFilters={setAppliedSourceFilters}
+      />
 
 
-    //Search Bar (React Hook)
-    const [searchTerm, setSearchTerm] = useState("");
-
-    //4 Filters option (React Hook)
-    const [appliedPriorityFilters, setAppliedPriorityFilters] = useState([]);
-    const [appliedSubjectFilters, setAppliedSubjectFilters] = useState([]);
-    const [appliedSourceFilters, setAppliedSourceFilters] = useState([]);
-
-    //Group by dropdown (React Hook)
-    const [groupByOption, setGroupByOption] = useState("");
-
-    //Data filtered by Search Bar & Filter Button
-    const filteredTasks = useMemo(() => {
-        let result = [...TaskObjects];
-
-        // Get data from each filter then merge later
-        let matches = [];
-
-        if (appliedPriorityFilters.length > 0) {
-            matches.push(
-                ...TaskObjects.filter(task => appliedPriorityFilters.includes(task.priority))
-            );
-        }
-        if (appliedSubjectFilters.length > 0) {
-            matches.push(
-                ...TaskObjects.filter(task => appliedSubjectFilters.includes(task.subject))
-            );
-        }
-        if (appliedSourceFilters.length > 0) {
-            matches.push(
-                ...TaskObjects.filter(task => appliedSourceFilters.includes(task.source))
-            );
-        }
-
-        // check do any checkbox got marked
-        const hasActiveFilters = appliedPriorityFilters.length > 0 || appliedSubjectFilters.length > 0 ||
-                                          appliedSourceFilters.length > 0;
-
-        if (hasActiveFilters) {
-            if (matches.length > 0) {
-                // merge & remove duplicates by id
-                const unique = {};
-                matches.forEach(task => (unique[task.id] = task));
-                result = Object.values(unique);
-            } else {
-                // filters active but no matches => show nothing
-                result = [];
-            }
-        } else {
-            // no filters checked => show all
-            result = [...TaskObjects];
-        }
-
-        // Filter out archived tasks
-        result = result.filter(task => !task.is_archived);
-
-        //  Search filter
-        if (searchTerm) {
-            result = result.filter(task =>
-                task.title.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-        }
+      {/* Colors legend : tell how far from deadline*/}
+      <div className="bg-pink-500 flex flex-col md:flex-row items-center gap-3 md:gap-6">
+        {legends.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className={`h-3 w-3 rounded-full ${item.color}`} />
+            <span className="text-sm font-medium">{item.label}</span>
+          </div>
+        ))}
+      </div>
 
 
-        return result;
-    }, [TaskObjects, searchTerm, appliedPriorityFilters, appliedSubjectFilters, appliedSourceFilters]);
+      <div>
+        {Object.entries(groupedTasks).map(([label, tasks]) => (
+          <AssignmentsGroup key={label} label={label} GroupedTasks={tasks} SubjectMap={SubjectMap}
+            onUpdateTask={onUpdateTask} events={events} />
+        ))}
+      </div>
 
 
-
-    //Create Separate Group each one has it own set of data
-    const groupedTasks = useMemo(() => {
-        if (groupByOption === "") return { "": filteredTasks };
-
-        const group = (taskValue) => Object.fromEntries(groupBy(filteredTasks, taskValue));
-        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-        switch (groupByOption) {
-            case "timetable":
-                return group();
-
-
-            case "day":
-                return group((t) => dayNames[t.day_of_week] || "Unassigned");
-            case "subject":
-                return group((t) => {
-                    const subj = SubjectMap[t.subject];
-                    return subj ? subj.name : "Unknown Subject";
-                });
-            case "priority":
-                return group((t) => t.priority || "Unknown");
-            default:
-                return { "": filteredTasks };
-        }
-    }, [filteredTasks, groupByOption, SubjectMap]);
-
-    return(
-        <div>
-
-            {/*Utility buttons: Search bar + Filter + Group*/}
-            <TaskFilterElements
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                groupByOption={groupByOption}
-                setGroupByOption={setGroupByOption}
-                SubjectObjects={SubjectObjects}
-                setAppliedPriorityFilters={setAppliedPriorityFilters}
-                setAppliedSubjectFilters={setAppliedSubjectFilters}
-                setAppliedSourceFilters={setAppliedSourceFilters}
-            />
-
-
-            {/* Colors legend : tell how far from deadline*/}
-            <div className="bg-pink-500 flex flex-col md:flex-row items-center gap-3 md:gap-6">
-                {legends.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <span className={`h-3 w-3 rounded-full ${item.color}`}/>
-                        <span className="text-sm font-medium">{item.label}</span>
-                    </div>
-                ))}
-            </div>
-
-
-            <div>
-                {Object.entries(groupedTasks).map(([label, tasks]) => (
-                    <AssignmentsGroup key={label} label={label} GroupedTasks={tasks} SubjectMap={SubjectMap}
-                                      onUpdateTask={onUpdateTask} events={events}/>
-                ))}
-            </div>
-
-
-        </div>
-    );
+    </div>
+  );
 }
 
 function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, events }) {
-    const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(true);
 
-    if (GroupedTasks.length === 0) {
-        return (
-            <section className="space-y-6">
-                <div className="text-lg opacity-70 py-2">No tasks to show.</div>
-            </section>
-        );
-    }
-
+  if (GroupedTasks.length === 0) {
     return (
-        <div>
-            {/* Header with toggle button */}
-            <div className="flex items-center justify-start mb-2">
-                {label && (
-                    <button
-                        onClick={() => setIsOpen(!isOpen)}
-                        className="px-3 text-sm text-blue-200 hover:text-white transition"
-                    >
-                        {isOpen ? "⏷" : "▶"}
-                    </button>
-                )}
-
-                <h2 className="text-lg font-bold uppercase">{label}</h2>
-
-            </div>
-
-            {/* Tasks list (conditionally rendered) */}
-            {isOpen && (
-                <div>
-                    {GroupedTasks.map((task) => (
-                        <AssignmentsCard key={task.id} task={task}  SubjectMap={SubjectMap} onUpdateTask={onUpdateTask}
-                                         events = {events}/>
-                    ))}
-                </div>
-            )}
-        </div>
+      <section className="space-y-6">
+        <div className="text-lg opacity-70 py-2">No tasks to show.</div>
+      </section>
     );
+  }
+
+  return (
+    <div>
+      {/* Header with toggle button */}
+      <div className="flex items-center justify-start mb-2">
+        {label && (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="px-3 text-sm text-blue-200 hover:text-white transition"
+          >
+            {isOpen ? "⏷" : "▶"}
+          </button>
+        )}
+
+        <h2 className="text-lg font-bold uppercase">{label}</h2>
+
+      </div>
+
+      {/* Tasks list (conditionally rendered) */}
+      {isOpen && (
+        <div>
+          {GroupedTasks.map((task) => (
+            <AssignmentsCard key={task.id} task={task} SubjectMap={SubjectMap} onUpdateTask={onUpdateTask}
+              events={events} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 
 function AssignmentsCard({ task, SubjectMap, onUpdateTask, events }) {
 
-    // Data tell task linked with Timetable or not?
-    const TableLink = linkOneAssignmentToEvents(task, events);
+  // Data tell task linked with Timetable or not?
+  const TableLink = linkOneAssignmentToEvents(task, events);
 
-    const days_left = task.days_left;
+  const days_left = task.days_left;
 
-    const leftText =
-        days_left == null ? "—" : `${Math.max(days_left, 0)} Day${Math.abs(days_left) === 1 ? "" : "s"} Left`;
-    // TODO: leftText = 0 Days Left
+  const leftText =
+    days_left == null ? "—" : `${Math.max(days_left, 0)} Day${Math.abs(days_left) === 1 ? "" : "s"} Left`;
+  // TODO: leftText = 0 Days Left
 
-    const linked = TableLink?.linked;
-    // Sample data true, false
+  const linked = TableLink?.linked;
+  // Sample data true, false
 
-    const dayBg =
-        days_left != null
-            ? days_left < 3
-                ? "bg-red-500"     // urgent (<3 days)
-                : days_left < 7
-                    ? "bg-yellow-400"  // moderate (<7 days)
-                    : "bg-green-500"   // safe (>7 days)
-            : "";
-    const dayRing =
-        days_left != null
-            ? days_left < 3
-                ? "ring-red-400"     // urgent (<3 days)
-                : days_left < 7
-                    ? "ring-yellow-200"  // moderate (<7 days)
-                    : "ring-green-300"   // safe (>7 days)
-            : "";
+  const dayBg =
+    days_left != null
+      ? days_left < 3
+        ? "bg-red-500"     // urgent (<3 days)
+        : days_left < 7
+          ? "bg-yellow-400"  // moderate (<7 days)
+          : "bg-green-500"   // safe (>7 days)
+      : "";
+  const dayRing =
+    days_left != null
+      ? days_left < 3
+        ? "ring-red-400"     // urgent (<3 days)
+        : days_left < 7
+          ? "ring-yellow-200"  // moderate (<7 days)
+          : "ring-green-300"   // safe (>7 days)
+      : "";
 
-    const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
-    const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
-    const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+  const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
+  const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
+  const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
-    const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
-    // get object that has the same key with this task
-    const subject = SubjectMap[task.subject];
+  const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
+  // get object that has the same key with this task
+  const subject = SubjectMap[task.subject];
 
-    const scheduleReminder = async (task) => {
-        if (!task?.due_at) { alert("No due date for this task."); return; }
+  const scheduleReminder = async (task) => {
+    if (!task?.due_at) { alert("No due date for this task."); return; }
 
-        const id = task.id;
-        console.log(id);
-        const due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
-        if (isNaN(+due)) { alert("Invalid due date."); return; }
+    const id = task.id;
+    console.log(id);
+    const due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
+    if (isNaN(+due)) { alert("Invalid due date."); return; }
 
-        const offset = Number(choice[id] ?? 3); // default 3 days
-        const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
-
-
-        try {
-            setPending(p => ({ ...p, [id]: true }));
-            await createReminder({
-                assignmentId: id,
-                remindAtISO: remindAt.toISOString(),
-                offsetDays: offset,
-            });
-            setScheduled(s => ({ ...s, [id]: true }));
-            alert(`Reminder set: ${offset} day(s) before due date.`);
-        } catch (e) {
-            console.error(e);
-            alert(`Failed to schedule reminder: ${e?.message || e}`);
-        } finally {
-            setPending(p => ({ ...p, [id]: false }));
-        }
-    };
-
-    return (
-        <div
-            key={task.id}
-            className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${dayRing} bg-white/5 overflow-hidden`}
-        >
-            {/* Left label (day color only when linked) */}
-            <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
-                <div className="text-center text-xl">{leftText}</div>
-            </div>
-
-            {/* Right content */}
-            <div className="p-4 min-w-0">
-                <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm opacity-80 truncate">
-                        <span className="tracking-wider">{subject.name || "Loading..."}</span>
-                        {task.assignment_alt_link && linked? (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                              {task.title}
-                            </span>
-                        ) : null}
-                    </div>
-                </div>
-
-                {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
-                {task.external_id ? (
-                    <div className="mt-1 text-sm">
-                        <span className="opacity-80 mr-2">HW:</span>
-                        <span className="font-semibold">{task.title}</span>
-                    </div>
-                ) : (
-                    <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
-                )}
-
-                {/* Due date & time (show when available) */}
-                {format_due && (
-                    <div className="mt-1 text-xs opacity-80">
-                        <span className="font-semibold">Due:</span>{" "}
-                        {fmtDueDateObj(format_due)}
-                    </div>
-                )}
+    const offset = Number(choice[id] ?? 3); // default 3 days
+    const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
 
-                <div className="mt-3 flex items-center gap-3">
-                    {task.assignment_alt_link && (
-                        <a
-                            href={task.assignment_alt_link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
-                            title="Open in Classroom"
-                        >
-                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
-                            Classroom
-                        </a>
-                    )}
+    try {
+      setPending(p => ({ ...p, [id]: true }));
+      await createReminder({
+        assignmentId: id,
+        remindAtISO: remindAt.toISOString(),
+        offsetDays: offset,
+      });
+      setScheduled(s => ({ ...s, [id]: true }));
+      alert(`Reminder set: ${offset} day(s) before due date.`);
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to schedule reminder: ${e?.message || e}`);
+    } finally {
+      setPending(p => ({ ...p, [id]: false }));
+    }
+  };
 
-                    {/*Reminder controls */}
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs opacity-75">Remind me:</label>
-                        <select
-                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-                            value={(choice[task.id] ?? 3)}
-                            onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
-                            title={task.due ? "Choose how many days before due date" : "No due date"}
-                        >
-                            <option value={1}>1 day before</option>
-                            <option value={3}>3 days before</option>
-                            <option value={7}>7 days before</option>
-                        </select>
-                        <button
-                            onClick={() => scheduleReminder(task)}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
-                            className={[
-                                "text-xs px-3 py-1.5 rounded-full font-semibold",
-                                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
-                            ].join(" ")}
-                            title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
-                        >
-                            {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
-                        </button>
-                    </div>
+  return (
+    <div
+      key={task.id}
+      className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${dayRing} bg-white/5 overflow-hidden`}
+    >
+      {/* Left label (day color only when linked) */}
+      <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
+        <div className="text-center text-xl">{leftText}</div>
+      </div>
 
-                    {/*Priority controls*/}
-                    <div className="ml-auto flex items-center gap-2">
-                        <span className="text-xs opacity-75">priority:</span>
-                        <select
-                            className="bg-neutral-800 border border-white/10 text-xs opacity-75"
-                            value={task.priority ?? "none"}
-                            onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
-                        >
-                            <option value="none">-</option>
-                            <option value="low">Low</option>
-                            <option value="normal">Medium</option>
-                            <option value="high">High</option>
-                        </select>
-
-                    </div>
-                </div>
-
-            </div>
+      {/* Right content */}
+      <div className="p-4 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm opacity-80 truncate">
+            <span className="tracking-wider">{subject.name || "Loading..."}</span>
+            {task.assignment_alt_link && linked ? (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                {task.title}
+              </span>
+            ) : null}
+          </div>
         </div>
-    );
+
+        {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
+        {task.external_id ? (
+          <div className="mt-1 text-sm">
+            <span className="opacity-80 mr-2">HW:</span>
+            <span className="font-semibold">{task.title}</span>
+          </div>
+        ) : (
+          <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
+        )}
+
+        {/* Due date & time (show when available) */}
+        {format_due && (
+          <div className="mt-1 text-xs opacity-80">
+            <span className="font-semibold">Due:</span>{" "}
+            {fmtDueDateObj(format_due)}
+          </div>
+        )}
+
+
+        <div className="mt-3 flex items-center gap-3">
+          {task.assignment_alt_link && (
+            <a
+              href={task.assignment_alt_link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+              title="Open in Classroom"
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+              Classroom
+            </a>
+          )}
+
+          {/*Reminder controls */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs opacity-75">Remind me:</label>
+            <select
+              className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+              value={(choice[task.id] ?? 3)}
+              onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
+              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+              title={task.due ? "Choose how many days before due date" : "No due date"}
+            >
+              <option value={1}>1 day before</option>
+              <option value={3}>3 days before</option>
+              <option value={7}>7 days before</option>
+            </select>
+            <button
+              onClick={() => scheduleReminder(task)}
+              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+              className={[
+                "text-xs px-3 py-1.5 rounded-full font-semibold",
+                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+              ].join(" ")}
+              title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
+            >
+              {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
+            </button>
+          </div>
+
+          {/*Priority controls*/}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs opacity-75">priority:</span>
+            <select
+              className="bg-neutral-800 border border-white/10 text-xs opacity-75"
+              value={task.priority ?? "none"}
+              onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
+            >
+              <option value="none">-</option>
+              <option value="low">Low</option>
+              <option value="normal">Medium</option>
+              <option value="high">High</option>
+            </select>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 
 
-function TaskFilterElements({searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
-                                setAppliedPriorityFilters, setAppliedSubjectFilters, setAppliedSourceFilters}) {
+function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
+  setAppliedPriorityFilters, setAppliedSubjectFilters, setAppliedSourceFilters }) {
 
-    const [priorityFilters, setPriorityFilters] = useState([]);
-    const [subjectFilters, setSubjectFilters] = useState([]);
-    const [sourceFilters, setSourceFilters] = useState([]);
-    const [daysLeftFilters, setDaysLeftFilters] = useState([]);
-
-
-    // Filter Button Utility
-    const toggleDropdown = () => setIsOpen(!isOpen);
-    const [isOpen, setIsOpen] = useState(false);
+  const [priorityFilters, setPriorityFilters] = useState([]);
+  const [subjectFilters, setSubjectFilters] = useState([]);
+  const [sourceFilters, setSourceFilters] = useState([]);
+  const [daysLeftFilters, setDaysLeftFilters] = useState([]);
 
 
-    // Filter function logic
-    const togglePriority = (priority_value) => {
-        setPriorityFilters((prev) =>
-            prev.includes(priority_value)
-                ? prev.filter((p) => p !== priority_value)
-                : [...prev, priority_value]
-        );
-    };
-    const toggleSubject = (subject_value) => {
-        setSubjectFilters((prev) =>
-            prev.includes(subject_value)
-                ? prev.filter((p) => p !== subject_value)
-                : [...prev, subject_value]
-        );
-    };
-    const toggleSource = (source_value) => {
-        setSourceFilters((prev) =>
-            prev.includes(source_value)
-                ? prev.filter((p) => p !== source_value)
-                : [...prev, source_value]
-        );
-    };
+  // Filter Button Utility
+  const toggleDropdown = () => setIsOpen(!isOpen);
+  const [isOpen, setIsOpen] = useState(false);
 
 
-    const ClearFilters = () => {
-        setSearchTerm("");
-        setPriorityFilters([]);
-        setSubjectFilters([]);
-        setSourceFilters([]);
-        setDaysLeftFilters([]);
-        setAppliedPriorityFilters([]);
-        setAppliedSubjectFilters([]);
-        setAppliedSourceFilters([]);
-        setGroupByOption("");
-    };
-
-    useEffect(() => {
-        const handleClickOutside = () => setIsOpen(false);
-        if (isOpen) document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, [isOpen]);
-
-    return (
-        <div className="flex flex-col md:flex-row items-center justify-start gap-4 py-3">
-
-            {/*Search Bar*/}
-            <input
-                type="text"
-                placeholder="Search tasks by title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full md:w-[38%] p-1.5 border rounded-lg focus:outline-none focus:ring focus:ring-blue-950 text-sm text-blue-950"
-            />
+  // Filter function logic
+  const togglePriority = (priority_value) => {
+    setPriorityFilters((prev) =>
+      prev.includes(priority_value)
+        ? prev.filter((p) => p !== priority_value)
+        : [...prev, priority_value]
+    );
+  };
+  const toggleSubject = (subject_value) => {
+    setSubjectFilters((prev) =>
+      prev.includes(subject_value)
+        ? prev.filter((p) => p !== subject_value)
+        : [...prev, subject_value]
+    );
+  };
+  const toggleSource = (source_value) => {
+    setSourceFilters((prev) =>
+      prev.includes(source_value)
+        ? prev.filter((p) => p !== source_value)
+        : [...prev, source_value]
+    );
+  };
 
 
-            {/*Filter Button*/}
+  const ClearFilters = () => {
+    setSearchTerm("");
+    setPriorityFilters([]);
+    setSubjectFilters([]);
+    setSourceFilters([]);
+    setDaysLeftFilters([]);
+    setAppliedPriorityFilters([]);
+    setAppliedSubjectFilters([]);
+    setAppliedSourceFilters([]);
+    setGroupByOption("");
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setIsOpen(false);
+    if (isOpen) document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="flex flex-col md:flex-row items-center justify-start gap-4 py-3">
+
+      {/*Search Bar*/}
+      <input
+        type="text"
+        placeholder="Search tasks by title..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full md:w-[38%] p-1.5 border rounded-lg focus:outline-none focus:ring focus:ring-blue-950 text-sm text-blue-950"
+      />
+
+
+      {/*Filter Button*/}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className="relative px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition"
+      >
+        Filter
+        <span className="ml-2"> ⏷ </span>
+
+        {/*Logic when the pop-up open*/}
+        {isOpen && (
+          <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-start ps-2 pb-5">
+              {["none", "low", "normal", "high"].map((priority_value) => (
+                <label
+                  key={priority_value}
+                  className=" items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={priorityFilters.includes(priority_value)}
+                    onChange={() => togglePriority(priority_value)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{priority_value}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              {SubjectObjects.map((subject) => (
+                <label
+                  key={subject.id}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={subjectFilters.includes(subject.id)}
+                    onChange={() => toggleSubject(subject.id)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{subject.name}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              {["classroom", "create"].map((source_value) => (
+                <label
+                  key={source_value}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={sourceFilters.includes(source_value)}
+                    onChange={() => toggleSource(source_value)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{source_value}</span>
+                </label>
+              ))}
+            </div>
+
             <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOpen((prev) => !prev);
-                }}
-                className="relative px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition"
+              onClick={() => {
+                setAppliedPriorityFilters(priorityFilters);
+                setAppliedSubjectFilters(subjectFilters);
+                setAppliedSourceFilters(sourceFilters);
+                toggleDropdown();
+              }}
+              className="m-3 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
             >
-                Filter
-                <span className="ml-2"> ⏷ </span>
-
-                {/*Logic when the pop-up open*/}
-                {isOpen && (
-                    <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10"
-                         onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-col items-start ps-2 pb-5">
-                            {["none", "low", "normal", "high"].map((priority_value) => (
-                                <label
-                                    key={priority_value}
-                                    className=" items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={priorityFilters.includes(priority_value)}
-                                        onChange={() => togglePriority(priority_value)}
-                                        className="rounded text-pink-500 focus:ring-pink-400"
-                                    />
-                                    <span className="capitalize">{priority_value}</span>
-                                </label>
-                            ))}
-                        </div>
-
-                        <div className="flex flex-col items-start ps-2 pb-5">
-                            {SubjectObjects.map((subject) => (
-                                <label
-                                    key={subject.id}
-                                    className="items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={subjectFilters.includes(subject.id)}
-                                        onChange={() => toggleSubject(subject.id)}
-                                        className="rounded text-pink-500 focus:ring-pink-400"
-                                    />
-                                    <span className="capitalize">{subject.name}</span>
-                                </label>
-                            ))}
-                        </div>
-
-                        <div className="flex flex-col items-start ps-2 pb-5">
-                            {["classroom", "create"].map((source_value) => (
-                                <label
-                                    key={source_value}
-                                    className="items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={sourceFilters.includes(source_value)}
-                                        onChange={() => toggleSource(source_value)}
-                                        className="rounded text-pink-500 focus:ring-pink-400"
-                                    />
-                                    <span className="capitalize">{source_value}</span>
-                                </label>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                setAppliedPriorityFilters(priorityFilters);
-                                setAppliedSubjectFilters(subjectFilters);
-                                setAppliedSourceFilters(sourceFilters);
-                                toggleDropdown();
-                            }}
-                            className="m-3 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
-                        >
-                            Apply Filter
-                        </button>
-
-                    </div>
-                )}
+              Apply Filter
             </button>
 
-
-            {/*GroupBy Drop-box*/}
-            <select
-                value={groupByOption}
-                onChange={(e) => setGroupByOption(e.target.value)}
-                className="p-2 rounded bg-red-400 shadow"
-            >
-                <option value="none">-</option>
-                <option value="day">By Due on</option>
-                <option value="subject">By Subject</option>
-                <option value="priority">By Urgency</option>
-            </select>
+          </div>
+        )}
+      </button>
 
 
-            {/*Clear filter Button*/}
-            <button
-                onClick={ClearFilters}
-            >
-                Clear all
-            </button>
+      {/*GroupBy Drop-box*/}
+      <select
+        value={groupByOption}
+        onChange={(e) => setGroupByOption(e.target.value)}
+        className="p-2 rounded bg-red-400 shadow"
+      >
+        <option value="none">-</option>
+        <option value="day">By Due on</option>
+        <option value="subject">By Subject</option>
+        <option value="priority">By Urgency</option>
+      </select>
 
 
-        </div>
-    )
+      {/*Clear filter Button*/}
+      <button
+        onClick={ClearFilters}
+      >
+        Clear all
+      </button>
+
+
+    </div>
+  )
 }
 
 
 function groupBy(filteredTasks, taskValue) {
-    // blank map
-    const grouped_map = new Map();
+  // blank map
+  const grouped_map = new Map();
 
-    // get attribute value of each task (based on what we group by)
-    filteredTasks.forEach((item) => {
-        // create Key
-        const key = taskValue(item);
-        // Check do key exist
-        if (!grouped_map.has(key)) {
-            grouped_map.set(key, []);
-        }
-        grouped_map.get(key).push(item);
-    });
-    return grouped_map;
+  // get attribute value of each task (based on what we group by)
+  filteredTasks.forEach((item) => {
+    // create Key
+    const key = taskValue(item);
+    // Check do key exist
+    if (!grouped_map.has(key)) {
+      grouped_map.set(key, []);
+    }
+    grouped_map.get(key).push(item);
+  });
+  return grouped_map;
 }
 
 
@@ -1194,16 +1194,17 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
   const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
-  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + STEP_MIN)); // 495 minutes (8:15 am)
+  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + 60));
   const [desc, setDesc] = useState(initial.desc || "");
   const [error, setError] = useState("");
+  const isNew = !initial?.id
 
   useEffect(() => {
     if (!open) return;
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
     setStart(initial.startMin ?? DAY_START_H * 60);
-    setEnd(initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + STEP_MIN, DAY_END_H * 60));
+    setEnd(isNew ? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60) : (initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60)));
     setDesc(initial.desc || "");
     setError("");
   }, [open, initial]);
@@ -1919,15 +1920,15 @@ export default function ClassroomTimetableDashboard() {
 
 
 
-          <div ref={tasksRef} className="scroll-mt-[80px]">
+            <div ref={tasksRef} className="scroll-mt-[80px]">
               <AssignmentsBoard
-                  // items={linkedAssignments}
-                  TaskObjects={taskObjects}
-                  onUpdateTask={handleUpdateTask}
-                  SubjectObjects={subjects}
-                  events={events}
+                // items={linkedAssignments}
+                TaskObjects={taskObjects}
+                onUpdateTask={handleUpdateTask}
+                SubjectObjects={subjects}
+                events={events}
               />
-          </div>
+            </div>
 
 
 
