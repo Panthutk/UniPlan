@@ -1487,6 +1487,9 @@ export default function ClassroomTimetableDashboard() {
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [showArchivedPopup, setShowArchivedPopup] = useState(false);
 
+  // loading state for tasks
+  const [tasksLoading, setTasksLoading] = useState(false);
+
 
 
   useEffect(() => {
@@ -1727,7 +1730,9 @@ export default function ClassroomTimetableDashboard() {
       headers: { "Content-Type": "application/json", ...authHeader() },
     });
     if (!r.ok) throw new Error(`POST /api/tasks/${id}/archive/ failed (${r.status})`);
-    return r.json();
+    const result = await r.json();
+    await fetchTasks();
+    return result;
   }
 
   async function unarchiveTask(id) {
@@ -1737,8 +1742,23 @@ export default function ClassroomTimetableDashboard() {
       headers: { "Content-Type": "application/json", ...authHeader() },
     });
     if (!r.ok) throw new Error(`POST /api/tasks/${id}/unarchive/ failed (${r.status})`);
-    return r.json();
+    const result = await r.json();
+    await fetchTasks();
+    return result;
   }
+
+  async function fetchTasks() {
+    try {
+      setTasksLoading(true);
+      const data = await get("/api/tasks/");
+      setTaskObjects(data);
+    } catch (e) {
+      console.error("Failed to refresh tasks:", e);
+    } finally {
+      setTasksLoading(false);
+    }
+  }
+
 
 
 
@@ -1771,6 +1791,8 @@ export default function ClassroomTimetableDashboard() {
       alert("Failed to unarchive task: " + e.message);
     }
   }
+
+
 
 
 
@@ -2028,15 +2050,26 @@ export default function ClassroomTimetableDashboard() {
 
 
             <div ref={tasksRef} className="scroll-mt-[80px]">
-              <AssignmentsBoard
-                // items={linkedAssignments}
-                TaskObjects={taskObjects}
-                onUpdateTask={handleUpdateTask}
-                onArchiveTask={archiveTask}
-                SubjectObjects={subjects}
-                events={events}
-              />
+              {tasksLoading ? (
+                <div className="flex items-center justify-center h-[40vh] text-gray-400">
+                  Refreshing tasks...
+                </div>
+              ) : !taskObjects || taskObjects.length === 0 ? (
+                <div className="flex items-center justify-center h-[40vh] text-gray-400">
+                  No tasks available.
+                </div>
+              ) : (
+                <AssignmentsBoard
+                  TaskObjects={taskObjects}
+                  onUpdateTask={handleUpdateTask}
+                  onArchiveTask={archiveTask}
+                  SubjectObjects={subjects}
+                  events={events}
+                />
+              )}
             </div>
+
+
 
 
 
