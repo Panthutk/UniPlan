@@ -1490,6 +1490,10 @@ export default function ClassroomTimetableDashboard() {
   // loading state for tasks
   const [tasksLoading, setTasksLoading] = useState(false);
 
+  // searchArchived state
+  const [searchQuery, setSearchQuery] = useState("");
+
+
 
 
   useEffect(() => {
@@ -1742,10 +1746,24 @@ export default function ClassroomTimetableDashboard() {
       headers: { "Content-Type": "application/json", ...authHeader() },
     });
     if (!r.ok) throw new Error(`POST /api/tasks/${id}/unarchive/ failed (${r.status})`);
-    const result = await r.json();
-    await fetchTasks();
-    return result;
+    return r.json();
   }
+
+
+  async function handleUnarchive(id) {
+    try {
+      await unarchiveTask(id);
+      alert("Task unarchived successfully!");
+      await fetchTasks(); // refresh main list
+      const refreshedArchived = await listArchivedTasks();
+      setArchivedTasks(refreshedArchived.filter(t => t.is_archived === true));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to unarchive task: " + e.message);
+    }
+  }
+
+
 
   async function fetchTasks() {
     try {
@@ -2103,41 +2121,86 @@ export default function ClassroomTimetableDashboard() {
 
             <h2 className="text-2xl font-semibold mb-4">Archived Tasks</h2>
 
+            {/* Search Bar */}
             <input
               type="text"
               placeholder="Search archived tasks..."
               className="w-full mb-4 px-3 py-2 rounded bg-neutral-800 text-white"
-              onChange={(e) => {
-                const q = e.target.value.toLowerCase();
-                setArchivedTasks((prev) =>
-                  prev.filter((t) => t.title.toLowerCase().includes(q))
-                );
-              }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
 
-            <div className="max-h-[60vh] overflow-y-auto space-y-3">
-              {archivedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 rounded-lg bg-neutral-800 flex justify-between items-center"
-                >
-                  <div>
-                    <div className="font-semibold">{task.title}</div>
-                    <div className="text-sm opacity-70">{task.subject_name || "—"}</div>
-                  </div>
-                  <button
-                    onClick={() => handleUnarchive(task.id)}
-                    className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
-                  >
-                    Unarchive
-                  </button>
-                </div>
-              ))}
+            {(() => {
+              const SubjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
 
-              {archivedTasks.length === 0 && (
-                <div className="text-center opacity-70 py-5">No archived tasks.</div>
-              )}
-            </div>
+              // filter based on query but never mutate original state
+              const filtered = archivedTasks.filter(t =>
+                t.title.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+
+              return (
+                <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                  {filtered.map((task) => {
+                    const subjectName = SubjectMap[task.subject] || "Unknown Subject";
+                    const dueDate = task.due_at ? new Date(task.due_at) : null;
+                    const formattedDue =
+                      dueDate && !isNaN(dueDate)
+                        ? dueDate.toLocaleString(undefined, {
+                          weekday: "short",
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                        : "No due date";
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-lg bg-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-neutral-700 transition-colors"
+                      >
+                        {/* LEFT SIDE */}
+                        <div className="min-w-0 flex-1 mb-3 sm:mb-0">
+                          <div className="font-semibold truncate">
+                            {subjectName} — {task.title}
+                          </div>
+                          <div className="text-sm opacity-70">Due: {formattedDue}</div>
+                        </div>
+
+                        {/* RIGHT SIDE */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {task.assignment_alt_link && (
+                            <a
+                              href={task.assignment_alt_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                              title="Open in Google Classroom"
+                            >
+                              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                              Classroom
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleUnarchive(task.id)}
+                            className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
+                          >
+                            Unarchive
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {filtered.length === 0 && (
+                    <div className="text-center opacity-70 py-5">No archived tasks found.</div>
+                  )}
+                </div>
+              );
+            })()}
+
+
           </div>
         </div>
       )}
