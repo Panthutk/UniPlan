@@ -1,10 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
 	darkMode: ["class"], // shadcn prefers dark mode toggling
-	content: [
-		"./index.html",
-		"./src/**/*.{js,jsx,ts,tsx}",
-	],
+    content: [
+        "./index.html",
+        "./src/**/*.{js,jsx,ts,tsx}",
+        "./components/**/*.{js,jsx,ts,tsx}",
+    ],
 	theme: {
 		extend: {
 			fontFamily: {
