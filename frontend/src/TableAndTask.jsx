@@ -763,7 +763,7 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObj
     }
   }, [filteredTasks, groupByOption, SubjectMap]);
 
-  return (
+    return (
     <div>
 
       {/*Utility buttons: Search bar + Filter + Group*/}
@@ -790,20 +790,19 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObj
           </div>
         ))}
       </div>
-
+        {console.log("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")}
 
       <div>
-        {Object.entries(groupedTasks).map(([label, tasks]) => (
-          <AssignmentsGroup
-            key={label}
-            label={label}
-            GroupedTasks={tasks}
-            SubjectMap={SubjectMap}
-            onUpdateTask={onUpdateTask}
-            onArchiveTask={onArchiveTask}
-            events={events}
-          />
-
+        {sortGroups(groupedTasks, groupByOption).map(([label, tasks]) => (
+            <AssignmentsGroup
+                key={label}
+                label={label}
+                GroupedTasks={tasks}
+                SubjectMap={SubjectMap}
+                onUpdateTask={onUpdateTask}
+                onArchiveTask={onArchiveTask}
+                events={events}
+            />
         ))}
       </div>
 
@@ -813,6 +812,9 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObj
 }
 
 function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask }) {
+  console.log("---------------------------------------------------------------------------");
+  console.log(label);
+  console.log(GroupedTasks);
 
   const [isOpen, setIsOpen] = useState(true);
 
@@ -1111,6 +1113,26 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, on
     </div>
   );
 }
+
+
+function sortGroups(groupedTasks, groupBy) {
+    const orderMap = {
+        day: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+        "lecture day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+        priority: ["high", "medium", "low", "none", "unknown"],
+    };
+
+    const order = orderMap[groupBy];
+    if (!order) return Object.entries(groupedTasks);
+
+    return Object.entries(groupedTasks).sort(([a], [b]) => {
+        const normalize = (str) => str?.toLowerCase()?.trim();
+        const indexA = order.findIndex((d) => normalize(d) === normalize(a));
+        const indexB = order.findIndex((d) => normalize(d) === normalize(b));
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    });
+}
+
 
 
 function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
