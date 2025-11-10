@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import uniplanLogo from "./assets/uniplanLogo.svg";
+import SaveIcon from '@mui/icons-material/Save';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -66,7 +71,8 @@ async function whoami() {
 async function createSubject(name) {
   const subjectsNow = await listSubjects();
   const code = uniqueCodeFromName(name, subjectsNow);
-  return post(`/api/subjects/`, { name, code }); // server sets user
+  const color_hex = CreateNewColorHex();
+  return post(`/api/subjects/`, { name, code, color_hex }); // server sets user
 }
 
 async function createTimetableEntry(row) {
@@ -90,30 +96,24 @@ async function sendTestEmail() {
   return data;
 }
 
+function CreateNewColorHex() {
+  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
+  return `#${randomColor.padStart(6, "0")}`;
+}
 
 // Create a scheduled email reminder for an assignment
 async function createReminder({
   assignmentId,
-  courseName,
-  title,
-  dueISO,
   remindAtISO,
   offsetDays,
-  link,
 }) {
   return post(`/api/reminders/intake/`, {
     assignmentId,
-    courseName,
-    title,
-    dueISO,
     remindAtISO,
     offsetDays,
-    link,
   });
 }
 
-const HH = (n) => String(n).padStart(2, "0");
-const hourOnly = (s) => parseInt(String(s).split(":")[0], 10);
 
 // UI uses 0=Mon..6=Sun, backend uses 0=Sun..6=Sat
 const uiToDbDay = (ui) => (ui + 1) % 7;  // Mon(0)->1 ... Sun(6)->0
@@ -141,17 +141,63 @@ function uniqueCodeFromName(name, existingSubjects) {
 }
 
 
+// helper for timetable in  minute
+
+const STEP_MIN = 15;
+const DAY_START_H = 8;
+const DAY_END_H = 20;
+
+
+const toHHMM = (m) => {
+  const hh = String(Math.floor(m / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}; // It converts a number of minutes since midnight into “HH:MM” for dropdown label also on eventcard
+
+const toLabelSS = (m) => `${toHHMM(m)}:00`;   // "HH:MM:SS" (08.15.00) for Django
+
+// For hour-based grid snapping(grid still the same for hr)
+const startHour = (m) => Math.floor(m / 60);                 // e.g. 08:15 -> 8
+const endHour = (mStart, mEnd) =>
+  Math.max(Math.ceil(mEnd / 60), Math.floor(mStart / 60) + 1); // at least 1h wide
+
+
+const parseHHMM = (s) => {
+  if (!s) return 0;
+  const [H, M] = String(s).split(":").map(Number);
+  return (H || 0) * 60 + (M || 0);  // convert hours/minutes to total minutes for easy math
+}
+
+
+// split hour and min
+const getHour = (m) => Math.floor(m / 60);
+const getMinute = (m) => m % 60;
+
+// options for hour/minute selects
+const HOURS = Array.from({ length: DAY_END_H - DAY_START_H + 1 }, (_, i) => DAY_START_H + i);
+const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
+
+
+// help for adjust the column card
+const COL_W = 120;
+const startOffsetPx = (mStart) => ((mStart % 60) / 60) * COL_W;
+const endTrimPx = (mEnd) =>
+  (mEnd % 60 === 0 ? 0 : (1 - (mEnd % 60) / 60) * COL_W);
+
+
 // --- Linking assignments to timetable events ---
 function norm(s) {
   return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 // returns { linked, day, color, eventTitle }
-function linkOneAssignmentToEvents(assignment, events) {
-  const aCourse = norm(assignment.courseName);
+function linkOneAssignmentToEvents(assignment, events, subjectName) {
+  const aCourse = norm(subjectName);
   const aTitle = norm(assignment.title);
 
-  // Best effort: match on courseName or assignment title being in event title (or vice versa)
+  const daySet = new Set();
+  const colorSet = new Set();
+
   for (const ev of events || []) {
     const eTitle = norm(ev.title);
     if (!eTitle) continue;
@@ -163,24 +209,87 @@ function linkOneAssignmentToEvents(assignment, events) {
       aTitle.includes(eTitle);
 
     if (match) {
-      return {
-        linked: true,
-        day: ev.day,                              // 0..6
-        color: colorForDay(ev.day),               // use your existing day→color helper
-        eventTitle: ev.title,
-      };
+      daySet.add(ev.day);
+      colorSet.add(colorForDay(ev.day));
     }
   }
-  return { linked: false, day: null, color: "bg-neutral-900", eventTitle: null };
+
+  const days = [...daySet];
+  const colors = [...colorSet];
+
+  return {
+    linked: days.length > 0,
+    days,
+    colors,
+    subjectName,
+  };
 }
 
-function annotateAssignmentsWithEvents(items, events) {
+
+function annotateAssignmentsWithEvents(items, events, SubjectMap) {
   return (items || []).map((a) => {
-    const link = linkOneAssignmentToEvents(a, events);
-    return { ...a, _link: link };
+    const link = linkOneAssignmentToEvents(a, events, SubjectMap[a.subject].name);
+    return { ...a, TableLink: link };
   });
 }
 
+
+async function getSubjectKeyByCourse(courseName, setSubjects) {
+  // get all subjects from backend
+  const subjects = await listSubjects();
+  // look for an existing subject by name
+  const match = subjects.find(sub => sub.name === courseName);
+
+  if (match) {
+    // found tell user the Key
+    return match.id;
+  } else {
+    // not found create new Subject obj
+    const newSubject = await createSubject(courseName);
+    setSubjects(prev => [...prev, newSubject]);
+    return newSubject.id;
+  }
+}
+
+
+// Send new assignment to tasks DB
+async function syncAssignmentsToTasks(assignments, setSubjects) {
+  try {
+    const existingTasks = await get("/api/tasks/");
+    const classroomIds = new Set(assignments.map(a => a.id));
+    const existingClassroomTasks = existingTasks.filter(t => t.source === "classroom");
+    const existingIds = new Set(existingClassroomTasks.map(t => t.external_id));
+
+    // Find new assignments from classroom API
+    const newAssignments = assignments.filter(a => !existingIds.has(a.id));
+
+    // check assignments that not appear in classroom API anymore
+    const removedTasks = existingClassroomTasks.filter(t => !classroomIds.has(t.external_id));
+
+    // Add new assignments
+    for (const a of newAssignments) {
+      const subjectKey = await getSubjectKeyByCourse(a.courseName, setSubjects);
+
+      const body = {
+        title: a.title,
+        subject: subjectKey,
+        due_at: a.due ? new Date(a.due).toISOString() : null,
+        source: "classroom",
+        external_id: a.id,
+        assignment_alt_link: a.altLink
+      };
+      await post("/api/tasks/", body);
+    }
+
+    // Delete finished assignments
+    for (const t of removedTasks) {
+      await del(`/api/tasks/${t.id}/`);
+    }
+
+  } catch (e) {
+    console.error("Sync failed:", e);
+  }
+}
 
 
 
@@ -267,6 +376,19 @@ function buildAssignments(courses, subsByCourse) {
   return items;
 }
 
+async function SetupTasks(courses, subsByCourse, setSubjects) {
+  // Build live assignments from classroom API
+  const liveAssignments = buildAssignments(courses, subsByCourse);
+
+  // push to Task DB
+  if (liveAssignments?.length) {
+    await syncAssignmentsToTasks(liveAssignments, setSubjects);
+  }
+
+  // Get task data from DB
+  const tasksObject = await get("/api/tasks/");
+  return tasksObject;
+}
 
 
 
@@ -329,11 +451,6 @@ function colorForDay(day) {
 }
 
 
-/* ----------------- ellipsis ------------------- */
-function trun8(s) {
-  if (!s) return "";
-  return s.length > 8 ? s.slice(0, 8) + "..." : s;
-}
 
 
 /* ----------------- UI: Timetable (clickable & shows events) ------------------- */
@@ -409,19 +526,31 @@ const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEvent
             <div
               key={e.id}
               onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
-              className={`rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90`}
+              className="relative" // ahchor for absolute child
               style={{
                 gridRow: rowFromDay(e.day),
-                gridColumn: `${colFromTime(e.start)} / ${colFromTime(e.end)}`,
+                // keep grid hour-based (snap to hours)
+                gridColumn: `${colFromTime(startHour(e.start))} / ${colFromTime(endHour(e.start, e.end))}`,
                 zIndex: 10,
+                overflow: "hidden", // keeps the card clipped inside the span
               }}
-              title={`${e.title} — ${e.start}:00–${e.end}:00`}
+              // show real minutes
+              title={`${e.title} — ${toHHMM(e.start)}–${toHHMM(e.end)}`}
             >
-              <div className="truncate whitespace-nowrap overflow-hidden">
-                {trun8(e.title)}
-              </div>
-              <div className="text-[10px] opacity-80">
-                {e.start}:00–{e.end}:00
+              {/* the card inside slide it on horizontal*/}
+              <div
+                className={`absolute top-0 bottom-0 rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90 overflow-hidden`}
+                style={{
+                  left: `${startOffsetPx(e.start)}px`,   // e.g., 30/60/90 px for :15/:30/:45
+                  right: `${endTrimPx(e.end)}px`,         // trim right side if ends mid-hour
+                }}>
+
+                <div className="truncate whitespace-nowrap overflow-hidden">
+                  {(e.title)}
+                </div>
+                <div className="text-[10px] opacity-80">
+                  {toHHMM(e.start)}–{toHHMM(e.end)}
+                </div>
               </div>
             </div>
           ))}
@@ -431,6 +560,7 @@ const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEvent
   );
 });
 
+// !! Didn't Use !!
 /* ----------------- UI: Tasks (from API) -------------------- */
 function CourseTasksCard({ course, submissions, showRaw }) {
   const id = course.id || course.courseId;
@@ -493,6 +623,7 @@ function CourseTasksCard({ course, submissions, showRaw }) {
   );
 }
 
+// !! Didn't Use !!
 const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw }) {
   if (!courses?.length) return <div className="text-sm opacity-70">No active classes found.</div>;
   return (
@@ -510,58 +641,339 @@ const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw
 });
 
 
-
-
 /* -----------------Assignments Board----------------- */
-function AssignmentsBoard({ items }) {
-  // --- reminder UI state ---
+
+function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, events }) {
+
+  // console.log("-------------------------------------------------------");
+  // console.log(TaskObjects);
+  // console.log(SubjectObjects);
+  // console.log("-------------------------------------------------------");
+
+  //Legend Deadline indicator (Array)
+  const legends = [
+    { color: "bg-red-600", label: "less than 3 days" },
+    { color: "bg-amber-400", label: "less than 7 days" },
+    { color: "bg-green-400", label: "more than 7 days" },
+  ];
+  // Make Subject ID to be Key for easier to use Subject data
+  const SubjectMap = useMemo(() => {
+    const map = {};
+    SubjectObjects.forEach(subj => {
+      map[subj.id] = subj;
+    });
+    return map;
+  }, [SubjectObjects]);
+
+
+  //Search Bar (React Hook)
+  const [searchTerm, setSearchTerm] = useState("");
+
+  //5 Filters option (React Hook)
+  const [appliedPriorityFilter, setAppliedPriorityFilter] = useState("");
+  const [appliedSubjectFilter, setAppliedSubjectFilter] = useState("");
+  const [appliedSourceFilter, setAppliedSourceFilter] = useState("");
+  const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
+  const [appliedOnTimetableFilter, setAppliedOnTimetableFilter] = useState("");
+
+  //Group by dropdown (React Hook)
+  const [groupByOption, setGroupByOption] = useState("");
+
+  //Add table link
+  const TaskObjects_tableLinked = useMemo(
+    () => annotateAssignmentsWithEvents(TaskObjects, events, SubjectMap),
+    [TaskObjects, events, SubjectMap]
+  );
+
+  //Data filtered by Search Bar & Filter Button
+  const filteredTasks = useMemo(() => {
+
+    let result = [...TaskObjects_tableLinked];
+
+    if (searchTerm) {
+      result = result.filter(task =>
+        task.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // must match all the selected to show the result
+    if (appliedPriorityFilter) {
+      result = result.filter(task => task.priority === appliedPriorityFilter);
+    }
+    if (appliedSubjectFilter) {
+      result = result.filter(task => task.subject === appliedSubjectFilter);
+    }
+    if (appliedSourceFilter) {
+      result = result.filter(task => task.source === appliedSourceFilter);
+    }
+    if (appliedDaysLeftFilter) {
+      if (appliedDaysLeftFilter < 1000) {
+        result = result.filter(task => task.days_left < appliedDaysLeftFilter);
+      }
+      else {
+        result = result.filter(task => task.days_left >= 7);
+      }
+    }
+    if (appliedOnTimetableFilter !== "") {
+      result = result.filter(task => task.TableLink.linked === appliedOnTimetableFilter);
+    }
+
+
+    result = result.filter(task => !task.is_archived);
+
+    return result;
+  }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter, appliedSourceFilter,
+    appliedDaysLeftFilter, appliedOnTimetableFilter]);
+
+
+  //Create Separate Group each one has it own set of data
+  const groupedTasks = useMemo(() => {
+    if (groupByOption === "") return { "": filteredTasks };
+
+    const group = (taskValue) => Object.fromEntries(TaskGroupBy(filteredTasks, taskValue));
+
+    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    switch (groupByOption) {
+      case "day":
+        return group((t) => dayNames[t.day_of_week] || "Unassigned");
+      case "subject":
+        return group((t) => {
+          const subj = SubjectMap[t.subject];
+          return subj ? subj.name : "Unknown Subject";
+        });
+      case "priority":
+        return group((t) => {
+          if (t.priority === "normal") {
+            return "Medium";
+          }
+          else return t.priority || "Unknown";
+        });
+      case "lecture day":
+        return group((t) => {
+          const days = t.TableLink?.days;
+          if (Array.isArray(days)) {
+            return days.map((i) => dayNames[i] || "Unassigned");
+          }
+          return dayNames[days] || "Unassigned";
+        });
+
+
+      default:
+        return { "": filteredTasks };
+    }
+  }, [filteredTasks, groupByOption, SubjectMap]);
+
+  return (
+    <div>
+
+      {/*Utility buttons: Search bar + Filter + Group*/}
+      <TaskFilterElements
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        groupByOption={groupByOption}
+        setGroupByOption={setGroupByOption}
+        SubjectObjects={SubjectObjects}
+        setAppliedPriorityFilter={setAppliedPriorityFilter}
+        setAppliedSubjectFilter={setAppliedSubjectFilter}
+        setAppliedSourceFilter={setAppliedSourceFilter}
+        setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
+        setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
+      />
+
+
+      {/* Colors legend : tell how far from deadline*/}
+      <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+        {legends.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className={`h-3 w-3 rounded-full ${item.color}`} />
+            <span className="text-sm font-medium">{item.label}</span>
+          </div>
+        ))}
+      </div>
+      {console.log("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")}
+
+      <div>
+        {sortGroups(groupedTasks, groupByOption).map(([label, tasks]) => (
+          <AssignmentsGroup
+            key={label}
+            label={label}
+            GroupedTasks={tasks}
+            SubjectMap={SubjectMap}
+            onUpdateTask={onUpdateTask}
+            onArchiveTask={onArchiveTask}
+            events={events}
+          />
+        ))}
+      </div>
+
+
+    </div>
+  );
+}
+
+function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask }) {
+  console.log("---------------------------------------------------------------------------");
+  console.log(label);
+  console.log(GroupedTasks);
+
+  const [isOpen, setIsOpen] = useState(true);
+
+  const colorMap = {
+    Monday: "#f6e05e",
+    Tuesday: "#f48fb1",
+    Wednesday: "#4ade80",
+    Thursday: "#f6ad55",
+    Friday: "#63b3ed",
+    Saturday: "#AC94FA",
+    Sunday: "#F87171",
+    none: "#FF9793",
+    low: "#FF4B33",
+    Medium: "#E72107",
+    high: "#B21500",
+    "": "#808080" // default
+  };
+
+  function getColor(label) {
+    if (colorMap[label]) return colorMap[label];
+
+    const subjectEntry = Object.values(SubjectMap).find(
+      (subject) => subject.name === label
+    );
+    if (subjectEntry?.color_hex) return subjectEntry.color_hex;
+    return "#808080";
+  }
+
+  const color = getColor(label);
+
+  if (GroupedTasks.length === 0) {
+    return (
+      <section className="space-y-6">
+        <div className="text-lg opacity-70 py-2">No tasks to show.</div>
+      </section>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header with toggle button */}
+      <div className="flex items-center justify-start mb-2">
+        {label && (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="px-3 text-sm hover:text-white transition"
+          >
+            {isOpen ? "⏷" : "▶"}
+          </button>
+        )}
+
+        <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
+          {label}
+          {label !== "" && (
+            <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
+          )}
+        </h2>
+
+      </div>
+
+      {/* Tasks list (conditionally rendered) */}
+      {isOpen && (
+        <div>
+          {GroupedTasks.map((task) => (
+            <AssignmentsCard
+              key={task.id}
+              task={task}
+              SubjectMap={SubjectMap}
+              onUpdateTask={onUpdateTask}
+              onArchiveTask={onArchiveTask}
+              color={color}
+              groupLabel={label}
+            />
+
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
+
+  const subject = SubjectMap[task.subject];
+
+  const days_left = task.days_left;
+
+  const leftText =
+    days_left == null ? "—" : `${Math.max(days_left, 0)} Day${Math.abs(days_left) === 1 ? "" : "s"} Left`;
+
+  // check data linked to databased or not
+  const linked = task.TableLink?.linked;
+
+  const dayBg =
+    days_left != null
+      ? days_left < 3
+        ? "bg-red-500"     // urgent (<3 days)
+        : days_left < 7
+          ? "bg-yellow-400"  // moderate (<7 days)
+          : "bg-green-500"   // safe (>7 days)
+      : "";
+  // slightly color change from Background Colors
+  const dayRing =
+    days_left != null
+      ? days_left < 3
+        ? "ring-red-400"
+        : days_left < 7
+          ? "ring-yellow-200"
+          : "ring-green-300"
+      : "";
+
+  const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 1.5px ${color}` } : {};
+  const ringClass = groupLabel === "" ? dayRing : "";
+
+
   const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
   const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
   const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
-  // Group assignments by linked day
-  const groups = useMemo(() => {
-    const m = new Map();
-    for (const a of items || []) {
-      const key = a._link?.linked ? String(a._link.day ?? "Unassigned") : "Unassigned";
-      if (!m.has(key)) m.set(key, []);
-      m.get(key).push(a);
+  const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
+  // get object that has the same key with this task
+
+  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  const lectureText = (() => {
+    if (!task.TableLink?.days?.length) return null;
+
+    if (task.TableLink.days.length === 7) {
+      return "Lecture: entire week";
+    } else if (task.TableLink.days.length === 1) {
+      return `Lecture: ${dayNames[task.TableLink.days[0]]}`;
+    } else {
+      const names = task.TableLink.days
+        .sort((a, b) => a - b)
+        .map((d) => dayNames[d])
+        .join(" / ");
+      return `Lecture: ${names}`;
     }
-    // sort inside each group by due date (soonest first)
-    for (const [, arr] of m) {
-      arr.sort((x, y) => {
-        if (x.due && y.due) return x.due - y.due;
-        if (x.due && !y.due) return -1;
-        if (!x.due && y.due) return 1;
-        return 0;
-      });
-    }
-    return m;
-  }, [items]);
+  })();
 
-  const orderKeys = ["0", "1", "2", "3", "4", "5", "6", "Unassigned"].filter(k => groups.has(k));
 
-  // --- post a reminder to backend ---
-  const scheduleReminder = async (a) => {
-    if (!a?.due) { alert("No due date for this task."); return; }
+  const scheduleReminder = async (task) => {
+    if (!task?.due_at) { alert("No due date for this task."); return; }
 
-    const id = a.id;
-    const due = a.due instanceof Date ? a.due : new Date(a.due);
+    const id = task.id;
+    const due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
     if (isNaN(+due)) { alert("Invalid due date."); return; }
 
     const offset = Number(choice[id] ?? 3); // default 3 days
     const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
+
     try {
       setPending(p => ({ ...p, [id]: true }));
       await createReminder({
         assignmentId: id,
-        courseName: a.courseName,
-        title: a.title,
-        dueISO: due.toISOString(),
         remindAtISO: remindAt.toISOString(),
         offsetDays: offset,
-        link: a.altLink || null,
       });
       setScheduled(s => ({ ...s, [id]: true }));
       alert(`Reminder set: ${offset} day(s) before due date.`);
@@ -573,165 +985,416 @@ function AssignmentsBoard({ items }) {
     }
   };
 
-
-  if (orderKeys.length === 0) {
-    return (
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">Tasks</h3>
-        </div>
-        <div className="text-sm opacity-70">No tasks to show.</div>
-      </section>
-    );
-  }
-
   return (
-    <section className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold">Tasks</h3>
+    <div
+      key={task.id}
+      className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-hidden`}
+      style={ringStyle}
+    >
+      {/* Left label (day color only when linked) */}
+      <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
+        <div className="text-center text-xl">{leftText}</div>
       </div>
 
-      {orderKeys.map((key) => {
-        const list = groups.get(key) || [];
-        const isUnassigned = key === "Unassigned";
-        const dayIdx = isUnassigned ? null : Number(key);
-        const dayName = isUnassigned ? "Unassigned" : DAYS[dayIdx];
-        const headerChip = isUnassigned ? "bg-neutral-800" : colorForDay(dayIdx);
-
-        return (
-          <div key={key} className="space-y-3">
-            {/* Section header */}
-            <div className="flex items-center gap-2">
-              <span className={`inline-block h-3 w-3 rounded ${headerChip}`} />
-              <h4 className="font-semibold">{dayName}</h4>
-              <span className="text-xs opacity-60">({list.length})</span>
-            </div>
-
-            {/* Cards */}
-            <div className="space-y-4">
-              {list.map((a) => {
-                const n = a.daysLeft;
-                const leftText =
-                  n == null ? "—" : `${Math.max(n, 0)} Day${Math.abs(n) === 1 ? "" : "s"} Left`;
-
-                const linked = a._link?.linked;
-                const dayBg =
-                  n != null
-                    ? n < 3
-                      ? "bg-red-500"     // urgent (<3 days)
-                      : n < 7
-                        ? "bg-yellow-400"  // moderate (<7 days)
-                        : "bg-green-500"   // safe (>7 days)
-                    : "";
-                const ringCls = linked ? "ring-emerald-300" : "ring-neutral-700";
-
-                return (
-                  <div
-                    key={a.id}
-                    className={`grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringCls} bg-white/5 overflow-hidden`}
-                  >
-                    {/* Left label (day color only when linked) */}
-                    <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
-                      <div className="text-center text-xl">{leftText}</div>
-                    </div>
-
-                    {/* Right content */}
-                    <div className="p-4 min-w-0">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm opacity-80 truncate">
-                          <span className="tracking-wider">{a.courseName}</span>
-                          {linked && a._link?.eventTitle ? (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                              {a._link.eventTitle}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
-                      {linked ? (
-                        <div className="mt-1 text-sm">
-                          <span className="opacity-80 mr-2">HW:</span>
-                          <span className="font-semibold">{a.title}</span>
-                        </div>
-                      ) : (
-                        <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
-                      )}
-
-                      {/* Due date & time (show when available) */}
-                      {a.due && (
-                        <div className="mt-1 text-xs opacity-80">
-                          <span className="font-semibold">Due:</span>{" "}
-                          {fmtDueDateObj(a.due)}
-                        </div>
-                      )}
-
-
-                      <div className="mt-3 flex items-center gap-3">
-                        {a.altLink && (
-                          <a
-                            href={a.altLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
-                            title="Open in Classroom"
-                          >
-                            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
-                            Classroom
-                          </a>
-                        )}
-
-                        {/* Reminder controls */}
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs opacity-75">Remind me:</label>
-                          <select
-                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-                            value={(choice[a.id] ?? 3)}
-                            onChange={(e) => setChoice(c => ({ ...c, [a.id]: Number(e.target.value) }))}
-                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
-                            title={a.due ? "Choose how many days before due date" : "No due date"}
-                          >
-                            <option value={1}>1 day before</option>
-                            <option value={3}>3 days before</option>
-                            <option value={7}>7 days before</option>
-                          </select>
-                          <button
-                            onClick={() => scheduleReminder(a)}
-                            disabled={!a.due || scheduled[a.id] || pending[a.id]}
-                            className={[
-                              "text-xs px-3 py-1.5 rounded-full font-semibold",
-                              scheduled[a.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
-                            ].join(" ")}
-                            title={!a.due ? "No due date" : (scheduled[a.id] ? "Already scheduled" : "Schedule email reminder")}
-                          >
-                            {scheduled[a.id] ? "Scheduled" : (pending[a.id] ? "Scheduling..." : "Remind")}
-                          </button>
-                        </div>
-
-                        <div className="ml-auto flex items-center gap-2">
-                          <span className="text-xs opacity-75">Status:</span>
-                          <span className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 border border-white/10">
-                            OPEN
-                          </span>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Right content */}
+      <div className="p-4 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm opacity-80 truncate">
+            <span className="tracking-wider">{subject.name || "Loading..."}</span>
+            {task.assignment_alt_link && linked === true ? (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                {lectureText && (
+                  <span className="ml-2 text-xs opacity-70">{lectureText}</span>
+                )}
+              </span>
+            ) : null}
           </div>
-        );
-      })}
-    </section>
+        </div>
+
+        {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
+        {task.external_id ? (
+          <div className="mt-1 text-sm">
+            <span className="opacity-80 mr-2">HW:</span>
+            <span className="font-semibold">{task.title}</span>
+          </div>
+        ) : (
+          <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
+        )}
+
+        {/* Due date & time (show when available) */}
+        {format_due && (
+          <div className="mt-1 text-xs opacity-80">
+            <span className="font-semibold">Due:</span>{" "}
+            {fmtDueDateObj(format_due)}
+          </div>
+        )}
+
+
+        {/*Classroom link button*/}
+        <div className="mt-3 flex items-center gap-3">
+          {task.assignment_alt_link && (
+            <a
+              href={task.assignment_alt_link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+              title="Open in Classroom"
+            >
+              {/*<span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />*/}
+              <span> 👨🏻‍💻 </span>
+              Classroom
+            </a>
+          )}
+
+          {/*Reminder controls */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs opacity-75">Remind me:</label>
+            <select
+              className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+              value={(choice[task.id] ?? 3)}
+              onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
+              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+              title={task.due ? "Choose how many days before due date" : "No due date"}
+            >
+              <option value={1}>1 day before</option>
+              <option value={3}>3 days before</option>
+              <option value={7}>7 days before</option>
+            </select>
+            <button
+              onClick={() => scheduleReminder(task)}
+              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+              className={[
+                "text-xs px-3 py-1.5 rounded-full font-semibold",
+                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+              ].join(" ")}
+              title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
+            >
+              {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
+            </button>
+          </div>
+          {/*Archive button*/}
+          <button
+            onClick={async () => {
+              if (window.confirm("Archive this task?")) {
+                try {
+                  await onArchiveTask(task.id);
+                  onUpdateTask(task.id, { is_archived: true });
+                  alert("Task archived successfully!");
+                } catch (e) {
+                  console.error(e);
+                  alert("Failed to archive task: " + e.message);
+                }
+              }
+            }}
+            className="text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
+            title="Archive this task"
+          >
+            Archive
+          </button>
+
+          {/*Priority controls*/}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs opacity-75">priority:</span>
+            <select
+              className="bg-neutral-800 border border-white/10 text-xs opacity-75"
+              value={task.priority ?? "none"}
+              onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
+            >
+              <option value="none">-</option>
+              <option value="low">Low</option>
+              <option value="normal">Medium</option>
+              <option value="high">High</option>
+            </select>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
   );
 }
 
 
+function sortGroups(groupedTasks, groupBy) {
+  const orderMap = {
+    day: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+    "lecture day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+    priority: ["high", "medium", "low", "none", "unknown"],
+  };
+
+  const order = orderMap[groupBy];
+  if (!order) return Object.entries(groupedTasks);
+
+  return Object.entries(groupedTasks).sort(([a], [b]) => {
+    const normalize = (str) => str?.toLowerCase()?.trim();
+    const indexA = order.findIndex((d) => normalize(d) === normalize(a));
+    const indexB = order.findIndex((d) => normalize(d) === normalize(b));
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+}
 
 
 
+function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
+  setAppliedPriorityFilter, setAppliedSubjectFilter, setAppliedSourceFilter,
+  setAppliedDaysLeftFilter, setAppliedOnTimetableFilter }) {
+
+  // Filter Hooks
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [daysLeftFilter, setDaysLeftFilter] = useState("");
+  const [onTimetableFilter, setOnTimetableFilter] = useState("");
+
+  // Filter Button Utility
+  const toggleDropdown = () => setIsOpen(!isOpen);
+  const [isOpen, setIsOpen] = useState(false);
+
+
+  // Filter function logic
+  const handlePriorityChange = (priority_value) => {
+    setPriorityFilter(prev => prev === priority_value ? "" : priority_value);
+  };
+  const handleSubjectChange = (subject_value) => {
+    setSubjectFilter(prev => prev === subject_value ? "" : subject_value);
+  };
+  const handleSourceChange = (source_value) => {
+    setSourceFilter(prev => prev === source_value ? "" : source_value);
+  };
+  const handleDaysLeftChange = (daysLeft_value) => {
+    setDaysLeftFilter(prev => prev === daysLeft_value ? "" : daysLeft_value);
+  };
+  const handleOnTimeableChange = (timetable_value) => {
+    setOnTimetableFilter(prev => prev === timetable_value ? "" : timetable_value);
+  };
+
+
+
+  const ClearFilters = () => {
+    setSearchTerm("");
+    setPriorityFilter("");
+    setSubjectFilter("");
+    setSourceFilter("");
+    setDaysLeftFilter("");
+    setOnTimetableFilter("");
+    setAppliedPriorityFilter("");
+    setAppliedSubjectFilter("");
+    setAppliedSourceFilter("");
+    setAppliedDaysLeftFilter("");
+    setAppliedOnTimetableFilter("");
+    setGroupByOption("");
+  };
+
+  const due_date = [
+    { value: 3, label: "less than 3 days" },
+    { value: 7, label: "less than 7 days" },
+    { value: 1000, label: "greater than or equal 7 days" },
+  ];
+
+  const tableLinked = [
+    { value: true, label: "Yes" },
+    { value: false, label: "No" },
+  ]
+
+  const PriorityShow = {
+    "none": "none",
+    "low": "low",
+    "normal": "medium",
+    "high": "high",
+  }
+
+  useEffect(() => {
+    const handleClickOutside = () => setIsOpen(false);
+    if (isOpen) document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="flex flex-col md:flex-row items-center justify-start gap-4 py-3">
+
+      {/*Search Bar*/}
+      <input
+        type="text"
+        placeholder="Search tasks by title..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full md:w-[38%] p-1.5 border rounded-lg focus:outline-none focus:ring focus:ring-blue-950 text-sm text-blue-950"
+      />
+
+
+      {/*Filter Button*/}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className="relative px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition"
+      >
+        Filter
+        <span className="ml-2"> ⏷ </span>
+
+        {/*Logic when the pop-up open*/}
+        {isOpen && (
+          <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-start ps-2 pb-5">
+              Priority:
+              {["none", "low", "normal", "high"].map((priority_value) => (
+                <label
+                  key={priority_value}
+                  className=" items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={priorityFilter === priority_value}
+                    onChange={() => handlePriorityChange(priority_value)}
+                    className="text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{PriorityShow[priority_value]}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              Subject:
+              {SubjectObjects.map((subject_value) => (
+                <label
+                  key={subject_value.id}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={subjectFilter === subject_value.id}
+                    onChange={() => handleSubjectChange(subject_value.id)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{subject_value.name}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              Assignment Source:
+              {["classroom", "create"].map((source_value) => (
+                <label
+                  key={source_value}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={sourceFilter === source_value}
+                    onChange={() => handleSourceChange(source_value)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{source_value}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              Due date in:
+              {due_date.map((daysLeft_value) => (
+                <label
+                  key={daysLeft_value.value}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={daysLeftFilter === daysLeft_value.value}
+                    onChange={() => handleDaysLeftChange(daysLeft_value.value)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{daysLeft_value.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-start ps-2 pb-5">
+              Lecture on Timetable:
+              {tableLinked.map((timetable_value) => (
+                <label
+                  key={timetable_value.value}
+                  className="items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={onTimetableFilter === timetable_value.value}
+                    onChange={() => handleOnTimeableChange(timetable_value.value)}
+                    className="rounded text-pink-500 focus:ring-pink-400"
+                  />
+                  <span className="capitalize">{timetable_value.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setAppliedPriorityFilter(priorityFilter);
+                setAppliedSubjectFilter(subjectFilter);
+                setAppliedSourceFilter(sourceFilter);
+                setAppliedDaysLeftFilter(daysLeftFilter);
+                setAppliedOnTimetableFilter(onTimetableFilter);
+                toggleDropdown();
+              }}
+              className="m-3 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
+            >
+              Apply Filter
+            </button>
+
+          </div>
+        )}
+      </button>
+
+
+      {/*GroupBy Drop-box*/}
+      <select
+        value={groupByOption}
+        onChange={(e) => setGroupByOption(e.target.value)}
+        className="p-2 rounded bg-red-400 shadow"
+      >
+        <option value="none">-</option>
+        <option value="day">By Due date</option>
+        <option value="subject">By Subject</option>
+        <option value="priority">By Priority</option>
+        <option value="lecture day">By Lecture Day</option>
+      </select>
+
+
+      {/*Clear filter Button*/}
+      <button
+        onClick={ClearFilters}
+      >
+        Clear all
+      </button>
+
+
+    </div>
+  )
+}
+
+
+function TaskGroupBy(filteredTasks, getKey) {
+  const grouped_map = new Map();
+
+  filteredTasks.forEach((item) => {
+    let key = getKey(item);
+
+    if (Array.isArray(key)) {
+      if (key.length === 0) key = ["Unassigned"];
+    } else {
+      key = [key];
+    }
+
+    key.forEach((k) => {
+      const label =
+        k === undefined || k === null || k === "" ? "Unassigned" : k;
+      if (!grouped_map.has(label)) grouped_map.set(label, []);
+      grouped_map.get(label).push(item);
+    });
+  });
+
+  return grouped_map;
+}
 
 
 
@@ -740,17 +1403,18 @@ function AssignmentsBoard({ items }) {
 function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
-  const [start, setStart] = useState(initial.start ?? 8);
-  const [end, setEnd] = useState(initial.end ?? 9);
+  const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
+  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + 60));
   const [desc, setDesc] = useState(initial.desc || "");
   const [error, setError] = useState("");
+  const isNew = !initial?.id
 
   useEffect(() => {
     if (!open) return;
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
-    setStart(initial.start ?? 8);
-    setEnd(initial.end ?? Math.min((initial.start ?? 8) + 1, 20));
+    setStart(initial.startMin ?? DAY_START_H * 60);
+    setEnd(isNew ? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60) : (initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60)));
     setDesc(initial.desc || "");
     setError("");
   }, [open, initial]);
@@ -785,9 +1449,6 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
     (duplicateError && "This subject already exists with the same day and time.") ||
     (overlapError && "This time overlaps another subject on the same day.");
 
-
-
-
   if (!open) return null;
 
   const isEditing = Boolean(initial?.id);
@@ -819,27 +1480,76 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="text-sm mb-1">Start Class</div>
-            <select
-              className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-              value={start}
-              onChange={(e) => setStart(Number(e.target.value))}
-            >
-              {TIMES.map((h) => (
-                <option key={h} value={h}>{h}:00</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              {/* Hour */}
+              <select
+                aria-label="Start hour"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getHour(start)}
+                onChange={(e) => {
+                  const h = parseInt(e.target.value, 10);
+                  setStart(h * 60 + getMinute(start));
+                }}
+              >
+                {HOURS.map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                ))}
+              </select>
+
+              <div className="text-neutral-400">:</div>
+
+              {/* Minute */}
+              <select
+                aria-label="Start minute"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getMinute(start)}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setStart(getHour(start) * 60 + m);
+                }}
+              >
+                {MINUTES.filter(m => getHour(start) < DAY_END_H || m == 0).map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <div className="text-sm mb-1">End Class</div>
-            <select
-              className={["w-full rounded-md bg-neutral-800 px-3 py-2 outline-none", timeError ? "ring-2 ring-rose-500" : "focus:ring-2 ring-emerald-500/50"].join("")}
-              value={end}
-              onChange={(e) => setEnd(Number(e.target.value))}
-            >
-              {TIMES.map((h) => (
-                <option key={h} value={h}>{h}:00</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              {/* Hour */}
+              <select
+                aria-label="End hour"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getHour(end)}
+                onChange={(e) => {
+                  const h = parseInt(e.target.value, 10);
+                  const newEnd = h * 60 + getMinute(end);
+                  setEnd(Math.min(newEnd, DAY_END_H * 60));
+                }}
+              >
+                {HOURS.map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                ))}
+              </select>
+
+              <div className="text-neutral-400">:</div>
+
+              {/* Minute */}
+              <select
+                aria-label="End minute"
+                className="w-24 h-10 rounded-md bg-neutral-800 border border-neutral-600 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/70"
+                value={getMinute(end)}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setEnd(Math.min(getHour(end) * 60 + m, DAY_END_H * 60));
+                }}
+              >
+                {MINUTES.filter(m => getHour(end) < DAY_END_H || m == 0).map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -888,28 +1598,29 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
             >
               Cancel
             </button>
-
             <button
               onClick={() => {
                 const s = Math.min(start, end);
                 const e = Math.max(start, end);
-                //run validations again
+                // run validation again
                 if (firstError) {
+
                   setError(firstError);
+
                 }
 
+                // call back parent function ClassroomTimetableDashboard
                 onSave({
                   ...(isEditing ? { id: initial.id } : {}),
                   title: title || "Untitled",
                   day,
-                  start: s,
-                  end: Math.max(e, s + 1),
+                  startMin: s,
+                  endMin: Math.max(e, s + STEP_MIN), //send minute outward
                   desc,
                 });
               }}
               className={["px-6 py-2 rounded-full font-semibold", firstError ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800"].join(" ")}
               disabled={Boolean(firstError)}
-
             >
               Save
             </button>
@@ -930,10 +1641,12 @@ export default function ClassroomTimetableDashboard() {
   const [err, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
+  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
+  const [reminders, setReminders] = useState([]);
 
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
@@ -941,6 +1654,22 @@ export default function ClassroomTimetableDashboard() {
 
   // hamburger drawer
   const [menuOpen, setMenuOpen] = useState(false); // false = hidden, true = visible
+
+  // task
+  const [taskObjects, setTaskObjects] = useState([]);
+
+  // archived task
+  const [archivedTasks, setArchivedTasks] = useState([]);
+  const [showArchivedPopup, setShowArchivedPopup] = useState(false);
+
+  // loading state for tasks
+  const [tasksLoading, setTasksLoading] = useState(false);
+
+  // searchArchived state
+  const [searchQuery, setSearchQuery] = useState("");
+
+
+
 
   useEffect(() => {
     (async () => {
@@ -962,7 +1691,7 @@ export default function ClassroomTimetableDashboard() {
       try {
         const [subj, tte] = await Promise.all([
           listSubjects(me.id),
-          listTimetable(me.id),
+          listTimetable(me.id), //UI after refresh it, api call backend will return data from db
         ]);
         setSubjects(subj);
 
@@ -972,8 +1701,8 @@ export default function ClassroomTimetableDashboard() {
           subjectId: t.subject,
           title: byId[t.subject]?.name || "Untitled",
           day: dbToUiDay(t.day_of_week),
-          start: hourOnly(t.start_time),
-          end: hourOnly(t.end_time),
+          start: parseHHMM(t.start_time),
+          end: parseHHMM(t.end_time),
           desc: t.room || "",
           color: colorForDay(dbToUiDay(t.day_of_week)),
         }));
@@ -998,16 +1727,16 @@ export default function ClassroomTimetableDashboard() {
 
   // Initialize from grid (create)
   const handleCellClick = (dayIdx, hour) => {
-    setModalInitial({ day: dayIdx, start: hour, end: Math.min(hour + 1, 20), title: "", desc: "" });
+    setModalInitial({ day: dayIdx, startMin: hour * 60, endMin: Math.min(hour * 60 + STEP_MIN, DAY_END_H * 60), title: "", desc: "" });
     setModalOpen(true);
   };
 
   // Initialize from event (edit)
   const handleEventClick = (evt) => {
-    setModalInitial({ ...evt }); // contains id, title, day, start, end, desc, color
+    setModalInitial({ ...evt, startMin: evt.start, endMin: evt.end }); // contains id, title, day, start, end, desc, color
     setModalOpen(true);
   };
-
+  // take modal data then sends a POST or PUT request to /api/timetable/
   const handleSaveEvent = async (payload) => {
     try {
       const desiredName = (payload.title || "Untitled").trim();
@@ -1020,18 +1749,21 @@ export default function ClassroomTimetableDashboard() {
       }
 
       // 2) normalize time
-      const s = Math.min(payload.start, payload.end);
-      const e = Math.max(payload.start, payload.end);
-      const startHH = String(s).padStart(2, "0");
-      const endHH = String(e).padStart(2, "0");
+      const sMin = Math.min(payload.startMin ?? payload.start, payload.endMin ?? payload.end);
+      const eMin = Math.max(payload.startMin ?? payload.start, payload.endMin ?? payload.end);
+
+      // for api
+      const start_time = toLabelSS(sMin);  // "HH:MM:SS"
+      const end_time = toLabelSS(eMin);
+
 
       if (payload.id && typeof payload.id === "number") {
         // UPDATE existing timetable entry
         const updated = await updateTimetableEntry(payload.id, {
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),   // <-- map UI -> DB
-          start_time: `${startHH}:00:00`,
-          end_time: `${endHH}:00:00`,
+          start_time,
+          end_time,
           room: payload.desc || "",
         });
 
@@ -1042,20 +1774,31 @@ export default function ClassroomTimetableDashboard() {
               subjectId: subject.id,
               title: subject.name,
               day: dbToUiDay(updated.day_of_week),                 // map DB -> UI
-              start: s,
-              end: e,
+              start: sMin,
+              end: eMin,
               desc: updated.room,
               color: colorForDay(dbToUiDay(updated.day_of_week)),  // color for UI day
             }
             : ev
         ));
+
+
+        // toast notification (use local subject)
+        pushToast({
+          type: "success",
+          title: "Subject updated",
+          desc: `${subject.name} · ${DAYS[dbToUiDay(updated.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
+          icon: <SaveIcon sx={{ fontSize: 20 }} />,
+        });
+
+
       } else {
         // CREATE new timetable entry
         const created = await createTimetableEntry({
           subject: subject.id,
           day_of_week: uiToDbDay(payload.day),
-          start_time: `${startHH}:00:00`,
-          end_time: `${endHH}:00:00`,
+          start_time,
+          end_time,
           room: payload.desc || "",
         });
 
@@ -1066,18 +1809,30 @@ export default function ClassroomTimetableDashboard() {
             subjectId: subject.id,
             title: subject.name,
             day: dbToUiDay(created.day_of_week),              // map DB -> UI
-            start: s,
-            end: e,
+            start: sMin,
+            end: eMin,
             desc: created.room,
             color: colorForDay(dbToUiDay(created.day_of_week)) // color for UI day
           },
         ]);
+
+        pushToast({
+          type: "success",
+          title: "Subject added",
+          desc: `${subject.name} · ${DAYS[dbToUiDay(created.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
+          icon: <SaveIcon sx={{ fontSize: 20 }} />,
+        });
+
       }
 
       setModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert(`Save failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Save failed",
+        desc: String(err?.message || err),
+      });
     }
   };
 
@@ -1085,14 +1840,28 @@ export default function ClassroomTimetableDashboard() {
 
   const handleDeleteEvent = async (id) => {
     try {
+      const removed = events.find(e => e.id === id);
+
       if (typeof id === "number") {
         await deleteTimetableEntry(id);
       }
       setEvents(prev => prev.filter(e => e.id !== id));
       setModalOpen(false);
+
+      pushToast({
+        type: "success",
+        title: "Subject deleted",
+        desc: removed ? removed.title : "",
+        icon: <DeleteForeverIcon sx={{ fontSize: 20 }} />
+      });
+
     } catch (err) {
       console.error(err);
-      alert(`Delete failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Delete failed",
+        desc: String(err?.message || err),
+      });
     }
   };
 
@@ -1103,9 +1872,23 @@ export default function ClassroomTimetableDashboard() {
       await Promise.allSettled(ids.map(id => deleteTimetableEntry(id)));
       setEvents([]);
       setModalOpen(false);
+
+      pushToast({
+        type: "success",
+        title: "All subjects cleared",
+        desc: `${ids.length} subject${ids.length !== 1 ? "s" : ""} removed.`,
+        icon: <CleaningServicesIcon sx={{ fontSize: 20 }} />,
+      });
+
+
     } catch (err) {
       console.error(err);
-      alert(`Clear failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Clear failed",
+        desc: String(err?.message || err),
+      });
+
     }
   };
 
@@ -1151,23 +1934,165 @@ export default function ClassroomTimetableDashboard() {
 
 
 
+  useEffect(() => {
+    (async () => {
+      if (!courses.length || !Object.keys(subsByCourse).length) return;
+      try {
+        const tasks = await SetupTasks(courses, subsByCourse, setSubjects);
+        setTaskObjects(tasks);
+      } catch (err) {
+        console.error("Failed to fetch or sync tasks:", err);
+      }
+    })();
+  }, [courses, subsByCourse]);
 
-  const liveAssignments = useMemo(
-    () => buildAssignments(courses, subsByCourse),
-    [courses, subsByCourse]
+  async function handleUpdateTask(id, newData) {
+    await patch(`/api/tasks/${id}/`, newData);
+    setTaskObjects(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...newData } : t))
+    );
+  }
+
+  async function archiveTask(id) {
+    const r = await fetch(`${API}/api/tasks/${id}/archive/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+    });
+    if (!r.ok) throw new Error(`POST /api/tasks/${id}/archive/ failed (${r.status})`);
+    const result = await r.json();
+    await fetchTasks();
+    return result;
+  }
+
+  async function unarchiveTask(id) {
+    const r = await fetch(`${API}/api/tasks/${id}/unarchive/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+    });
+    if (!r.ok) throw new Error(`POST /api/tasks/${id}/unarchive/ failed (${r.status})`);
+    return r.json();
+  }
+
+
+  async function handleUnarchive(id) {
+    try {
+      await unarchiveTask(id);
+      alert("Task unarchived successfully!");
+      await fetchTasks(); // refresh main list
+      const refreshedArchived = await listArchivedTasks();
+      setArchivedTasks(refreshedArchived.filter(t => t.is_archived === true));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to unarchive task: " + e.message);
+    }
+  }
+
+
+
+  async function fetchTasks() {
+    try {
+      setTasksLoading(true);
+      const data = await get("/api/tasks/");
+      setTaskObjects(data);
+    } catch (e) {
+      console.error("Failed to refresh tasks:", e);
+    } finally {
+      setTasksLoading(false);
+    }
+  }
+
+
+
+
+
+  async function listArchivedTasks() {
+    return get(`/api/tasks/?archived=true`);
+  }
+
+  async function handleShowArchived() {
+    try {
+      const data = await listArchivedTasks();
+      const archivedOnly = data.filter(t => t.is_archived === true);
+      setArchivedTasks(archivedOnly);
+      setShowArchivedPopup(true);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to load archived tasks: " + e.message);
+    }
+  }
+
+
+
+
+
+
+
+
+  // add icon
+  const [toasts, setToasts] = useState([]);
+  // show for 3 s
+  function pushToast({ type = "info", title, desc = "", duration = 3500, icon = null }) {
+    const id = (crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
+    setToasts((t) => [...t, { id, type, title, desc, icon }]);
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
+  }
+
+  const typeStyle = (tp) =>
+    tp === "success"
+      ? "border-emerald-500/40 bg-emerald-500/10"
+      : tp === "error"
+        ? "border-rose-500/40 bg-rose-500/10"
+        : "border-sky-500/40 bg-sky-500/10"
+
+  const defaultIcon = (tp) =>
+    tp === "success" ? <SaveIcon sx={{ fontSize: 20 }} /> :
+      tp === "error" ? <ErrorOutlineIcon sx={{ fontSize: 20 }} /> :
+        <InfoOutlinedIcon sx={{ fontSize: 20 }} />; //icon size
+
+
+  const Toasts = () => (
+    <div
+      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(92vw, 380px)] flex-col gap-3"
+      aria-live="polite"
+    >
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          role="status"
+          className={`pointer-events-auto rounded-xl border p-4 shadow-xl backdrop-blur text-white/90 ${typeStyle(
+            t.type
+          )}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              {/* ICON */}
+              <div className="mt-0.5 shrink-0 opacity-90">
+                {t.icon ?? defaultIcon(t.type)}
+              </div>
+              {/* TEXT */}
+              <div className="min-w-0">
+                <div className="font-semibold leading-tight">{t.title}</div>
+                {t.desc ? (
+                  <div className="mt-1 text-sm opacity-80 break-words">{t.desc}</div>
+                ) : null}
+              </div>
+            </div>
+            <button
+              onClick={() =>
+                setToasts((toasts) => toasts.filter((x) => x.id !== t.id))
+              }
+              className="ml-2 rounded-md px-2 py-1 text-sm opacity-70 hover:opacity-100"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
-
-
-
-
-
-  // Link assignments to timetable events (so board knows which ones are placed)
-  const linkedAssignments = useMemo(
-    () => annotateAssignmentsWithEvents(liveAssignments, events),
-    [liveAssignments, events]
-  );
-
-
 
 
   // Active menu (closest section center)
@@ -1354,6 +2279,18 @@ export default function ClassroomTimetableDashboard() {
               >
                 Tasks
               </button>
+
+              {/* Archived Tasks button */}
+              <button
+                onClick={() => {
+                  handleShowArchived();
+                  setMenuOpen(false);
+                }}
+                className="w-full py-4 rounded-full font-semibold bg-neutral-700 hover:bg-neutral-600"
+              >
+                Archived Tasks
+              </button>
+
             </nav>
 
           </aside>
@@ -1410,10 +2347,27 @@ export default function ClassroomTimetableDashboard() {
 
 
             <div ref={tasksRef} className="scroll-mt-[80px]">
-              <AssignmentsBoard
-                items={linkedAssignments}
-              />
+              {tasksLoading ? (
+                <div className="flex items-center justify-center h-[40vh] text-gray-400">
+                  Refreshing tasks...
+                </div>
+              ) : !taskObjects || taskObjects.length === 0 ? (
+                <div className="flex items-center justify-center h-[40vh] text-gray-400">
+                  No tasks available.
+                </div>
+              ) : (
+                <AssignmentsBoard
+                  TaskObjects={taskObjects}
+                  onUpdateTask={handleUpdateTask}
+                  onArchiveTask={archiveTask}
+                  SubjectObjects={subjects}
+                  events={events}
+                />
+              )}
             </div>
+
+            <Toasts />
+
 
 
 
@@ -1433,6 +2387,105 @@ export default function ClassroomTimetableDashboard() {
         subjectOptions={subjectOptions}
         existingEvents={events}
       />
+
+
+      {/* Archived Tasks Popup */}
+      {showArchivedPopup && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
+          <div className="bg-neutral-900 text-white w-[90vw] max-w-3xl rounded-xl p-6 shadow-lg relative">
+            <button
+              onClick={() => setShowArchivedPopup(false)}
+              className="absolute top-3 right-3 text-xl font-bold"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-2xl font-semibold mb-4">Archived Tasks</h2>
+
+            {/* Search Bar */}
+            <input
+              type="text"
+              placeholder="Search archived tasks..."
+              className="w-full mb-4 px-3 py-2 rounded bg-neutral-800 text-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+
+            {(() => {
+              const SubjectMap = Object.fromEntries(subjects.map(s => [s.id, s.name]));
+
+              // filter based on query but never mutate original state
+              const filtered = archivedTasks.filter(t =>
+                t.title.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+
+              return (
+                <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                  {filtered.map((task) => {
+                    const subjectName = SubjectMap[task.subject] || "Unknown Subject";
+                    const dueDate = task.due_at ? new Date(task.due_at) : null;
+                    const formattedDue =
+                      dueDate && !isNaN(dueDate)
+                        ? dueDate.toLocaleString(undefined, {
+                          weekday: "short",
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                        : "No due date";
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-lg bg-neutral-800 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-neutral-700 transition-colors"
+                      >
+                        {/* LEFT SIDE */}
+                        <div className="min-w-0 flex-1 mb-3 sm:mb-0">
+                          <div className="font-semibold truncate">
+                            {subjectName} — {task.title}
+                          </div>
+                          <div className="text-sm opacity-70">Due: {formattedDue}</div>
+                        </div>
+
+                        {/* RIGHT SIDE */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {task.assignment_alt_link && (
+                            <a
+                              href={task.assignment_alt_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                              title="Open in Google Classroom"
+                            >
+                              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                              Classroom
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleUnarchive(task.id)}
+                            className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
+                          >
+                            Unarchive
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {filtered.length === 0 && (
+                    <div className="text-center opacity-70 py-5">No archived tasks found.</div>
+                  )}
+                </div>
+              );
+            })()}
+
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

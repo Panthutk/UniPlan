@@ -249,7 +249,6 @@ class SubjectViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # only the caller's subjects
         return Subject.objects.filter(user=self.request.user).order_by("name")
 
     def perform_create(self, serializer):
@@ -273,18 +272,62 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+from rest_framework.decorators import action
+
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.none()
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    
     def get_queryset(self):
-        return Task.objects.filter(user=self.request.user).select_related("subject").order_by("-created_at")
+        qs = (
+            Task.objects
+            .filter(user=self.request.user)
+            .select_related("subject")
+            .order_by("due_at", "priority")
+        )
+        source = self.request.query_params.get("source")
+        if source:
+            qs = qs.filter(source=source)
+
+        open_only = self.request.query_params.get("open", "true").lower() == "true"
+        if open_only:
+            qs = qs.exclude(status="COMPLETED")
+
+        # Special case: allow archived tasks for unarchive action
+        if getattr(self, "action", None) == "unarchive":
+            return qs  # don't hide archived ones
+
+        # Hide archived tasks by default unless ?archived=true
+        show_archived = self.request.query_params.get("archived", "false").lower() == "true"
+        if not show_archived:
+            qs = qs.filter(is_archived=False)
+
+        return qs
+
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
+
+    #  Archive endpoint
+    @action(detail=True, methods=["post"])
+    def archive(self, request, pk=None):
+        task = self.get_object()
+        task.is_archived = True
+        task.save(update_fields=["is_archived"])
+        return Response({"success": True, "id": task.id, "is_archived": True})
+
+    #  Unarchive endpoint
+    @action(detail=True, methods=["post"])
+    def unarchive(self, request, pk=None):
+        task = self.get_object()
+        task.is_archived = False
+        task.save(update_fields=["is_archived"])
+        return Response({"success": True, "id": task.id, "is_archived": False})
 
 class ReminderViewSet(viewsets.ModelViewSet):
     queryset = Reminder.objects.none()        # <-- add this

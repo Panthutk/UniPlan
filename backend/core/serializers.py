@@ -71,17 +71,32 @@ class TimetableEntrySerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     reminder_days_before = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     next_reminder_at = serializers.DateTimeField(read_only=True)
+    days_left = serializers.SerializerMethodField()
+    day_of_week = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
         fields = [
-            "id", "user", "subject", "title", "description",
-            "status", "priority", "due_at", "rrule", "source",
-            "external_id", "created_at", "updated_at", "completed_at",
-            # new:
-            "reminder_days_before", "next_reminder_at",
+            "id","user","subject","title","description",
+            "status","priority","due_at","rrule","source","external_id",
+            "assignment_alt_link","created_at","updated_at","completed_at", "is_archived",
+            "reminder_days_before","next_reminder_at","days_left","day_of_week",
         ]
-        read_only_fields = ["user", "created_at", "updated_at", "completed_at"]
+        read_only_fields = ["user","created_at","updated_at","completed_at","days_left","day_of_week"]
+
+    def get_days_left(self, obj):
+        if not obj.due_at:
+            return None
+        # Convert to current tz for consistent “days left”
+        due = timezone.localtime(obj.due_at)
+        now = timezone.localtime()
+        delta = (due.date() - now.date()).days
+        return delta
+
+    def get_day_of_week(self, obj):
+        if not obj.due_at:
+            return None
+        return timezone.localtime(obj.due_at).weekday()  # 0=Mon ... 6=Sun
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -172,72 +187,40 @@ class OAuthAccountSerializer(serializers.ModelSerializer):
         # never leak refresh tokens
         data["refresh_token"] = "********"
         return data
-    
-    
+
+
 
 class ReminderIntakeSerializer(serializers.Serializer):
-    assignmentId = serializers.CharField(max_length=128)
-    courseName   = serializers.CharField(max_length=255, allow_blank=True, required=False)
-    title        = serializers.CharField(max_length=255)
-    link         = serializers.URLField(required=False, allow_blank=True, allow_null=True)
-    # was: serializers.IntegerField(default=3)
-    offsetDays   = serializers.IntegerField(required=False, allow_null=True)
-    dueISO       = serializers.DateTimeField()
+    # Support both new and old fields
+    assignmentId = serializers.IntegerField(required=False)
     remindAtISO  = serializers.DateTimeField()
+    offsetDays   = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     def create(self, validated):
-        user       = self.context["request"].user
-        assignment = validated["assignmentId"]
-        title      = validated["title"]
-        course     = validated.get("courseName", "")
-        link       = validated.get("link")
-        due_at     = validated["dueISO"]
-        remind_at  = validated["remindAtISO"]
+        user = self.context["request"].user
+        task = None
 
-        # 1) Upsert task
-        task, _ = Task.objects.get_or_create(
-            user=user,
-            source="classroom",
-            external_id=assignment,
-            defaults={
-                "title": title,
-                "description": (f"{course}\n{link}" if link else course).strip(),
-                "due_at": due_at,
-            },
-        )
+        if "assignmentId" in validated:
+            assignment_id = validated["assignmentId"]
+            task = Task.objects.filter(id=assignment_id, user=user).first()
 
-        dirty = False
-        if task.title != title:
-            task.title = title; dirty = True
-        if not task.due_at or task.due_at != due_at:
-            task.due_at = due_at; dirty = True
+        if not task:
+            raise serializers.ValidationError(
+                {"assignmentId": "Task not found or invalid assignmentId."}
+            )
 
-        desc = (task.description or "")
-        extra = []
-        if course and course not in desc:
-            extra.append(course)
-        if link and link not in desc:
-            extra.append(link)
-        if extra:
-            task.description = (desc + ("\n" if desc else "") + "\n".join(extra)).strip()
-            dirty = True
-        if dirty:
-            task.save(update_fields=["title", "due_at", "description"])
-
-        # 2) (optional) derive offset for your own use (not saved on Task)
+        remind_at = validated["remindAtISO"]
         offset = validated.get("offsetDays")
-        if offset is None:
-            offset = max(0, int(round((due_at - remind_at).total_seconds() / 86400)))
 
-        # 3) De-dupe reminder by (task, channel, notify_at)
+        # Create or get reminder
         reminder, _ = Reminder.objects.get_or_create(
             task=task,
             channel="email",
             notify_at=remind_at,
             defaults={"status": "pending"},
         )
-        return reminder
 
+        return reminder
 
     def to_representation(self, instance):
         t = instance.task
@@ -245,7 +228,13 @@ class ReminderIntakeSerializer(serializers.Serializer):
             "id": instance.id,
             "notify_at": instance.notify_at,
             "status": instance.status,
-            "task": { "id": t.id, "title": t.title, "due_at": t.due_at },
+            "task": {
+                "id": t.id,
+                "title": t.title,
+                "due_at": t.due_at,
+                "assignment_alt_link": getattr(t, "assignment_alt_link", None),
+            },
         }
-    
+
+
     
