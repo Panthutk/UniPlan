@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import uniplanLogo from "./assets/uniplanLogo.svg";
+import SaveIcon from '@mui/icons-material/Save';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -1372,23 +1377,22 @@ function TaskGroupBy(filteredTasks, getKey) {
 
 
 
-
-
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
 function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, existingEvents = [] }) {
   const [title, setTitle] = useState(initial.title || "");
   const [day, setDay] = useState(initial.day ?? 0);
   const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
-  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + STEP_MIN)); // 495 minutes (8:15 am)
+  const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + 60));
   const [desc, setDesc] = useState(initial.desc || "");
   const [error, setError] = useState("");
+  const isNew = !initial?.id
 
   useEffect(() => {
     if (!open) return;
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
     setStart(initial.startMin ?? DAY_START_H * 60);
-    setEnd(initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + STEP_MIN, DAY_END_H * 60));
+    setEnd(isNew ? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60) : (initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60)));
     setDesc(initial.desc || "");
     setError("");
   }, [open, initial]);
@@ -1755,6 +1759,17 @@ export default function ClassroomTimetableDashboard() {
             }
             : ev
         ));
+
+
+        // toast notification (use local subject)
+        pushToast({
+          type: "success",
+          tittle: "Subject updated",
+          desc: `${subject.name} · ${DAYS[dbToUiDay(updated.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
+          icon: <SaveIcon sx={{ fontSize: 20 }} />,
+        });
+
+
       } else {
         // CREATE new timetable entry
         const created = await createTimetableEntry({
@@ -1778,12 +1793,24 @@ export default function ClassroomTimetableDashboard() {
             color: colorForDay(dbToUiDay(created.day_of_week)) // color for UI day
           },
         ]);
+
+        pushToast({
+          type: "sucess",
+          tittle: "Subject added",
+          desc: `${subject.name} · ${DAYS[dbToUiDay(created.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
+          icon: <SaveIcon sx={{ fontSize: 20 }} />,
+        });
+
       }
 
       setModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert(`Save failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Save failed",
+        desc: String(err?.message || err),
+      });
     }
   };
 
@@ -1791,14 +1818,28 @@ export default function ClassroomTimetableDashboard() {
 
   const handleDeleteEvent = async (id) => {
     try {
+      const removed = events.find(e => e.id === id);
+
       if (typeof id === "number") {
         await deleteTimetableEntry(id);
       }
       setEvents(prev => prev.filter(e => e.id !== id));
       setModalOpen(false);
+
+      pushToast({
+        type: "success",
+        title: "Subject deleted",
+        desc: removed ? removed.title : "",
+        icon: <DeleteForeverIcon sx={{ fontSize: 20 }} />
+      });
+
     } catch (err) {
       console.error(err);
-      alert(`Delete failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Delete failed",
+        desc: String(err?.message || err),
+      });
     }
   };
 
@@ -1809,9 +1850,23 @@ export default function ClassroomTimetableDashboard() {
       await Promise.allSettled(ids.map(id => deleteTimetableEntry(id)));
       setEvents([]);
       setModalOpen(false);
+
+      pushToast({
+        type: "success",
+        title: "All subjects cleared",
+        desc: `${ids.length} subject${ids.length !== 1 ? "s" : ""} removed.`,
+        icon: <CleaningServicesIcon sx={{ fontSize: 20 }} />,
+      });
+
+
     } catch (err) {
       console.error(err);
-      alert(`Clear failed: ${err.message || err}`);
+      pushToast({
+        type: "error",
+        title: "Clear failed",
+        desc: String(err?.message || err),
+      });
+
     }
   };
 
@@ -1952,6 +2007,70 @@ export default function ClassroomTimetableDashboard() {
 
 
 
+
+  // add icon
+  const [toasts, setToasts] = useState([]);
+  // show for 3 s
+  function pushToast({ type = "info", title, desc = "", duration = 3500, icon = null }) {
+    const id = (crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
+    setToasts((t) => [...t, { id, type, title, desc, icon }]);
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
+  }
+
+  const typeStyle = (tp) =>
+    tp === "success"
+      ? "border-emerald-500/40 bg-emerald-500/10"
+      : tp === "error"
+        ? "border-rose-500/40 bg-rose-500/10"
+        : "border-sky-500/40 bg-sky-500/10"
+
+  const defaultIcon = (tp) =>
+    tp === "sucess" ? <SaveIcon sx={{ fontSize: 20 }} /> :
+      tp === "error" ? <ErrorOutlineIcon sx={{ fontSize: 20 }} /> :
+        <InfoOutlinedIcon sx={{ fontSize: 20 }} />; //icon size
+
+
+  const Toasts = () => (
+    <div
+      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(92vw, 380px)] flex-col gap-3"
+      aria-live="polite"
+    >
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          role="status"
+          className={`pointer-events-auto rounded-xl border p-4 shadow-xl backdrop-blur text-white/90 ${typeStyle(
+            t.type
+          )}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              {/* ICON */}
+              <div className="mt-0.5 shrink-0 opacity-90">
+                {t.icon ?? defaultIcon(t.type)}
+              </div>
+              {/* TEXT */}
+              <div className="min-w-0">
+                <div className="font-semibold leading-tight">{t.title}</div>
+                {t.desc ? (
+                  <div className="mt-1 text-sm opacity-80 break-words">{t.desc}</div>
+                ) : null}
+              </div>
+            </div>
+            <button
+              onClick={() =>
+                setToasts((toasts) => toasts.filter((x) => x.id !== t.id))
+              }
+              className="ml-2 rounded-md px-2 py-1 text-sm opacity-70 hover:opacity-100"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
 
   // Active menu (closest section center)
@@ -2224,6 +2343,8 @@ export default function ClassroomTimetableDashboard() {
                 />
               )}
             </div>
+
+            <Toasts />
 
 
 
