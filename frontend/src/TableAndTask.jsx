@@ -861,6 +861,9 @@ function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArc
 
         <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
           {label}
+            {label !== "" && (
+                <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
+            )}
         </h2>
 
       </div>
