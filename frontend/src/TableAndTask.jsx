@@ -1659,7 +1659,7 @@ export default function ClassroomTimetableDashboard() {
       pushToast({
         type: "success",
         title: "All subjects cleared",
-        desc: `${ids.length} event${ids.length !== 1 ? "s" : ""} removed.`,
+        desc: `${ids.length} subject${ids.length !== 1 ? "s" : ""} removed.`,
         icon: <CleaningServicesIcon sx={{ fontSize: 20 }} />,
       });
 
