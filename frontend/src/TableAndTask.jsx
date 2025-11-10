@@ -763,7 +763,7 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObj
     }
   }, [filteredTasks, groupByOption, SubjectMap]);
 
-    return (
+  return (
     <div>
 
       {/*Utility buttons: Search bar + Filter + Group*/}
@@ -790,19 +790,19 @@ function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObj
           </div>
         ))}
       </div>
-        {console.log("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")}
+      {console.log("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")}
 
       <div>
         {sortGroups(groupedTasks, groupByOption).map(([label, tasks]) => (
-            <AssignmentsGroup
-                key={label}
-                label={label}
-                GroupedTasks={tasks}
-                SubjectMap={SubjectMap}
-                onUpdateTask={onUpdateTask}
-                onArchiveTask={onArchiveTask}
-                events={events}
-            />
+          <AssignmentsGroup
+            key={label}
+            label={label}
+            GroupedTasks={tasks}
+            SubjectMap={SubjectMap}
+            onUpdateTask={onUpdateTask}
+            onArchiveTask={onArchiveTask}
+            events={events}
+          />
         ))}
       </div>
 
@@ -868,9 +868,9 @@ function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArc
 
         <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
           {label}
-            {label !== "" && (
-                <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
-            )}
+          {label !== "" && (
+            <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
+          )}
         </h2>
 
       </div>
@@ -1116,21 +1116,21 @@ function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, on
 
 
 function sortGroups(groupedTasks, groupBy) {
-    const orderMap = {
-        day: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
-        "lecture day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
-        priority: ["high", "medium", "low", "none", "unknown"],
-    };
+  const orderMap = {
+    day: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+    "lecture day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
+    priority: ["high", "medium", "low", "none", "unknown"],
+  };
 
-    const order = orderMap[groupBy];
-    if (!order) return Object.entries(groupedTasks);
+  const order = orderMap[groupBy];
+  if (!order) return Object.entries(groupedTasks);
 
-    return Object.entries(groupedTasks).sort(([a], [b]) => {
-        const normalize = (str) => str?.toLowerCase()?.trim();
-        const indexA = order.findIndex((d) => normalize(d) === normalize(a));
-        const indexB = order.findIndex((d) => normalize(d) === normalize(b));
-        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-    });
+  return Object.entries(groupedTasks).sort(([a], [b]) => {
+    const normalize = (str) => str?.toLowerCase()?.trim();
+    const indexA = order.findIndex((d) => normalize(d) === normalize(a));
+    const indexB = order.findIndex((d) => normalize(d) === normalize(b));
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
 }
 
 
@@ -1786,7 +1786,7 @@ export default function ClassroomTimetableDashboard() {
         // toast notification (use local subject)
         pushToast({
           type: "success",
-          tittle: "Subject updated",
+          title: "Subject updated",
           desc: `${subject.name} · ${DAYS[dbToUiDay(updated.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -1817,8 +1817,8 @@ export default function ClassroomTimetableDashboard() {
         ]);
 
         pushToast({
-          type: "sucess",
-          tittle: "Subject added",
+          type: "success",
+          title: "Subject added",
           desc: `${subject.name} · ${DAYS[dbToUiDay(created.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -2047,7 +2047,7 @@ export default function ClassroomTimetableDashboard() {
         : "border-sky-500/40 bg-sky-500/10"
 
   const defaultIcon = (tp) =>
-    tp === "sucess" ? <SaveIcon sx={{ fontSize: 20 }} /> :
+    tp === "success" ? <SaveIcon sx={{ fontSize: 20 }} /> :
       tp === "error" ? <ErrorOutlineIcon sx={{ fontSize: 20 }} /> :
         <InfoOutlinedIcon sx={{ fontSize: 20 }} />; //icon size
 
