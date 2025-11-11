@@ -2,9 +2,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { API, authHeader } from "@/utils/api.js";
-import {TimetableGrid} from '../timetable/timetableGrid';
-import {AssignmentsBoard} from '../assignmentsBoard/assignments_section.jsx';
-
+import { TimetableGrid } from '../timetable/timetableGrid';
+import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
 
 export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
@@ -13,12 +12,11 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
 
     return (
         <div>
+
             <div className="sticky z-50 pl-2"
                  style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlap with header
-
             >
                 <div className="pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2">
-
                     <button
                         onClick={() => setMenuOpen(true)}
                         className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
@@ -30,22 +28,12 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
                             <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
                         </svg>
                     </button>
-
                 </div>
             </div>
 
-
-
             {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
             <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
-                <div className="pb-10 grid grid-cols-1 gap-y-6 items-start min-w-0">
-                    <main className="space-y-6 min-w-0">
-                        {/* actions / timetable / assignments / tasks*/}
-
-
-                    </main>
-
-
+                <div className="pb-10 grid grid-cols-1 gap-y-12 items-start min-w-0">
 
                     {/* Drawer overlay */}
                     <div
@@ -277,6 +265,7 @@ function Toasts({toasts, setToasts}) {
         </div>
     );
 }
+
 
 async function sendTestEmail() {
     const r = await fetch(`${API}/api/test-email/`, {

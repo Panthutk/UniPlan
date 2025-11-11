@@ -1,9 +1,6 @@
-// frontend/src/utils/time.js
-
 /* ----------------- Time / Day helpers ----------------- */
-
 export const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-
+export const FULL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 export const TIMES = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
 
 export const colFromTime = (h) => (h - 8) + 2;   // 8 -> col 2, 19 -> 13

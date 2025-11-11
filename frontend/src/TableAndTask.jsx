@@ -1,14 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState, memo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 
+// Helper Calling
+import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
+import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
+import { colorForDay } from "./utils/color.js";
 
+// Components Calling
 import { HeaderSection } from "../components/layout/header.jsx";
 import { DrawerPanel } from "../components/layout/drawerPanel.jsx";
-import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
-import { TIMES, DAYS, parseHHMM, toHHMM, toLabelSS} from "./utils/time";
 
 
 async function listTimetable() {
@@ -272,109 +275,8 @@ function normalizeCourses(json) {
 function normalizeSubmissions(json) {
   return Array.isArray(json) ? json : json?.studentSubmissions || [];
 }
-function fmtDate(s) {
-  if (!s) return "—";
-  const d = new Date(s);
-  return isNaN(d) ? "—" : d.toLocaleString();
-}
 
 
-
-
-// !! Didn't Use !!
-/* ----------------- UI: Tasks (from API) -------------------- */
-function CourseTasksCard({ course, submissions, showRaw }) {
-  const id = course.id || course.courseId;
-  const subs = (submissions || [])
-    .slice()
-    .sort((a, b) => {
-      const ta = Date.parse(a.updateTime || a.creationTime || 0);
-      const tb = Date.parse(b.updateTime || b.creationTime || 0);
-      return (tb || 0) - (ta || 0);
-    });
-
-  return (
-    <div className="rounded-xl border border-white/10 p-4 bg-white/5">
-      <div className="flex items-baseline justify-between">
-        <div className="font-medium">
-          {course.name}{" "}
-          {course.section ? <span className="opacity-70">({course.section})</span> : null}
-        </div>
-        <div className="text-xs opacity-70">ID: {id}</div>
-      </div>
-
-      <div className="mt-3 text-sm font-semibold">Active Assignments ({subs.length})</div>
-
-      {subs.length === 0 ? (
-        <div className="text-sm opacity-70 mt-1">No active assignments.</div>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {subs.map((s) => (
-            <li key={s.id} className="rounded-lg border border-white/10 p-3 bg-white/5">
-              <div className="font-medium">
-                #{s.courseWorkId} · {s.courseWorkType || "CourseWork"}
-              </div>
-              <div className="text-xs opacity-70">
-                State: {s.state} · Late: {String(s.late)} · Created: {fmtDate(s.creationTime)} · Updated: {fmtDate(s.updateTime)}
-              </div>
-              {s.alternateLink && (
-                <a className="text-xs underline" href={s.alternateLink} target="_blank" rel="noreferrer">
-                  Open in Classroom
-                </a>
-              )}
-              {showRaw && (
-                <pre className="mt-2 text-xs bg-black/10 p-2 rounded overflow-auto">
-                  {JSON.stringify(s, null, 2)}
-                </pre>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {showRaw && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs opacity-70">Course raw JSON</summary>
-          <pre className="mt-2 text-xs bg-black/10 p-3 rounded overflow-auto">
-            {JSON.stringify(course, null, 2)}
-          </pre>
-        </details>
-      )}
-    </div>
-  );
-}
-
-// !! Didn't Use !!
-const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw }) {
-  if (!courses?.length) return <div className="text-sm opacity-70">No active classes found.</div>;
-  return (
-    <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {courses.map((c) => (
-        <CourseTasksCard
-          key={c.id || c.courseId}
-          course={c}
-          submissions={subsByCourse[c.id || c.courseId]}
-          showRaw={showRaw}
-        />
-      ))}
-    </div>
-  );
-});
-
-
-function colorForDay(day) {
-    // 0=Mon ... 6=Sun
-    const map = [
-        "bg-yellow-400",
-        "bg-pink-400",
-        "bg-green-400",
-        "bg-orange-400",
-        "bg-blue-400",
-        "bg-purple-400",
-        "bg-red-400",
-    ];
-    return map[day] ?? "bg-slate-400";
-}
 
 
 /* ----------------- Modal form (Subject combo box from API) -------------------- */
@@ -523,7 +425,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
                   setEnd(Math.min(getHour(end) * 60 + m, DAY_END_H * 60));
                 }}
               >
-                {MINUTES.filter(m => getHour(end) < DAY_END_H || m == 0).map(m => (
+                {MINUTES.filter(m => getHour(end) < DAY_END_H || m === 0).map(m => (
                   <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
                 ))}
               </select>
@@ -689,7 +591,7 @@ export default function ClassroomTimetableDashboard() {
         console.error(e);
       }
     })();
-  }, [me?.id, meLoading]);
+  }, [me, me?.id, meLoading]);
 
 
   // Refs + active-menu logic (center-closest)

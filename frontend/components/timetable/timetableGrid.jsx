@@ -1,7 +1,7 @@
-/* ----------------- UI: Timetable (clickable & shows events) ------------------- */
-import {memo} from "react";
-import { TIMES, DAYS, rowFromDay, colFromTime, startHour, endHour, toHHMM, startOffsetPx, endTrimPx } from "@/utils/time.js";
+import { memo } from "react";
+import { TIMES, DAYS, rowFromDay, colFromTime, startHour, endHour, toHHMM, startOffsetPx, endTrimPx } from "/src/utils/time.js";
 
+/* ----------------- UI: Timetable (clickable & shows events) ------------------- */
 export const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
     const HEADER_H = 52;
     const ROW_H = 92;
