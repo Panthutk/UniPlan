@@ -667,7 +667,7 @@ export default function ClassroomTimetableDashboard() {
         // toast notification (use local subject)
         pushToast({
           type: "success",
-          tittle: "Subject updated",
+          title: "Subject updated",
           desc: `${subject.name} · ${DAYS[dbToUiDay(updated.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -699,7 +699,7 @@ export default function ClassroomTimetableDashboard() {
 
         pushToast({
           type: "success",
-          tittle: "Subject added",
+          title: "Subject added",
           desc: `${subject.name} · ${DAYS[dbToUiDay(created.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -953,27 +953,27 @@ export default function ClassroomTimetableDashboard() {
   return (
     <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
-      <HeaderSection/>
+      <HeaderSection />
 
       <DrawerPanel
-          menuOpen={menuOpen}
-          setMenuOpen={setMenuOpen}
-          user={user}
-          timetableRef={timetableRef}
-          activeMenu = {activeMenu}
-          tasksRef = {tasksRef}
-          handleShowArchived = {handleShowArchived}
-          handleClearEvents = {handleClearEvents}
-          events = {events}
-          handleCellClick = {handleCellClick}
-          handleEventClick = {handleEventClick}
-          tasksLoading = {tasksLoading}
-          taskObjects ={taskObjects}
-          handleUpdateTask = {handleUpdateTask}
-          archiveTask = {archiveTask}
-          subjects = {subjects}
-          toasts = {toasts}
-          setToasts={setToasts}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        user={user}
+        timetableRef={timetableRef}
+        activeMenu={activeMenu}
+        tasksRef={tasksRef}
+        handleShowArchived={handleShowArchived}
+        handleClearEvents={handleClearEvents}
+        events={events}
+        handleCellClick={handleCellClick}
+        handleEventClick={handleEventClick}
+        tasksLoading={tasksLoading}
+        taskObjects={taskObjects}
+        handleUpdateTask={handleUpdateTask}
+        archiveTask={archiveTask}
+        subjects={subjects}
+        toasts={toasts}
+        setToasts={setToasts}
       />
 
       {/* Modal */}
