@@ -48,3 +48,77 @@ export async function del(path) {
     if (!r.ok && r.status !== 204)
         throw new Error(`DELETE ${path} failed (${r.status})`);
 }
+
+// Timetable list + subjects (used after import to refresh UI)
+export async function listTimetable() {
+  return get(`/api/timetable/?ordering=day_of_week,start_time`);
+}
+export async function listSubjects() {
+  return get(`/api/subjects/`);
+}
+
+// EXPORT: GET /api/timetable/export.csv -> download file
+export async function exportTimetableCSV() {
+  const candidates = [
+    "/api/timetable/export.csv",
+    "/api/timetable/export/?format=csv",
+    "/api/timetable/export/",
+    "/api/timetable/export",        // <— add
+    "/api/timetable/csv/",          // <— add
+  ];
+
+  let resp = null;
+  for (const path of candidates) {
+    const r = await fetch(`${API}${path}`, {
+      method: "GET",
+      credentials: "include",
+      headers: { ...authHeader() },
+    });
+    if (r.ok) { resp = r; break; }
+  }
+
+  if (!resp) throw new Error("Export failed (no matching endpoint)");
+
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "timetable.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+
+export async function importTimetableCSV(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const candidates = [
+    "/api/timetable/import",
+    "/api/timetable/import/",
+  ];
+
+  let resp = null, json = null, last = null;
+
+  for (const path of candidates) {
+    const r = await fetch(`${API}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { ...authHeader() }, // don't set content-type for FormData
+      body: fd,
+    });
+    last = r;
+    json = await r.json().catch(() => ({}));
+    if (r.ok) { resp = r; break; }
+  }
+
+  if (!resp) {
+    const msg = json?.detail || `Import failed (${last?.status ?? "?"})`;
+    const errs = json?.errors?.length ? `\n\nErrors:\n- ${json.errors.join("\n- ")}` : "";
+    throw new Error(msg + errs);
+  }
+  return json;
+}
+

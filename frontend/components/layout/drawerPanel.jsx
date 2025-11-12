@@ -8,7 +8,7 @@ import React from "react";
 
 export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
                          handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask
-                         , archiveTask, subjects, toasts, setToasts}) {
+                         , archiveTask, subjects, toasts, setToasts, onImport, onExport, importBusy = false, exportBusy = false,}) {
 
     return (
         <div>
@@ -139,11 +139,26 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
                             >
                                 Clear
                             </button>
-                            <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
-                                Import
+                            <button
+                              onClick={onImport}
+                              disabled={importBusy}
+                              className={[
+                                "px-5 py-2 rounded-full font-semibold",
+                                importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                              ].join(" ")}
+                            >
+                              {importBusy ? "Importing…" : "Import"}
                             </button>
-                            <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
-                                Export
+                          
+                            <button
+                              onClick={onExport}
+                              disabled={exportBusy}
+                              className={[
+                                "px-5 py-2 rounded-full font-semibold",
+                                exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                              ].join(" ")}
+                            >
+                              {exportBusy ? "Exporting…" : "Export"}
                             </button>
 
                             {/* NEW: Send a test email */}

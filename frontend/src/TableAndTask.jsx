@@ -13,13 +13,8 @@ import { colorForDay } from "./utils/color.js";
 import { HeaderSection } from "../components/layout/header.jsx";
 import { DrawerPanel } from "../components/layout/drawerPanel.jsx";
 
+import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 
-async function listTimetable() {
-  return get(`/api/timetable/?ordering=day_of_week,start_time`);
-}
-async function listSubjects() {
-  return get(`/api/subjects/`);
-}
 
 async function whoami() {
   // returns { id, username, email, ... } when logged in, or {} if anonymous
@@ -599,11 +594,64 @@ export default function ClassroomTimetableDashboard() {
   const tasksRef = useRef(null);
   const [activeMenu, setActiveMenu] = useState("timetable");
   const activeRef = useRef(activeMenu);
+  const fileInputRef = useRef(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
   useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalInitial, setModalInitial] = useState({ day: 0, start: 8, end: 9, title: "", desc: "" });
+
+  const handleExportClick = async () => {
+  try {
+    setExportBusy(true);
+    await exportTimetableCSV();
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "Export failed");
+  } finally {
+    setExportBusy(false);
+  }
+};
+
+const handleImportClick = () => fileInputRef.current?.click();
+
+const handleImportChange = async (ev) => {
+  const file = ev.target.files?.[0];
+  // allow selecting the same file again next time
+  ev.target.value = "";
+  if (!file) return;
+
+  try {
+    setImportBusy(true);
+    const res = await importTimetableCSV(file);
+    alert(`Import success: replaced ${res?.replaced ?? 0} entries`);
+
+    // refresh timetable from DB and rebuild events
+    const [subj, tte] = await Promise.all([listSubjects(), listTimetable()]);
+    setSubjects(subj);
+    const byId = Object.fromEntries(subj.map(s => [s.id, s]));
+    const evs = tte.map(t => ({
+      id: t.id,
+      subjectId: t.subject,
+      title: byId[t.subject]?.name || "Untitled",
+      day: dbToUiDay(t.day_of_week),
+      start: parseHHMM(t.start_time),
+      end: parseHHMM(t.end_time),
+      desc: t.room || "",
+      color: colorForDay(dbToUiDay(t.day_of_week)),
+    }));
+    setEvents(evs);
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "Import failed");
+  } finally {
+    setImportBusy(false);
+  }
+};
+
 
   // Initialize from grid (create)
   const handleCellClick = (dayIdx, hour) => {
@@ -953,6 +1001,14 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection/>
+      {/* Hidden input for Import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        onChange={handleImportChange}
+        className="hidden"
+      />
 
       <DrawerPanel
           menuOpen={menuOpen}
@@ -973,6 +1029,10 @@ export default function ClassroomTimetableDashboard() {
           subjects = {subjects}
           toasts = {toasts}
           setToasts={setToasts}
+          onImport={handleImportClick}
+          onExport={handleExportClick}
+          importBusy={importBusy}
+          exportBusy={exportBusy}
       />
 
       {/* Modal */}
@@ -1045,28 +1105,6 @@ export default function ClassroomTimetableDashboard() {
                             {subjectName} — {task.title}
                           </div>
                           <div className="text-sm opacity-70">Due: {formattedDue}</div>
-                        </div>
-
-                        {/* RIGHT SIDE */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {task.assignment_alt_link && (
-                            <a
-                              href={task.assignment_alt_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
-                              title="Open in Google Classroom"
-                            >
-                              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
-                              Classroom
-                            </a>
-                          )}
-                          <button
-                            onClick={() => handleUnarchive(task.id)}
-                            className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
-                          >
-                            Unarchive
-                          </button>
                         </div>
                       </div>
                     );
