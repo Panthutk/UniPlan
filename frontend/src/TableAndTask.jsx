@@ -1,67 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState, memo } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import uniplanLogo from "./assets/uniplanLogo.svg";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+// Helper Calling
+import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
+import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
+import { colorForDay } from "./utils/color.js";
+import { XIcon } from "./utils/icon.jsx";
 
-const API = BASE_URL;
+// Components Calling
+import { HeaderSection } from "../components/layout/header.jsx";
+import { DrawerPanel } from "../components/layout/drawerPanel.jsx";
 
-const authHeader = () => {
-  const t = localStorage.getItem("jwt");
-  return t ? { Authorization: `Bearer ${t}` } : {};
-};
+import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 
-async function get(path) {
-  const r = await fetch(`${API}${path}`, {
-    credentials: "include",
-    headers: { ...authHeader() },
-  });
-  if (!r.ok) throw new Error(`GET ${path} failed (${r.status}): ${await r.text().catch(() => "")}`);
-  return r.json();
-}
-
-async function post(path, body) {
-  const r = await fetch(`${API}${path}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`POST ${path} failed (${r.status}): ${await r.text().catch(() => "")}`);
-  return r.json();
-}
-
-async function patch(path, body) {
-  const r = await fetch(`${API}${path}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`PATCH ${path} failed (${r.status})`);
-  return r.json();
-}
-
-async function del(path) {
-  const r = await fetch(`${API}${path}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: { ...authHeader() },
-  });
-  if (!r.ok && r.status !== 204) throw new Error(`DELETE ${path} failed (${r.status})`);
-}
-
-async function listTimetable() {
-  return get(`/api/timetable/?ordering=day_of_week,start_time`);
-}
-async function listSubjects() {
-  return get(`/api/subjects/`);
-}
 
 async function whoami() {
   // returns { id, username, email, ... } when logged in, or {} if anonymous
@@ -85,33 +39,9 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
-async function sendTestEmail() {
-  const r = await fetch(`${API}/api/test-email/`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeader() },
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data?.detail || `POST /api/test-email/ failed (${r.status})`);
-  return data;
-}
-
 function CreateNewColorHex() {
   const randomColor = Math.floor(Math.random() * 16777215).toString(16);
   return `#${randomColor.padStart(6, "0")}`;
-}
-
-// Create a scheduled email reminder for an assignment
-async function createReminder({
-  assignmentId,
-  remindAtISO,
-  offsetDays,
-}) {
-  return post(`/api/reminders/intake/`, {
-    assignmentId,
-    remindAtISO,
-    offsetDays,
-  });
 }
 
 
@@ -148,25 +78,6 @@ const DAY_START_H = 8;
 const DAY_END_H = 20;
 
 
-const toHHMM = (m) => {
-  const hh = String(Math.floor(m / 60)).padStart(2, "0");
-  const mm = String(m % 60).padStart(2, "0");
-  return `${hh}:${mm}`;
-}; // It converts a number of minutes since midnight into “HH:MM” for dropdown label also on eventcard
-
-const toLabelSS = (m) => `${toHHMM(m)}:00`;   // "HH:MM:SS" (08.15.00) for Django
-
-// For hour-based grid snapping(grid still the same for hr)
-const startHour = (m) => Math.floor(m / 60);                 // e.g. 08:15 -> 8
-const endHour = (mStart, mEnd) =>
-  Math.max(Math.ceil(mEnd / 60), Math.floor(mStart / 60) + 1); // at least 1h wide
-
-
-const parseHHMM = (s) => {
-  if (!s) return 0;
-  const [H, M] = String(s).split(":").map(Number);
-  return (H || 0) * 60 + (M || 0);  // convert hours/minutes to total minutes for easy math
-}
 
 
 // split hour and min
@@ -180,58 +91,8 @@ const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
 
 // help for adjust the column card
 const COL_W = 120;
-const startOffsetPx = (mStart) => ((mStart % 60) / 60) * COL_W;
-const endTrimPx = (mEnd) =>
-  (mEnd % 60 === 0 ? 0 : (1 - (mEnd % 60) / 60) * COL_W);
 
 
-// --- Linking assignments to timetable events ---
-function norm(s) {
-  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-// returns { linked, day, color, eventTitle }
-function linkOneAssignmentToEvents(assignment, events, subjectName) {
-  const aCourse = norm(subjectName);
-  const aTitle = norm(assignment.title);
-
-  const daySet = new Set();
-  const colorSet = new Set();
-
-  for (const ev of events || []) {
-    const eTitle = norm(ev.title);
-    if (!eTitle) continue;
-
-    const match =
-      eTitle.includes(aCourse) ||
-      aCourse.includes(eTitle) ||
-      eTitle.includes(aTitle) ||
-      aTitle.includes(eTitle);
-
-    if (match) {
-      daySet.add(ev.day);
-      colorSet.add(colorForDay(ev.day));
-    }
-  }
-
-  const days = [...daySet];
-  const colors = [...colorSet];
-
-  return {
-    linked: days.length > 0,
-    days,
-    colors,
-    subjectName,
-  };
-}
-
-
-function annotateAssignmentsWithEvents(items, events, SubjectMap) {
-  return (items || []).map((a) => {
-    const link = linkOneAssignmentToEvents(a, events, SubjectMap[a.subject].name);
-    return { ...a, TableLink: link };
-  });
-}
 
 
 async function getSubjectKeyByCourse(courseName, setSubjects) {
@@ -410,991 +271,6 @@ function normalizeCourses(json) {
 function normalizeSubmissions(json) {
   return Array.isArray(json) ? json : json?.studentSubmissions || [];
 }
-function fmtDate(s) {
-  if (!s) return "—";
-  const d = new Date(s);
-  return isNaN(d) ? "—" : d.toLocaleString();
-}
-function fmtDueDateObj(d) {
-  if (!d || isNaN(+d)) return "—";
-  return d.toLocaleString(undefined, {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-
-/* ----------------- time/day ----------------- */
-const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-const TIMES = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
-const colFromTime = (h) => (h - 8) + 2;   // 8 -> col 2, 19 -> 13
-const rowFromDay = (d) => d + 2;         // 0..6 -> rows 2..8
-
-
-
-function colorForDay(day) {
-  // 0=Mon ... 6=Sun
-  const map = [
-    "bg-yellow-400",
-    "bg-pink-400",
-    "bg-green-400",
-    "bg-orange-400",
-    "bg-blue-400",
-    "bg-purple-400",
-    "bg-red-400",
-  ];
-  return map[day] ?? "bg-slate-400";
-}
-
-
-
-
-/* ----------------- UI: Timetable (clickable & shows events) ------------------- */
-const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, onEventClick }) {
-  const HEADER_H = 52;
-  const ROW_H = 92;
-  const LABEL_W = 132; // first column day label
-  const GAP = 2; // space between each grid cell(px)
-  const COL_W = 120; // fixed column width of each time column (px)
-
-  // Fixed total size (so it never shrinks)
-  const TOTAL_W = LABEL_W + 12 * COL_W + 13 * GAP; // 13 columns, 12 gaps
-  const TOTAL_H = HEADER_H + 7 * ROW_H + 8 * GAP; // 8 rows, 7 gaps
-
-  return (
-    <div className="rounded-xl bg-neutral-800 p-2  w-full h-full">
-      {/* scroll container (adds scrollbars when needed) */}
-      <div className="relative overflow-auto w-full h-full max-h-[75vh] scrollbar-transparent" style={{ WebkitOverflowScrolling: "touch" }}>
-        {/* fixed-size grid that does NOT shrink */}
-        <div
-          className="relative grid gap-[2px] select-none w-full"
-          style={{
-            width: `${TOTAL_W}px`,
-            height: `${TOTAL_H}px`,
-            gridTemplateRows: `${HEADER_H}px repeat(7, ${ROW_H}px)`,
-            gridTemplateColumns: `${LABEL_W}px repeat(12, ${COL_W}px)`, // fixed px columns (no fr)
-          }}
-          role="grid"
-          aria-label="Weekly timetable"
-        >
-          {/* Corner */}
-          <div className="bg-neutral-900/60 flex items-center justify-center text-xs">
-            Day/Time
-          </div>
-
-          {/* Time headers */}
-          {TIMES.map((h) => (
-            <div
-              key={h}
-              className="bg-neutral-900/60 flex items-center justify-center text-xs"
-            >
-              {h}:00
-            </div>
-          ))}
-
-          {/* Day labels */}
-          {DAYS.map((d, i) => (
-            <div
-              key={d}
-              className="bg-neutral-900/60 flex items-center justify-center text-xs"
-              style={{ gridRow: i + 2, gridColumn: 1 }}
-            >
-              {d}
-            </div>
-          ))}
-
-          {/* Background cells*/}
-          {DAYS.map((_, di) =>
-            TIMES.map((h, ti) => (
-              <button
-                key={`bg-${di}-${ti}`}
-                type="button"
-                onClick={() => onCellClick(di, h)}
-                className="bg-neutral-900/20 hover:bg-neutral-900/30 transition-colors"
-                style={{ gridRow: di + 2, gridColumn: ti + 2, cursor: "pointer" }}
-                aria-label={`Add on ${DAYS[di]} at ${h}:00`}
-              />
-            ))
-          )}
-
-          {/* Events layer*/}
-          {events.map((e) => (
-            <div
-              key={e.id}
-              onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
-              className="relative" // ahchor for absolute child
-              style={{
-                gridRow: rowFromDay(e.day),
-                // keep grid hour-based (snap to hours)
-                gridColumn: `${colFromTime(startHour(e.start))} / ${colFromTime(endHour(e.start, e.end))}`,
-                zIndex: 10,
-                overflow: "hidden", // keeps the card clipped inside the span
-              }}
-              // show real minutes
-              title={`${e.title} — ${toHHMM(e.start)}–${toHHMM(e.end)}`}
-            >
-              {/* the card inside slide it on horizontal*/}
-              <div
-                className={`absolute top-0 bottom-0 rounded-md text-black p-2 text-xs font-semibold ${e.color || "bg-emerald-400"} cursor-pointer hover:opacity-90 overflow-hidden`}
-                style={{
-                  left: `${startOffsetPx(e.start)}px`,   // e.g., 30/60/90 px for :15/:30/:45
-                  right: `${endTrimPx(e.end)}px`,         // trim right side if ends mid-hour
-                }}>
-
-                <div className="truncate whitespace-nowrap overflow-hidden">
-                  {(e.title)}
-                </div>
-                <div className="text-[10px] opacity-80">
-                  {toHHMM(e.start)}–{toHHMM(e.end)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-// !! Didn't Use !!
-/* ----------------- UI: Tasks (from API) -------------------- */
-function CourseTasksCard({ course, submissions, showRaw }) {
-  const id = course.id || course.courseId;
-  const subs = (submissions || [])
-    .slice()
-    .sort((a, b) => {
-      const ta = Date.parse(a.updateTime || a.creationTime || 0);
-      const tb = Date.parse(b.updateTime || b.creationTime || 0);
-      return (tb || 0) - (ta || 0);
-    });
-
-  return (
-    <div className="rounded-xl border border-white/10 p-4 bg-white/5">
-      <div className="flex items-baseline justify-between">
-        <div className="font-medium">
-          {course.name}{" "}
-          {course.section ? <span className="opacity-70">({course.section})</span> : null}
-        </div>
-        <div className="text-xs opacity-70">ID: {id}</div>
-      </div>
-
-      <div className="mt-3 text-sm font-semibold">Active Assignments ({subs.length})</div>
-
-      {subs.length === 0 ? (
-        <div className="text-sm opacity-70 mt-1">No active assignments.</div>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {subs.map((s) => (
-            <li key={s.id} className="rounded-lg border border-white/10 p-3 bg-white/5">
-              <div className="font-medium">
-                #{s.courseWorkId} · {s.courseWorkType || "CourseWork"}
-              </div>
-              <div className="text-xs opacity-70">
-                State: {s.state} · Late: {String(s.late)} · Created: {fmtDate(s.creationTime)} · Updated: {fmtDate(s.updateTime)}
-              </div>
-              {s.alternateLink && (
-                <a className="text-xs underline" href={s.alternateLink} target="_blank" rel="noreferrer">
-                  Open in Classroom
-                </a>
-              )}
-              {showRaw && (
-                <pre className="mt-2 text-xs bg-black/10 p-2 rounded overflow-auto">
-                  {JSON.stringify(s, null, 2)}
-                </pre>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {showRaw && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs opacity-70">Course raw JSON</summary>
-          <pre className="mt-2 text-xs bg-black/10 p-3 rounded overflow-auto">
-            {JSON.stringify(course, null, 2)}
-          </pre>
-        </details>
-      )}
-    </div>
-  );
-}
-
-// !! Didn't Use !!
-const TasksSection = memo(function TasksSection({ courses, subsByCourse, showRaw }) {
-  if (!courses?.length) return <div className="text-sm opacity-70">No active classes found.</div>;
-  return (
-    <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {courses.map((c) => (
-        <CourseTasksCard
-          key={c.id || c.courseId}
-          course={c}
-          submissions={subsByCourse[c.id || c.courseId]}
-          showRaw={showRaw}
-        />
-      ))}
-    </div>
-  );
-});
-
-
-/* -----------------Assignments Board----------------- */
-
-function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, events }) {
-
-  // console.log("-------------------------------------------------------");
-  // console.log(TaskObjects);
-  // console.log(SubjectObjects);
-  // console.log("-------------------------------------------------------");
-
-  //Legend Deadline indicator (Array)
-  const legends = [
-    { color: "bg-red-600", label: "less than 3 days" },
-    { color: "bg-amber-400", label: "less than 7 days" },
-    { color: "bg-green-400", label: "more than 7 days" },
-  ];
-  // Make Subject ID to be Key for easier to use Subject data
-  const SubjectMap = useMemo(() => {
-    const map = {};
-    SubjectObjects.forEach(subj => {
-      map[subj.id] = subj;
-    });
-    return map;
-  }, [SubjectObjects]);
-
-
-  //Search Bar (React Hook)
-  const [searchTerm, setSearchTerm] = useState("");
-
-  //5 Filters option (React Hook)
-  const [appliedPriorityFilter, setAppliedPriorityFilter] = useState("");
-  const [appliedSubjectFilter, setAppliedSubjectFilter] = useState("");
-  const [appliedSourceFilter, setAppliedSourceFilter] = useState("");
-  const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
-  const [appliedOnTimetableFilter, setAppliedOnTimetableFilter] = useState("");
-
-  //Group by dropdown (React Hook)
-  const [groupByOption, setGroupByOption] = useState("");
-
-  //Add table link
-  const TaskObjects_tableLinked = useMemo(
-    () => annotateAssignmentsWithEvents(TaskObjects, events, SubjectMap),
-    [TaskObjects, events, SubjectMap]
-  );
-
-  //Data filtered by Search Bar & Filter Button
-  const filteredTasks = useMemo(() => {
-
-    let result = [...TaskObjects_tableLinked];
-
-    if (searchTerm) {
-      result = result.filter(task =>
-        task.title.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // must match all the selected to show the result
-    if (appliedPriorityFilter) {
-      result = result.filter(task => task.priority === appliedPriorityFilter);
-    }
-    if (appliedSubjectFilter) {
-      result = result.filter(task => task.subject === appliedSubjectFilter);
-    }
-    if (appliedSourceFilter) {
-      result = result.filter(task => task.source === appliedSourceFilter);
-    }
-    if (appliedDaysLeftFilter) {
-      if (appliedDaysLeftFilter < 1000) {
-        result = result.filter(task => task.days_left < appliedDaysLeftFilter);
-      }
-      else {
-        result = result.filter(task => task.days_left >= 7);
-      }
-    }
-    if (appliedOnTimetableFilter !== "") {
-      result = result.filter(task => task.TableLink.linked === appliedOnTimetableFilter);
-    }
-
-
-    result = result.filter(task => !task.is_archived);
-
-    return result;
-  }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter, appliedSourceFilter,
-    appliedDaysLeftFilter, appliedOnTimetableFilter]);
-
-
-  //Create Separate Group each one has it own set of data
-  const groupedTasks = useMemo(() => {
-    if (groupByOption === "") return { "": filteredTasks };
-
-    const group = (taskValue) => Object.fromEntries(TaskGroupBy(filteredTasks, taskValue));
-
-    const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    switch (groupByOption) {
-      case "day":
-        return group((t) => dayNames[t.day_of_week] || "Unassigned");
-      case "subject":
-        return group((t) => {
-          const subj = SubjectMap[t.subject];
-          return subj ? subj.name : "Unknown Subject";
-        });
-      case "priority":
-        return group((t) => {
-          if (t.priority === "normal") {
-            return "Medium";
-          }
-          else return t.priority || "Unknown";
-        });
-      case "lecture day":
-        return group((t) => {
-          const days = t.TableLink?.days;
-          if (Array.isArray(days)) {
-            return days.map((i) => dayNames[i] || "Unassigned");
-          }
-          return dayNames[days] || "Unassigned";
-        });
-
-
-      default:
-        return { "": filteredTasks };
-    }
-  }, [filteredTasks, groupByOption, SubjectMap]);
-
-  return (
-    <div>
-
-      {/*Utility buttons: Search bar + Filter + Group*/}
-      <TaskFilterElements
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        groupByOption={groupByOption}
-        setGroupByOption={setGroupByOption}
-        SubjectObjects={SubjectObjects}
-        setAppliedPriorityFilter={setAppliedPriorityFilter}
-        setAppliedSubjectFilter={setAppliedSubjectFilter}
-        setAppliedSourceFilter={setAppliedSourceFilter}
-        setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
-        setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
-      />
-
-
-      {/* Colors legend : tell how far from deadline*/}
-      <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
-        {legends.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className={`h-3 w-3 rounded-full ${item.color}`} />
-            <span className="text-sm font-medium">{item.label}</span>
-          </div>
-        ))}
-      </div>
-      {console.log("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")}
-
-      <div>
-        {sortGroups(groupedTasks, groupByOption).map(([label, tasks]) => (
-          <AssignmentsGroup
-            key={label}
-            label={label}
-            GroupedTasks={tasks}
-            SubjectMap={SubjectMap}
-            onUpdateTask={onUpdateTask}
-            onArchiveTask={onArchiveTask}
-            events={events}
-          />
-        ))}
-      </div>
-
-
-    </div>
-  );
-}
-
-function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask }) {
-  console.log("---------------------------------------------------------------------------");
-  console.log(label);
-  console.log(GroupedTasks);
-
-  const [isOpen, setIsOpen] = useState(true);
-
-  const colorMap = {
-    Monday: "#f6e05e",
-    Tuesday: "#f48fb1",
-    Wednesday: "#4ade80",
-    Thursday: "#f6ad55",
-    Friday: "#63b3ed",
-    Saturday: "#AC94FA",
-    Sunday: "#F87171",
-    none: "#FF9793",
-    low: "#FF4B33",
-    Medium: "#E72107",
-    high: "#B21500",
-    "": "#808080" // default
-  };
-
-  function getColor(label) {
-    if (colorMap[label]) return colorMap[label];
-
-    const subjectEntry = Object.values(SubjectMap).find(
-      (subject) => subject.name === label
-    );
-    if (subjectEntry?.color_hex) return subjectEntry.color_hex;
-    return "#808080";
-  }
-
-  const color = getColor(label);
-
-  if (GroupedTasks.length === 0) {
-    return (
-      <section className="space-y-6">
-        <div className="text-lg opacity-70 py-2">No tasks to show.</div>
-      </section>
-    );
-  }
-
-  return (
-    <div>
-      {/* Header with toggle button */}
-      <div className="flex items-center justify-start mb-2">
-        {label && (
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="px-3 text-sm hover:text-white transition"
-          >
-            {isOpen ? "⏷" : "▶"}
-          </button>
-        )}
-
-        <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
-          {label}
-          {label !== "" && (
-            <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
-          )}
-        </h2>
-
-      </div>
-
-      {/* Tasks list (conditionally rendered) */}
-      {isOpen && (
-        <div>
-          {GroupedTasks.map((task) => (
-            <AssignmentsCard
-              key={task.id}
-              task={task}
-              SubjectMap={SubjectMap}
-              onUpdateTask={onUpdateTask}
-              onArchiveTask={onArchiveTask}
-              color={color}
-              groupLabel={label}
-            />
-
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
-
-  const subject = SubjectMap[task.subject];
-
-  const days_left = task.days_left;
-
-  const leftText =
-    days_left == null ? "—" : `${Math.max(days_left, 0)} Day${Math.abs(days_left) === 1 ? "" : "s"} Left`;
-
-  // check data linked to databased or not
-  const linked = task.TableLink?.linked;
-
-  const dayBg =
-    days_left != null
-      ? days_left < 3
-        ? "bg-red-500"     // urgent (<3 days)
-        : days_left < 7
-          ? "bg-yellow-400"  // moderate (<7 days)
-          : "bg-green-500"   // safe (>7 days)
-      : "";
-  // slightly color change from Background Colors
-  const dayRing =
-    days_left != null
-      ? days_left < 3
-        ? "ring-red-400"
-        : days_left < 7
-          ? "ring-yellow-200"
-          : "ring-green-300"
-      : "";
-
-  const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 1.5px ${color}` } : {};
-  const ringClass = groupLabel === "" ? dayRing : "";
-
-
-  const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
-  const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
-  const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
-
-  const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
-  // get object that has the same key with this task
-
-  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-  const lectureText = (() => {
-    if (!task.TableLink?.days?.length) return null;
-
-    if (task.TableLink.days.length === 7) {
-      return "Lecture: entire week";
-    } else if (task.TableLink.days.length === 1) {
-      return `Lecture: ${dayNames[task.TableLink.days[0]]}`;
-    } else {
-      const names = task.TableLink.days
-        .sort((a, b) => a - b)
-        .map((d) => dayNames[d])
-        .join(" / ");
-      return `Lecture: ${names}`;
-    }
-  })();
-
-
-  const scheduleReminder = async (task) => {
-    if (!task?.due_at) { alert("No due date for this task."); return; }
-
-    const id = task.id;
-    const due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
-    if (isNaN(+due)) { alert("Invalid due date."); return; }
-
-    const offset = Number(choice[id] ?? 3); // default 3 days
-    const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
-
-
-    try {
-      setPending(p => ({ ...p, [id]: true }));
-      await createReminder({
-        assignmentId: id,
-        remindAtISO: remindAt.toISOString(),
-        offsetDays: offset,
-      });
-      setScheduled(s => ({ ...s, [id]: true }));
-      alert(`Reminder set: ${offset} day(s) before due date.`);
-    } catch (e) {
-      console.error(e);
-      alert(`Failed to schedule reminder: ${e?.message || e}`);
-    } finally {
-      setPending(p => ({ ...p, [id]: false }));
-    }
-  };
-
-  return (
-    <div
-      key={task.id}
-      className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-hidden`}
-      style={ringStyle}
-    >
-      {/* Left label (day color only when linked) */}
-      <div className={`${dayBg} text-neutral-900 font-bold flex items-center justify-center p-3`}>
-        <div className="text-center text-xl">{leftText}</div>
-      </div>
-
-      {/* Right content */}
-      <div className="p-4 min-w-0">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm opacity-80 truncate">
-            <span className="tracking-wider">{subject.name || "Loading..."}</span>
-            {task.assignment_alt_link && linked === true ? (
-              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                {lectureText && (
-                  <span className="ml-2 text-xs opacity-70">{lectureText}</span>
-                )}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Title (if linked, show the “HW:” line; if not linked, show note) */}
-        {task.external_id ? (
-          <div className="mt-1 text-sm">
-            <span className="opacity-80 mr-2">HW:</span>
-            <span className="font-semibold">{task.title}</span>
-          </div>
-        ) : (
-          <div className="mt-1 text-sm opacity-50 italic">Not assigned on timetable</div>
-        )}
-
-        {/* Due date & time (show when available) */}
-        {format_due && (
-          <div className="mt-1 text-xs opacity-80">
-            <span className="font-semibold">Due:</span>{" "}
-            {fmtDueDateObj(format_due)}
-          </div>
-        )}
-
-
-        {/*Classroom link button*/}
-        <div className="mt-3 flex items-center gap-3">
-          {task.assignment_alt_link && (
-            <a
-              href={task.assignment_alt_link}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
-              title="Open in Classroom"
-            >
-              {/*<span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />*/}
-              <span> 👨🏻‍💻 </span>
-              Classroom
-            </a>
-          )}
-
-          {/*Reminder controls */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs opacity-75">Remind me:</label>
-            <select
-              className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-              value={(choice[task.id] ?? 3)}
-              onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
-              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
-              title={task.due ? "Choose how many days before due date" : "No due date"}
-            >
-              <option value={1}>1 day before</option>
-              <option value={3}>3 days before</option>
-              <option value={7}>7 days before</option>
-            </select>
-            <button
-              onClick={() => scheduleReminder(task)}
-              disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
-              className={[
-                "text-xs px-3 py-1.5 rounded-full font-semibold",
-                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
-              ].join(" ")}
-              title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
-            >
-              {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
-            </button>
-          </div>
-          {/*Archive button*/}
-          <button
-            onClick={async () => {
-              if (window.confirm("Archive this task?")) {
-                try {
-                  await onArchiveTask(task.id);
-                  onUpdateTask(task.id, { is_archived: true });
-                  alert("Task archived successfully!");
-                } catch (e) {
-                  console.error(e);
-                  alert("Failed to archive task: " + e.message);
-                }
-              }
-            }}
-            className="text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
-            title="Archive this task"
-          >
-            Archive
-          </button>
-
-          {/*Priority controls*/}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs opacity-75">priority:</span>
-            <select
-              className="bg-neutral-800 border border-white/10 text-xs opacity-75"
-              value={task.priority ?? "none"}
-              onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
-            >
-              <option value="none">-</option>
-              <option value="low">Low</option>
-              <option value="normal">Medium</option>
-              <option value="high">High</option>
-            </select>
-
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-
-function sortGroups(groupedTasks, groupBy) {
-  const orderMap = {
-    day: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
-    "lecture day": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Unassigned"],
-    priority: ["high", "medium", "low", "none", "unknown"],
-  };
-
-  const order = orderMap[groupBy];
-  if (!order) return Object.entries(groupedTasks);
-
-  return Object.entries(groupedTasks).sort(([a], [b]) => {
-    const normalize = (str) => str?.toLowerCase()?.trim();
-    const indexA = order.findIndex((d) => normalize(d) === normalize(a));
-    const indexB = order.findIndex((d) => normalize(d) === normalize(b));
-    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-  });
-}
-
-
-
-function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
-  setAppliedPriorityFilter, setAppliedSubjectFilter, setAppliedSourceFilter,
-  setAppliedDaysLeftFilter, setAppliedOnTimetableFilter }) {
-
-  // Filter Hooks
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [subjectFilter, setSubjectFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [daysLeftFilter, setDaysLeftFilter] = useState("");
-  const [onTimetableFilter, setOnTimetableFilter] = useState("");
-
-  // Filter Button Utility
-  const toggleDropdown = () => setIsOpen(!isOpen);
-  const [isOpen, setIsOpen] = useState(false);
-
-
-  // Filter function logic
-  const handlePriorityChange = (priority_value) => {
-    setPriorityFilter(prev => prev === priority_value ? "" : priority_value);
-  };
-  const handleSubjectChange = (subject_value) => {
-    setSubjectFilter(prev => prev === subject_value ? "" : subject_value);
-  };
-  const handleSourceChange = (source_value) => {
-    setSourceFilter(prev => prev === source_value ? "" : source_value);
-  };
-  const handleDaysLeftChange = (daysLeft_value) => {
-    setDaysLeftFilter(prev => prev === daysLeft_value ? "" : daysLeft_value);
-  };
-  const handleOnTimeableChange = (timetable_value) => {
-    setOnTimetableFilter(prev => prev === timetable_value ? "" : timetable_value);
-  };
-
-
-
-  const ClearFilters = () => {
-    setSearchTerm("");
-    setPriorityFilter("");
-    setSubjectFilter("");
-    setSourceFilter("");
-    setDaysLeftFilter("");
-    setOnTimetableFilter("");
-    setAppliedPriorityFilter("");
-    setAppliedSubjectFilter("");
-    setAppliedSourceFilter("");
-    setAppliedDaysLeftFilter("");
-    setAppliedOnTimetableFilter("");
-    setGroupByOption("");
-  };
-
-  const due_date = [
-    { value: 3, label: "less than 3 days" },
-    { value: 7, label: "less than 7 days" },
-    { value: 1000, label: "greater than or equal 7 days" },
-  ];
-
-  const tableLinked = [
-    { value: true, label: "Yes" },
-    { value: false, label: "No" },
-  ]
-
-  const PriorityShow = {
-    "none": "none",
-    "low": "low",
-    "normal": "medium",
-    "high": "high",
-  }
-
-  useEffect(() => {
-    const handleClickOutside = () => setIsOpen(false);
-    if (isOpen) document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [isOpen]);
-
-  return (
-    <div className="flex flex-col md:flex-row items-center justify-start gap-4 py-3">
-
-      {/*Search Bar*/}
-      <input
-        type="text"
-        placeholder="Search tasks by title..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full md:w-[38%] p-1.5 border rounded-lg focus:outline-none focus:ring focus:ring-blue-950 text-sm text-blue-950"
-      />
-
-
-      {/*Filter Button*/}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen((prev) => !prev);
-        }}
-        className="relative px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition"
-      >
-        Filter
-        <span className="ml-2"> ⏷ </span>
-
-        {/*Logic when the pop-up open*/}
-        {isOpen && (
-          <div className=" my-5 flex flex-col absolute w-[500px] bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-col items-start ps-2 pb-5">
-              Priority:
-              {["none", "low", "normal", "high"].map((priority_value) => (
-                <label
-                  key={priority_value}
-                  className=" items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={priorityFilter === priority_value}
-                    onChange={() => handlePriorityChange(priority_value)}
-                    className="text-pink-500 focus:ring-pink-400"
-                  />
-                  <span className="capitalize">{PriorityShow[priority_value]}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-start ps-2 pb-5">
-              Subject:
-              {SubjectObjects.map((subject_value) => (
-                <label
-                  key={subject_value.id}
-                  className="items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={subjectFilter === subject_value.id}
-                    onChange={() => handleSubjectChange(subject_value.id)}
-                    className="rounded text-pink-500 focus:ring-pink-400"
-                  />
-                  <span className="capitalize">{subject_value.name}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-start ps-2 pb-5">
-              Assignment Source:
-              {["classroom", "create"].map((source_value) => (
-                <label
-                  key={source_value}
-                  className="items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={sourceFilter === source_value}
-                    onChange={() => handleSourceChange(source_value)}
-                    className="rounded text-pink-500 focus:ring-pink-400"
-                  />
-                  <span className="capitalize">{source_value}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-start ps-2 pb-5">
-              Due date in:
-              {due_date.map((daysLeft_value) => (
-                <label
-                  key={daysLeft_value.value}
-                  className="items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={daysLeftFilter === daysLeft_value.value}
-                    onChange={() => handleDaysLeftChange(daysLeft_value.value)}
-                    className="rounded text-pink-500 focus:ring-pink-400"
-                  />
-                  <span className="capitalize">{daysLeft_value.label}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-start ps-2 pb-5">
-              Lecture on Timetable:
-              {tableLinked.map((timetable_value) => (
-                <label
-                  key={timetable_value.value}
-                  className="items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={onTimetableFilter === timetable_value.value}
-                    onChange={() => handleOnTimeableChange(timetable_value.value)}
-                    className="rounded text-pink-500 focus:ring-pink-400"
-                  />
-                  <span className="capitalize">{timetable_value.label}</span>
-                </label>
-              ))}
-            </div>
-
-            <button
-              onClick={() => {
-                setAppliedPriorityFilter(priorityFilter);
-                setAppliedSubjectFilter(subjectFilter);
-                setAppliedSourceFilter(sourceFilter);
-                setAppliedDaysLeftFilter(daysLeftFilter);
-                setAppliedOnTimetableFilter(onTimetableFilter);
-                toggleDropdown();
-              }}
-              className="m-3 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
-            >
-              Apply Filter
-            </button>
-
-          </div>
-        )}
-      </button>
-
-
-      {/*GroupBy Drop-box*/}
-      <select
-        value={groupByOption}
-        onChange={(e) => setGroupByOption(e.target.value)}
-        className="p-2 rounded bg-red-400 shadow"
-      >
-        <option value="none">-</option>
-        <option value="day">By Due date</option>
-        <option value="subject">By Subject</option>
-        <option value="priority">By Priority</option>
-        <option value="lecture day">By Lecture Day</option>
-      </select>
-
-
-      {/*Clear filter Button*/}
-      <button
-        onClick={ClearFilters}
-      >
-        Clear all
-      </button>
-
-
-    </div>
-  )
-}
-
-
-function TaskGroupBy(filteredTasks, getKey) {
-  const grouped_map = new Map();
-
-  filteredTasks.forEach((item) => {
-    let key = getKey(item);
-
-    if (Array.isArray(key)) {
-      if (key.length === 0) key = ["Unassigned"];
-    } else {
-      key = [key];
-    }
-
-    key.forEach((k) => {
-      const label =
-        k === undefined || k === null || k === "" ? "Unassigned" : k;
-      if (!grouped_map.has(label)) grouped_map.set(label, []);
-      grouped_map.get(label).push(item);
-    });
-  });
-
-  return grouped_map;
-}
 
 
 
@@ -1545,7 +421,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
                   setEnd(Math.min(getHour(end) * 60 + m, DAY_END_H * 60));
                 }}
               >
-                {MINUTES.filter(m => getHour(end) < DAY_END_H || m == 0).map(m => (
+                {MINUTES.filter(m => getHour(end) < DAY_END_H || m === 0).map(m => (
                   <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
                 ))}
               </select>
@@ -1711,7 +587,7 @@ export default function ClassroomTimetableDashboard() {
         console.error(e);
       }
     })();
-  }, [me?.id, meLoading]);
+  }, [me, me?.id, meLoading]);
 
 
   // Refs + active-menu logic (center-closest)
@@ -1719,11 +595,64 @@ export default function ClassroomTimetableDashboard() {
   const tasksRef = useRef(null);
   const [activeMenu, setActiveMenu] = useState("timetable");
   const activeRef = useRef(activeMenu);
+  const fileInputRef = useRef(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
   useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalInitial, setModalInitial] = useState({ day: 0, start: 8, end: 9, title: "", desc: "" });
+
+  const handleExportClick = async () => {
+    try {
+      setExportBusy(true);
+      await exportTimetableCSV();
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Export failed");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleImportChange = async (ev) => {
+    const file = ev.target.files?.[0];
+    // allow selecting the same file again next time
+    ev.target.value = "";
+    if (!file) return;
+
+    try {
+      setImportBusy(true);
+      const res = await importTimetableCSV(file);
+      alert(`Import success: replaced ${res?.replaced ?? 0} entries`);
+
+      // refresh timetable from DB and rebuild events
+      const [subj, tte] = await Promise.all([listSubjects(), listTimetable()]);
+      setSubjects(subj);
+      const byId = Object.fromEntries(subj.map(s => [s.id, s]));
+      const evs = tte.map(t => ({
+        id: t.id,
+        subjectId: t.subject,
+        title: byId[t.subject]?.name || "Untitled",
+        day: dbToUiDay(t.day_of_week),
+        start: parseHHMM(t.start_time),
+        end: parseHHMM(t.end_time),
+        desc: t.room || "",
+        color: colorForDay(dbToUiDay(t.day_of_week)),
+      }));
+      setEvents(evs);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Import failed");
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
 
   // Initialize from grid (create)
   const handleCellClick = (dayIdx, hour) => {
@@ -1836,8 +765,6 @@ export default function ClassroomTimetableDashboard() {
     }
   };
 
-
-
   const handleDeleteEvent = async (id) => {
     try {
       const removed = events.find(e => e.id === id);
@@ -1865,7 +792,6 @@ export default function ClassroomTimetableDashboard() {
     }
   };
 
-
   const handleClearEvents = async () => {
     try {
       const ids = events.filter(e => typeof e.id === "number").map(e => e.id);
@@ -1891,7 +817,6 @@ export default function ClassroomTimetableDashboard() {
 
     }
   };
-
 
   useEffect(() => {
     if (!token) { nav("/login"); return; }
@@ -1931,8 +856,6 @@ export default function ClassroomTimetableDashboard() {
     for (const c of courses) if (c?.name) set.add(c.name.trim());
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [courses]);
-
-
 
   useEffect(() => {
     (async () => {
@@ -2003,10 +926,6 @@ export default function ClassroomTimetableDashboard() {
     }
   }
 
-
-
-
-
   async function listArchivedTasks() {
     return get(`/api/tasks/?archived=true`);
   }
@@ -2023,13 +942,6 @@ export default function ClassroomTimetableDashboard() {
     }
   }
 
-
-
-
-
-
-
-
   // add icon
   const [toasts, setToasts] = useState([]);
   // show for 3 s
@@ -2038,62 +950,6 @@ export default function ClassroomTimetableDashboard() {
     setToasts((t) => [...t, { id, type, title, desc, icon }]);
     setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
   }
-
-  const typeStyle = (tp) =>
-    tp === "success"
-      ? "border-emerald-500/40 bg-emerald-500/10"
-      : tp === "error"
-        ? "border-rose-500/40 bg-rose-500/10"
-        : "border-sky-500/40 bg-sky-500/10"
-
-  const defaultIcon = (tp) =>
-    tp === "success" ? <SaveIcon sx={{ fontSize: 20 }} /> :
-      tp === "error" ? <ErrorOutlineIcon sx={{ fontSize: 20 }} /> :
-        <InfoOutlinedIcon sx={{ fontSize: 20 }} />; //icon size
-
-
-  const Toasts = () => (
-    <div
-      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(92vw, 380px)] flex-col gap-3"
-      aria-live="polite"
-    >
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          role="status"
-          className={`pointer-events-auto rounded-xl border p-4 shadow-xl backdrop-blur text-white/90 ${typeStyle(
-            t.type
-          )}`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              {/* ICON */}
-              <div className="mt-0.5 shrink-0 opacity-90">
-                {t.icon ?? defaultIcon(t.type)}
-              </div>
-              {/* TEXT */}
-              <div className="min-w-0">
-                <div className="font-semibold leading-tight">{t.title}</div>
-                {t.desc ? (
-                  <div className="mt-1 text-sm opacity-80 break-words">{t.desc}</div>
-                ) : null}
-              </div>
-            </div>
-            <button
-              onClick={() =>
-                setToasts((toasts) => toasts.filter((x) => x.id !== t.id))
-              }
-              className="ml-2 rounded-md px-2 py-1 text-sm opacity-70 hover:opacity-100"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
 
   // Active menu (closest section center)
   useEffect(() => {
@@ -2143,239 +999,42 @@ export default function ClassroomTimetableDashboard() {
   if (!token) return null;
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
-      <header className="sticky top-0 z-50 py-3 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
-        <div className="w-full pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 flex items-center justify-between">
+      <HeaderSection />
+      {/* Hidden input for Import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        onChange={handleImportChange}
+        className="hidden"
+      />
 
-          {/* LEFT: Logo on top, Menu under it */}
-          <div className="flex flex-col items-start gap-2">
-            <img
-              src={uniplanLogo}
-              alt="Uniplan Logo"
-              className="h-[clamp(20px,6vh,50px)] w-auto"
-            />
-
-          </div>
-
-
-          <div className="flex items-center gap-6">
-            <Link to="/about" state={{ from: "/tableandtask" }} className="opacity-90 text-sm hover:underline">Contact</Link>
-            <button
-              className="border rounded-lg px-3 py-2" //  clear local data
-              onClick={() => { localStorage.clear(); nav("/", { replace: true }); }}  // go to home and replace current history entry
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="sticky z-50 pl-2"
-        style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlapp with header
-
-      >
-        <div className="pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2">
-
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
-            aria-expanded={menuOpen}
-            aria-controls="app-drawer"
-            title="Menu"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-              <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
-            </svg>
-          </button>
-
-        </div>
-      </div>
-
-
-
-      {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
-      <div className="mx-auto max-w-[1800px] 2xl:max-w-[2000px] px-4 sm:px-6 lg:px-8">
-        <div className="pb-10 grid grid-cols-1 gap-y-6 items-start min-w-0">
-          <main className="space-y-6 min-w-0">
-            {/* actions / timetable / assignments / tasks*/}
-
-
-          </main>
-
-
-
-          {/* Drawer overlay */}
-          <div
-            className={`fixed inset-0 z-50 ${menuOpen ? 'visible bg-black/50' : 'invisible bg-black/0'} transition-colors`}
-            onClick={() => setMenuOpen(false)}
-          />
-
-          {/* Drawer panel */}
-          <aside
-            id="app-drawer"
-            className={[
-              "fixed inset-y-0 left-0 z-50 w-[352px] max-w-[85vw]",
-              "bg-neutral-800 text-white shadow-2xl",
-              "transform transition-transform duration-300",
-              menuOpen ? "translate-x-0" : "-translate-x-full",
-              "flex flex-col p-4"
-            ].join(" ")}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Sidebar menu"
-          >
-            {/* Header inside drawer */}
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3 truncate">
-                <div className="h-4 w-4 rounded-full bg-emerald-500" />
-                <div className="font-semibold text-lg leading-tight truncate">
-                  {user?.email || "student@gmail.com"}
-                </div>
-              </div>
-
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="inline-flex items-center justify-center rounded-md border px-3 py-2"
-                aria-label="Close menu"
-              >
-                {/* X icon */}
-                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="currentColor" d="M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.6 10.6l6.29-6.3z" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Nav buttons*/}
-            <nav className="space-y-3">
-              <button
-                onClick={() => {
-                  timetableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  setMenuOpen(false);
-                }}
-                aria-current={activeMenu === "timetable" ? "page" : undefined}
-                className={[
-                  "w-full py-4 rounded-full font-semibold transition-colors",
-                  activeMenu === "timetable"
-                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                    : "bg-neutral-700 hover:bg-neutral-600",
-                ].join(" ")}
-              >
-                TimeTable
-              </button>
-
-              <button
-                onClick={() => {
-                  tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  setMenuOpen(false);
-                }}
-                aria-current={activeMenu === "tasks" ? "page" : undefined}
-                className={[
-                  "w-full py-4 rounded-full font-semibold transition-colors",
-                  activeMenu === "tasks"
-                    ? "bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400/40"
-                    : "bg-neutral-700 hover:bg-neutral-600",
-                ].join(" ")}
-              >
-                Tasks
-              </button>
-
-              {/* Archived Tasks button */}
-              <button
-                onClick={() => {
-                  handleShowArchived();
-                  setMenuOpen(false);
-                }}
-                className="w-full py-4 rounded-full font-semibold bg-neutral-700 hover:bg-neutral-600"
-              >
-                Archived Tasks
-              </button>
-
-            </nav>
-
-          </aside>
-
-
-
-
-          {/* RIGHT — timetable + tasks */}
-          <main className="space-y-6 min-w-0">
-            {/* actions */}
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleClearEvents}
-                className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
-                title="Clear"
-              >
-                Clear
-              </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
-                Import
-              </button>
-              <button className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 font-semibold">
-                Export
-              </button>
-
-              {/* NEW: Send a test email */}
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await sendTestEmail(); // <- uses the helper you added earlier
-                    alert(res.detail || "Test email sent!");
-                  } catch (e) {
-                    console.error(e);
-                    alert(e.message || "Failed to send test email");
-                  }
-                }}
-                className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
-                title="Send a test email to your account email"
-              >
-                Send Test Email
-              </button>
-            </div>
-
-
-            {/* Timetable (click cells to add; click events to edit) */}
-            <div ref={timetableRef} className="scroll-mt-[80px] min-w-0">
-              <TimetableGrid
-                events={events}
-                onCellClick={handleCellClick}
-                onEventClick={handleEventClick}
-              />
-            </div>
-
-
-
-            <div ref={tasksRef} className="scroll-mt-[80px]">
-              {tasksLoading ? (
-                <div className="flex items-center justify-center h-[40vh] text-gray-400">
-                  Refreshing tasks...
-                </div>
-              ) : !taskObjects || taskObjects.length === 0 ? (
-                <div className="flex items-center justify-center h-[40vh] text-gray-400">
-                  No tasks available.
-                </div>
-              ) : (
-                <AssignmentsBoard
-                  TaskObjects={taskObjects}
-                  onUpdateTask={handleUpdateTask}
-                  onArchiveTask={archiveTask}
-                  SubjectObjects={subjects}
-                  events={events}
-                />
-              )}
-            </div>
-
-            <Toasts />
-
-
-
-
-
-
-          </main>
-        </div>
-      </div>
+      <DrawerPanel
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        user={user}
+        timetableRef={timetableRef}
+        activeMenu={activeMenu}
+        tasksRef={tasksRef}
+        handleShowArchived={handleShowArchived}
+        handleClearEvents={handleClearEvents}
+        events={events}
+        handleCellClick={handleCellClick}
+        handleEventClick={handleEventClick}
+        tasksLoading={tasksLoading}
+        taskObjects={taskObjects}
+        handleUpdateTask={handleUpdateTask}
+        archiveTask={archiveTask}
+        subjects={subjects}
+        toasts={toasts}
+        setToasts={setToasts}
+        onImport={handleImportClick}
+        onExport={handleExportClick}
+        importBusy={importBusy}
+        exportBusy={exportBusy}
+      />
 
       {/* Modal */}
       <EventModal
@@ -2397,7 +1056,7 @@ export default function ClassroomTimetableDashboard() {
               onClick={() => setShowArchivedPopup(false)}
               className="absolute top-3 right-3 text-xl font-bold"
             >
-              ✕
+              <XIcon />
             </button>
 
             <h2 className="text-2xl font-semibold mb-4">Archived Tasks</h2>
@@ -2449,6 +1108,7 @@ export default function ClassroomTimetableDashboard() {
                           <div className="text-sm opacity-70">Due: {formattedDue}</div>
                         </div>
 
+
                         {/* RIGHT SIDE */}
                         <div className="flex items-center gap-3 flex-shrink-0">
                           {task.assignment_alt_link && (
@@ -2470,6 +1130,11 @@ export default function ClassroomTimetableDashboard() {
                             Unarchive
                           </button>
                         </div>
+
+
+
+
+
                       </div>
                     );
                   })}
@@ -2486,6 +1151,10 @@ export default function ClassroomTimetableDashboard() {
         </div>
       )}
 
+
+
+
     </div>
   );
 }
+

@@ -1,7 +1,9 @@
 # backend/core/views.py
+import csv
+import io
 import json, os, urllib.parse
 from django.conf import settings
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.core.signing import dumps, loads, BadSignature, SignatureExpired
@@ -14,7 +16,7 @@ from google.auth.transport.requests import Request
 from .models import GoogleAccount
 from rest_framework import viewsets, permissions, status
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from django.core.mail import send_mail
 from rest_framework import mixins
@@ -270,6 +272,129 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export_csv(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"detail": "Authentication required."}, status=401)
+
+        rows = (
+            TimetableEntry.objects
+            .filter(user=user)
+            .select_related("subject")
+            .order_by("day_of_week", "start_time")
+        )
+
+        # build CSV
+        resp = HttpResponse(content_type="text/csv")
+        resp["Content-Disposition"] = 'attachment; filename="timetable.csv"'
+        writer = csv.writer(resp)
+        # headers — keep simple and stable
+        writer.writerow(["subject", "day_of_week", "start_time", "end_time", "room"])
+        for r in rows:
+            writer.writerow([
+                r.subject.name if r.subject else "",
+                r.day_of_week,                 # backend 0=Sun..6=Sat
+                r.start_time.strftime("%H:%M:%S"),
+                r.end_time.strftime("%H:%M:%S"),
+                r.room or "",
+            ])
+        return resp
+
+    @action(detail=False, methods=["post"], url_path="import")
+    def import_csv(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"detail": "Authentication required."}, status=401)
+
+        f = request.FILES.get("file")
+        if not f:
+            return Response({"detail": "No file uploaded (field name must be 'file')."}, status=400)
+
+        # read bytes → text
+        data = f.read()
+        try:
+            text = data.decode("utf-8-sig")  # tolerate BOM
+        except Exception:
+            text = data.decode("utf-8")
+
+        reader = csv.DictReader(io.StringIO(text))
+        # accepted column names
+        # subject | subject_name (either)
+        # day_of_week (0..6 or MON..SUN ok)
+        # start_time/end_time ("HH:MM" or "HH:MM:SS")
+        # room (optional)
+
+        # wipe current user’s rows and rebuild
+        TimetableEntry.objects.filter(user=user).delete()
+        created = 0
+
+        day_map = {
+            "sun": 0, "sunday": 0,
+            "mon": 1, "monday": 1,
+            "tue": 2, "tuesday": 2,
+            "wed": 3, "wednesday": 3,
+            "thu": 4, "thursday": 4,
+            "fri": 5, "friday": 5,
+            "sat": 6, "saturday": 6,
+        }
+
+        def norm_time(s):
+            if not s:
+                return None
+            s = s.strip()
+            if len(s) == 5:  # HH:MM
+                s = s + ":00"
+            return s  # Django will parse "HH:MM:SS" for TimeField
+
+        for row in reader:
+            subj_name = (
+                row.get("subject") or
+                row.get("subject_name") or
+                ""
+            ).strip()
+
+            if not subj_name:
+                # skip empty subject lines
+                continue
+
+            # find or create subject for this user
+            subj, _ = Subject.objects.get_or_create(
+                user=user,
+                name=subj_name,
+                defaults={"code": subj_name.lower().replace(" ", "-")[:30], "color_hex": "#888888"},
+            )
+
+            dow_raw = (row.get("day_of_week") or "").strip()
+            if dow_raw == "":
+                continue
+            try:
+                # numeric 0..6
+                dow = int(dow_raw)
+            except ValueError:
+                dow = day_map.get(dow_raw.lower())
+            if dow is None or dow < 0 or dow > 6:
+                continue
+
+            start = norm_time(row.get("start_time"))
+            end   = norm_time(row.get("end_time"))
+            room  = (row.get("room") or "").strip()
+
+            if not start or not end:
+                continue
+
+            TimetableEntry.objects.create(
+                user=user,
+                subject=subj,
+                day_of_week=dow,
+                start_time=start,
+                end_time=end,
+                room=room,
+            )
+            created += 1
+
+        return Response({"replaced": created}, status=status.HTTP_200_OK)
 
 
 from rest_framework.decorators import action

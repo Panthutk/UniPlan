@@ -51,13 +51,13 @@ export default function About() {
                 <div className="mx-10 md:mx-auto w-auto md:w-[93vw] flex flex-col md:flex-row">
                     <div className="shrink-0 basis-3/5 mb-[12vh] md:mb-[20vh] ">
                         <div className="h-full mr-[10%]">
-              <span className="font-lexend text-white leading-snug text-[clamp(25px,4.5vw,45px)] xl:text-[clamp(20px,6.5vh,70px)] text-right flex justify-end py-[7%]">
+              <span className="text-white leading-snug text-[clamp(25px,4.5vw,45px)] xl:text-[clamp(20px,3.5vw,100px)] text-right flex justify-end py-[7%]">
                 Let’s Get to<br/> Know Our<br/> Developer at
               </span>
                             <span className="font-lexend text-right flex text-[#69a064] font-medium text-[clamp(25px,4.5vw,45px)] xl:text-[clamp(25px,7.5vh,90px)] justify-end py-[2%]">
                 TarwanRapfa Co.
               </span>
-                            <span className="font-cousine flex justify-end text-right text-[#aeb0af] text-[clamp(12px,1.75vw,18px)] xl:text-[clamp(15px,3vh,20px)]">
+                            <span className="flex justify-end text-right text-[#aeb0af] text-[clamp(12px,1.75vw,18px)] xl:text-[clamp(15px,3vh,20px)]">
                 *This cooperation only refers to the group name<br/>It is not real and does not actually exist
               </span>
                         </div>
@@ -105,11 +105,11 @@ export default function About() {
             <div className="flex w-auto ml-10 md:ml-16 mr-[5%] md:mr-[1.65%] flex-col md:flex-row">
                 {/* Left side of second section - Tabs */}
                 <div className=" rounded-2xl max-w-[700px] w-auto md:w-[30%] bg-[#212121] h-[50%] flex flex-col px-[8%] md:sticky md:top-[8%] md:px-[2%] py-[8%] md:py-[2%] my-[3%] gap-3 md:my-0">
-            <span className="text-center font-lexend text-[#aeb0af] mb-[1vh] text-[clamp(19px,1.7vw,27px)]">
+            <span className="text-center text-[#aeb0af] mb-[1vh] text-[clamp(19px,1.7vw,27px)]">
               OUR DEVELOPERS
             </span>
                     {tabs.map((tab, index) => (
-                        <button key={index} onClick={() => setActiveTab(index)} className={`p-3  text-[clamp(19px,4vh,40px)] text-center font-cousine transition text-[#aeaeae] rounded-2xl
+                        <button key={index} onClick={() => setActiveTab(index)} className={`p-3  text-[clamp(19px,4vh,40px)] text-center transition text-[#aeaeae] rounded-2xl
                   ${activeTab === index ? "bg-[#395d44] text-[#ffffff]" : "hover:bg-[#5e5757] scale-75"}`}>
                             {tab}
                         </button>
@@ -119,7 +119,7 @@ export default function About() {
                 {/* Right side of second section - Content */}
                 <div key={activeTab} className="flex flex-col flex-1 md:ml-[1.75%]">
                     <div className="h-auto rounded-sm text-xl px-[5.4%] bg-[#518b61] flex flex-row font-bold mb-[3vh]">
-            <span className="flex flex-col font-lexend py-[8%] md:py-[5%] text-[clamp(20px,2.5vw,45px)] xl:text-[clamp(20px,2.7vw,65px)] flex-1 min-w-0">
+            <span className="flex flex-col py-[8%] md:py-[5%] text-[clamp(20px,2.5vw,45px)] xl:text-[clamp(20px,2.7vw,65px)] flex-1 min-w-0">
               <p className="animate-slideInLeft sm:pb-[3%] md:pb-[8%] whitespace-normal break-words">
                 {members_info[activeTab].first_name}
               </p>
@@ -137,12 +137,12 @@ export default function About() {
 
                     </div>
 
-                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
                         <span className="text-gray-300 flex flex-wrap tracking-widest">Email:</span>
                         <span className="animate-slideInLeft text-white flex flex-wrap">{members_info[activeTab].email}</span>
                     </div>
 
-                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
                         <span className=" text-gray-300 flex flex-wrap tracking-widest">GitHub:</span>
                         {members_info[activeTab] && (
                             <a href={members_info[activeTab].github} className="animate-slideInLeft text-[#364e3d] hover:underline" target="_blank" rel="noopener noreferrer">
@@ -151,14 +151,14 @@ export default function About() {
                         )}
                     </div>
 
-                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
                         <span className="text-gray-300 flex flex-wrap tracking-widest">University:</span>
                         <a href="https://www.ku.ac.th/en/community-home" className="animate-slideIn_Leftdelay text-[#364e3d] hover:underline">
                             Kasetsart University - Bangkhen campus
                         </a>
                     </div>
 
-                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] font-cousine text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
+                    <div className="flex rounded-lg flex-wrap gap-2 bg-[#6b9f7b] mb-[3vh] py-[4vh] xl:py-[3vh] px-[5.4%] text-[clamp(9px,10vw,17px)] xl:text-[clamp(18px,10vw,20px)]">
                         <span className="text-gray-300 flex flex-wrap tracking-widest">Faculty:</span>
                         <a href="https://cpe.ku.ac.th/index.php/ske/" className="animate-slideIn_Leftdelay text-[#364e3d] hover:underline">
                             Software and Knowledge Engineering
@@ -172,7 +172,7 @@ export default function About() {
 
             {/* Third section - back to previous page  */}
             <div className=" md:mx-[6vw] py-[10%] pt-[30%] md:pt-[10%] flex flex-col md:flex-row ">
-                <div className="flex tracking-widest flex-col px-[6vw] md:px-[2vw] text-center justify-center font-back items-center text-white font-lexend md:basis-[70%] md:h-auto text-[clamp(19px,5vw,35px)] overflow-hidden">
+                <div className="flex tracking-widest flex-col px-[6vw] md:px-[2vw] text-center justify-center font-back items-center text-white md:basis-[70%] md:h-auto text-[clamp(19px,5vw,35px)] overflow-hidden">
                     <p>Are you ready to <span> {location.state?.from === "/tableandtask" ? "continue" : "start" } </span> your
                         <span className="ml-[2vw] tracking-widest md:ml-[2vw] bg-gradient-to-r from-[#6b9e7b] to-yellow-400 bg-clip-text text-transparent ">
                 Planning?
@@ -184,7 +184,7 @@ export default function About() {
                 <div className="my-[5%] md:my-0 md:w-[30%] flex items-center justify-center">
                     <NavLink
                         to={location.state?.from === "/tableandtask" ? "/tableandtask" : "/"}
-                        className={({ isActive }) =>`font-cousine rounded-md border border-white/15 bg-[#3a5e45] py-[0.7em] px-[6vw] text-[clamp(8px,8vw,20px)] ${isActive ? "text-white " : " text-zinc-200 hover:bg-[#2bb75a] hover:text-white hover:scale-125 transition-transform duration-300 "}`}>
+                        className={({ isActive }) =>` rounded-md border border-white/15 bg-[#3a5e45] py-[0.7em] px-[6vw] text-[clamp(8px,8vw,20px)] ${isActive ? "text-white " : " text-zinc-200 hover:bg-[#2bb75a] hover:text-white hover:scale-125 transition-transform duration-300 "}`}>
                         Return
                     </NavLink>
                 </div>
