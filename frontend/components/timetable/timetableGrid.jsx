@@ -74,7 +74,7 @@ export const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, 
                         <div
                             key={e.id}
                             onClick={(ev) => { ev.stopPropagation(); onEventClick?.(e); }}
-                            className="relative" // ahchor for absolute child
+                            className="relative" // anchor for absolute child
                             style={{
                                 gridRow: rowFromDay(e.day),
                                 // keep grid hour-based (snap to hours)
@@ -102,6 +102,7 @@ export const TimetableGrid = memo(function TimetableGrid({ events, onCellClick, 
                             </div>
                         </div>
                     ))}
+
                 </div>
             </div>
         </div>

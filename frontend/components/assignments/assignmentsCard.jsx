@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { post } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
+import ConfirmModal from "./assignmentConfirmModal";
 
 export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
 
@@ -25,10 +26,11 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
     const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
+    // parse due date
     const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
+
+
     // get object that has the same key with this task
-
-
     const lectureText = (() => {
         if (!task.TableLink?.days?.length) return null;
 
@@ -47,32 +49,77 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
 
     const scheduleReminder = async (task) => {
-        if (!task?.due_at) { alert("No due date for this task."); return; }
+        if (!task?.due_at) {
+            openConfirm({
+                title: "No due date",
+                message: "This task doesnt have a due date, so a reminder cant be scheduled.",
+                confirmLabel: "OK",
+                cancelLabel: "",
+                onConfirm: closeConfirm,
+            })
+            return;
+        }
 
         const id = task.id;
         const due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
-        if (isNaN(+due)) { alert("Invalid due date."); return; }
+        if (isNaN(+due)) {
+
+            openConfirm({
+                title: "Invalid due date",
+                message: "The due date is invalid",
+                confirmLabel: "OK",
+                cancelLabel: "",
+                onConfirm: closeConfirm,
+            })
+            return;
+        }
 
         const offset = Number(choice[id] ?? 3); // default 3 days
         const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
+        openConfirm({
+            title: "Schedule reminder?",
+            message: `Send a reminder ${offset} day(s) before due date`,
+            confirmLabel: "Confirm",
+            cancelLabel: "Cancel",
+            onConfirm: async () => {
+                setConfirm((s) => ({ ...s, loading: true }));
 
-        try {
-            setPending(p => ({ ...p, [id]: true }));
-            await createReminder({
-                assignmentId: id,
-                remindAtISO: remindAt.toISOString(),
-                offsetDays: offset,
-            });
-            setScheduled(s => ({ ...s, [id]: true }));
-            alert(`Reminder set: ${offset} day(s) before due date.`);
-        } catch (e) {
-            console.error(e);
-            alert(`Failed to schedule reminder: ${e?.message || e}`);
-        } finally {
-            setPending(p => ({ ...p, [id]: false }));
-        }
+                try {
+                    setPending(p => ({ ...p, [id]: true }));
+                    await createReminder({
+                        assignmentId: id,
+                        remindAtISO: remindAt.toISOString(),
+                        offsetDays: offset,
+                    });
+                    setScheduled(s => ({ ...s, [id]: true }));
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setPending(p => ({ ...p, [id]: false }));
+                    closeConfirm();
+                }
+            },
+        });
     };
+
+
+
+
+
+
+    const [confirm, setConfirm] = useState({
+        open: false,
+        title: "",
+        message: "",
+        loading: false,
+        onConfirm: null,
+        confirmLabel: "Confirm",
+        cancelLabel: "Cancel",
+    });
+
+    const openConfirm = (cfg) => setConfirm({ open: true, loading: false, confirmLabel: "Confirm", cancelLabel: "Cancel", ...cfg });
+    const closeConfirm = () => setConfirm((s) => ({ ...s, open: false, onConfirm: null }));
 
     return (
         <div
@@ -92,10 +139,10 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         <span className="tracking-wider">{subject.name || "Loading..."}</span>
                         {task.assignment_alt_link && linked === true ? (
                             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
-                {lectureText && (
-                    <span className="ml-2 text-xs opacity-70">{lectureText}</span>
-                )}
-              </span>
+                                {lectureText && (
+                                    <span className="ml-2 text-xs opacity-70">{lectureText}</span>
+                                )}
+                            </span>
                         ) : null}
                     </div>
                 </div>
@@ -119,6 +166,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                 )}
 
 
+
                 {/*Classroom link button*/}
                 <div className="mt-3 flex items-center gap-3">
                     {task.assignment_alt_link && (
@@ -134,6 +182,22 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             Classroom
                         </a>
                     )}
+
+                    {/*Priority controls*/}
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs opacity-75">priority:</span>
+                        <select
+                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+                            value={task.priority ?? "none"}
+                            onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
+                        >
+                            <option value="none">-</option>
+                            <option value="low">Low</option>
+                            <option value="normal">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+
+                    </div>
 
                     {/*Reminder controls */}
                     <div className="flex items-center gap-2">
@@ -164,47 +228,51 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                     {/*Archive button*/}
                     <button
                         onClick={async () => {
-                            if (window.confirm("Archive this task?")) {
-                                try {
-                                    await onArchiveTask(task.id);
-                                    onUpdateTask(task.id, { is_archived: true });
-                                    alert("Task archived successfully!");
-                                } catch (e) {
-                                    console.error(e);
-                                    alert("Failed to archive task: " + e.message);
-                                }
-                            }
+                            openConfirm({
+                                title: "Archive this task?",
+                                message: `“${task.title}” will move to Archive. You can unarchive later.`,
+                                onConfirm: async () => {
+                                    setConfirm((s) => ({ ...s, loading: true }));
+
+                                    try {
+                                        await onArchiveTask(task.id);
+                                        onUpdateTask(task.id, { is_archived: true });
+
+                                    } catch (e) {
+                                        console.error(e);
+
+                                    } finally {
+                                        closeConfirm();
+                                    }
+
+                                },
+                            });
+
                         }}
-                        className="text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
+                        className="ml-auto text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
                         title="Archive this task"
                     >
                         Archive
                     </button>
 
-                    {/*Priority controls*/}
-                    <div className="ml-auto flex items-center gap-2">
-                        <span className="text-xs opacity-75">priority:</span>
-                        <select
-                            className="bg-neutral-800 border border-white/10 text-xs opacity-75"
-                            value={task.priority ?? "none"}
-                            onChange={(e) => onUpdateTask(task.id, { priority: e.target.value })}
-                        >
-                            <option value="none">-</option>
-                            <option value="low">Low</option>
-                            <option value="normal">Medium</option>
-                            <option value="high">High</option>
-                        </select>
-
-                    </div>
                 </div>
 
             </div>
+            <ConfirmModal
+                open={confirm.open}
+                title={confirm.title}
+                message={confirm.message}
+                loading={confirm.loading}
+                onCancel={closeConfirm}
+                onConfirm={confirm.onConfirm || closeConfirm}
+                confirmLabel={confirm.confirmLabel}
+                cancelLabel={confirm.cancelLabel} />
         </div>
     );
 }
 
 // Create a scheduled email reminder for an assignment
-async function createReminder({ assignmentId, remindAtISO, offsetDays,}) {
+async function createReminder({ assignmentId, remindAtISO, offsetDays, }) {
     return post(`/api/reminders/intake/`, {
         assignmentId,
         remindAtISO,
@@ -221,5 +289,8 @@ function fmtDueDateObj(d) {
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        hour12: true
     });
 }
+
+

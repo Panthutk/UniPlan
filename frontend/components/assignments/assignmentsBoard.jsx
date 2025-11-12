@@ -2,9 +2,10 @@ import React, { useMemo, useState } from "react";
 import { TaskFilterElements } from "./assignmentsFilterButtons.jsx";
 import { AssignmentsGroup, TaskGroupBy } from "./assignmentsGroup.jsx";
 import { colorForDay } from "/src/utils/color.js"
+import {FULL_DAYS} from "/src/utils/time.js";
 
 
-export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, events }) {
+export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events }) {
 
     // console.log("-------------------------------------------------------");
     // console.log(TaskObjects);
@@ -89,14 +90,12 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
 
     //Create Separate Group each one has it own set of data
     const groupedTasks = useMemo(() => {
-        if (groupByOption === "") return { "": filteredTasks };
+        if (groupByOption === "none") return { "": filteredTasks };
 
         const group = (taskValue) => Object.fromEntries(TaskGroupBy(filteredTasks, taskValue));
 
-        const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
         switch (groupByOption) {
-            case "day":
-                return group((t) => dayNames[t.day_of_week] || "Unassigned");
+
             case "subject":
                 return group((t) => {
                     const subj = SubjectMap[t.subject];
@@ -113,9 +112,9 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                 return group((t) => {
                     const days = t.TableLink?.days;
                     if (Array.isArray(days)) {
-                        return days.map((i) => dayNames[i] || "Unassigned");
+                        return days.map((i) => FULL_DAYS[i] || "Unassigned");
                     }
-                    return dayNames[days] || "Unassigned";
+                    return FULL_DAYS[days] || "Unassigned";
                 });
 
 
@@ -129,6 +128,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
 
             {/*Utility buttons: Search bar + Filter + Group*/}
             <TaskFilterElements
+                subjectOptions = {subjectOptions}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 groupByOption={groupByOption}
@@ -143,10 +143,10 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
 
 
             {/* Colors legend : tell how far from deadline*/}
-            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-5">
                 {legends.map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <span className={`h-3 w-3 rounded-full ${item.color}`} />
+                        <span className={`h-3 w-3 rounded-full ${item.color}`}/>
                         <span className="text-sm font-medium">{item.label}</span>
                     </div>
                 ))}

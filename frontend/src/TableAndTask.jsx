@@ -8,6 +8,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
 import { colorForDay } from "./utils/color.js";
+import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
 import { HeaderSection } from "../components/layout/header.jsx";
@@ -714,7 +715,7 @@ const handleImportChange = async (ev) => {
         // toast notification (use local subject)
         pushToast({
           type: "success",
-          tittle: "Subject updated",
+          title: "Subject updated",
           desc: `${subject.name} · ${DAYS[dbToUiDay(updated.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -746,7 +747,7 @@ const handleImportChange = async (ev) => {
 
         pushToast({
           type: "success",
-          tittle: "Subject added",
+          title: "Subject added",
           desc: `${subject.name} · ${DAYS[dbToUiDay(created.day_of_week)]} ${toHHMM(sMin)}–${toHHMM(eMin)}`,
           icon: <SaveIcon sx={{ fontSize: 20 }} />,
         });
@@ -998,7 +999,7 @@ const handleImportChange = async (ev) => {
   if (!token) return null;
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection/>
       {/* Hidden input for Import */}
@@ -1055,7 +1056,7 @@ const handleImportChange = async (ev) => {
               onClick={() => setShowArchivedPopup(false)}
               className="absolute top-3 right-3 text-xl font-bold"
             >
-              ✕
+              <XIcon />
             </button>
 
             <h2 className="text-2xl font-semibold mb-4">Archived Tasks</h2>
@@ -1121,6 +1122,9 @@ const handleImportChange = async (ev) => {
           </div>
         </div>
       )}
+
+
+
 
     </div>
   );
