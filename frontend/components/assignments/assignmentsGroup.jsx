@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { AssignmentsCard } from "./assignmentsCard.jsx";
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 import { colorGroupTask, defaultGrayColor } from "/src/utils/color.js";
 
 // Break the Task to be different Group
@@ -53,13 +55,13 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
     return (
         <div>
             {/* Header with toggle button */}
-            <div className="flex items-center justify-start mb-2">
+            <div className="flex items-center justify-start py-2 mb-2">
                 {label && (
                     <button
                         onClick={() => setIsOpen(!isOpen)}
                         className="px-3 text-sm hover:text-white transition"
                     >
-                        {isOpen ? "⏷" : "▶"}
+                        {isOpen ? <ArrowDropDownIcon fontSize="large" /> : <ArrowRightIcon fontSize="large" />}
                     </button>
                 )}
 

@@ -8,6 +8,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
 import { colorForDay } from "./utils/color.js";
+import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
 import { HeaderSection } from "../components/layout/header.jsx";
@@ -950,7 +951,7 @@ export default function ClassroomTimetableDashboard() {
   if (!token) return null;
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white" style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
 
@@ -995,7 +996,7 @@ export default function ClassroomTimetableDashboard() {
               onClick={() => setShowArchivedPopup(false)}
               className="absolute top-3 right-3 text-xl font-bold"
             >
-              ✕
+              <XIcon />
             </button>
 
             <h2 className="text-2xl font-semibold mb-4">Archived Tasks</h2>
@@ -1083,6 +1084,9 @@ export default function ClassroomTimetableDashboard() {
           </div>
         </div>
       )}
+
+
+
 
     </div>
   );
