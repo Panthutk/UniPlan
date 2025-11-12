@@ -1,25 +1,27 @@
 import SaveIcon from "@mui/icons-material/Save";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { API, authHeader } from "@/utils/api.js";
+import { API, authHeader } from "/src/utils/api.js";
+import { XIcon } from "/src/utils/icon.jsx";
 import { TimetableGrid } from '../timetable/timetableGrid';
 import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
 
 export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
                          handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask
-                         , archiveTask, subjects, toasts, setToasts}) {
+                         , archiveTask, subjects, subjectOptions, toasts, setToasts}) {
 
     return (
         <div>
 
-            <div className="sticky z-50 pl-2"
+            {/*Hamburger Button*/}
+            <div className="sticky z-50 pl-2 pointer-events-none"
                  style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlap with header
             >
-                <div className="pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2">
+                <div className=" pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2 ">
                     <button
                         onClick={() => setMenuOpen(true)}
-                        className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"
+                        className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm pointer-events-auto"
                         aria-expanded={menuOpen}
                         aria-controls="app-drawer"
                         title="Menu"
@@ -70,9 +72,7 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
                                 aria-label="Close menu"
                             >
                                 {/* X icon */}
-                                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path fill="currentColor" d="M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.6 10.6l6.29-6.3z" />
-                                </svg>
+                                <XIcon />
                             </button>
                         </div>
 
@@ -129,7 +129,7 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
 
 
                     {/* RIGHT — timetable + tasks */}
-                    <main className="space-y-6 min-w-0">
+                    <main className="space-y-6 min-w-0 z-60">
                         {/* actions */}
                         <div className="flex justify-end gap-3">
                             <button
