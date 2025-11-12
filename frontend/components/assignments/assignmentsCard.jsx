@@ -26,20 +26,8 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
     const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
 
-    // Force +7 hours (Bangkok)
-    const format_due = (() => {
-        if (!task.due_at) return null;
-
-        const s = String(task.due_at).trim();
-        if (!s) return null;
-
-        try {
-            const d = /(?:Z|[+\-]\d{2}:?\d{2})$/i.test(s) ? new Date(s) : new Date(s + "Z");
-            return isNaN(+d) ? null : new Date(d.getTime() + 7 * 60 * 60 * 1000);
-        } catch {
-            return null;
-        }
-    })();
+    // parse due date
+    const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
 
 
     // get object that has the same key with this task
