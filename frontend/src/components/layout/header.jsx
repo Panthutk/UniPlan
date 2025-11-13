@@ -1,6 +1,6 @@
 import { useNavigate, Link } from "react-router-dom";
 import React from "react";
-import uniplanLogo from '../../src/assets/uniplanLogo.svg';
+import uniplanLogo from '../../assets/uniplanLogo.svg';
 
 export function HeaderSection() {
     const navigate = useNavigate();

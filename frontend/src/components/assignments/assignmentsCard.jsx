@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { post } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
-import ConfirmModal from "./assignmentConfirmModal";
+import ConfirmModal from "./assignmentConfirmModal.jsx";
 
 export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
 

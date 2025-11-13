@@ -11,8 +11,8 @@ import { colorForDay } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
-import { HeaderSection } from "../components/layout/header.jsx";
-import { DrawerPanel } from "../components/layout/drawerPanel.jsx";
+import { HeaderSection } from "@/components/layout/header.jsx";
+import { DrawerPanel } from "@/components/layout/drawerPanel.jsx";
 
 import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 

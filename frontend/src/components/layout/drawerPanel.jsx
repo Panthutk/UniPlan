@@ -3,7 +3,7 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { API, authHeader } from "/src/utils/api.js";
 import { XIcon } from "/src/utils/icon.jsx";
-import { TimetableGrid } from '../timetable/timetableGrid';
+import { TimetableGrid } from '../timetable/timetableGrid.jsx';
 import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
 
