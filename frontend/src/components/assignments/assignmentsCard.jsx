@@ -3,8 +3,10 @@ import { post } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
 import ConfirmModal from "./assignmentConfirmModal.jsx";
-
-export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
+import ArchiveIcon from '@mui/icons-material/Archive';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import EventIcon from '@mui/icons-material/Event';
+export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast = () => { } }) {
 
     const subject = SubjectMap[task.subject];
 
@@ -93,8 +95,22 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         offsetDays: offset,
                     });
                     setScheduled(s => ({ ...s, [id]: true }));
+
+                    pushToast({
+                        type: "success",
+                        title: "Reminder scheduled",
+                        desc: `We'll remind you ${offset} day(s) before the due date for "${task.title}".`,
+                        icon: <EventIcon sx={{ fontSize: 20 }} />,
+                    });
                 } catch (e) {
                     console.error(e);
+
+                    pushToast({
+                        type: "error",
+                        title: "Failed to schedule reminder",
+                        desc: e?.message || "Something went wrong while scheduling the reminder.",
+                        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+                    });
                 } finally {
                     setPending(p => ({ ...p, [id]: false }));
                     closeConfirm();
@@ -238,8 +254,22 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                                         await onArchiveTask(task.id);
                                         onUpdateTask(task.id, { is_archived: true });
 
+                                        pushToast({
+                                            type: "success",
+                                            title: "Task archived",
+                                            desc: `"${task.title}" has been moved to Archive.`,
+                                            icon: <ArchiveIcon sx={{ fontSize: 20 }} />,
+                                        });
+
                                     } catch (e) {
                                         console.error(e);
+
+                                        pushToast({
+                                            type: "error",
+                                            title: "Archive failed",
+                                            desc: e?.message || "Something went wrong while archiving this task.",
+                                            icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+                                        })
 
                                     } finally {
                                         closeConfirm();

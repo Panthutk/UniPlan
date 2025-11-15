@@ -4,6 +4,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
@@ -765,6 +766,7 @@ export default function ClassroomTimetableDashboard() {
         type: "error",
         title: "Save failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
     }
   };
@@ -792,6 +794,7 @@ export default function ClassroomTimetableDashboard() {
         type: "error",
         title: "Delete failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
     }
   };
@@ -817,6 +820,7 @@ export default function ClassroomTimetableDashboard() {
         type: "error",
         title: "Clear failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
 
     }
@@ -921,7 +925,8 @@ export default function ClassroomTimetableDashboard() {
       pushToast({
         type: "error",
         title: "Unarchive failed",
-        desc: e?.message || "Something went wrong while unarchive"
+        desc: e?.message || "Something went wrong while unarchive",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       })
     }
   }
@@ -1048,6 +1053,7 @@ export default function ClassroomTimetableDashboard() {
         onExport={handleExportClick}
         importBusy={importBusy}
         exportBusy={exportBusy}
+        pushToast={pushToast}
       />
 
       {/* Modal */}

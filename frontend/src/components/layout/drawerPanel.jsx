@@ -7,16 +7,16 @@ import { TimetableGrid } from '../timetable/timetableGrid.jsx';
 import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
 
-export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
-                         handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask
-                         , archiveTask, subjects, toasts, setToasts, onImport, onExport, importBusy = false, exportBusy = false,}) {
+export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
+    handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask
+    , archiveTask, subjects, toasts, setToasts, onImport, onExport, importBusy = false, exportBusy = false, pushToast, }) {
 
     return (
         <div>
 
             {/*Hamburger Button*/}
             <div className="sticky z-50 pl-2 pointer-events-none"
-                 style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlap with header
+                style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlap with header
             >
                 <div className=" pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2 ">
                     <button
@@ -140,25 +140,25 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
                                 Clear
                             </button>
                             <button
-                              onClick={onImport}
-                              disabled={importBusy}
-                              className={[
-                                "px-5 py-2 rounded-full font-semibold",
-                                importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
-                              ].join(" ")}
+                                onClick={onImport}
+                                disabled={importBusy}
+                                className={[
+                                    "px-5 py-2 rounded-full font-semibold",
+                                    importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                                ].join(" ")}
                             >
-                              {importBusy ? "Importing…" : "Import"}
+                                {importBusy ? "Importing…" : "Import"}
                             </button>
-                          
+
                             <button
-                              onClick={onExport}
-                              disabled={exportBusy}
-                              className={[
-                                "px-5 py-2 rounded-full font-semibold",
-                                exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
-                              ].join(" ")}
+                                onClick={onExport}
+                                disabled={exportBusy}
+                                className={[
+                                    "px-5 py-2 rounded-full font-semibold",
+                                    exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                                ].join(" ")}
                             >
-                              {exportBusy ? "Exporting…" : "Export"}
+                                {exportBusy ? "Exporting…" : "Export"}
                             </button>
 
                             {/* NEW: Send a test email */}
@@ -207,6 +207,7 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
                                     onArchiveTask={archiveTask}
                                     SubjectObjects={subjects}
                                     events={events}
+                                    pushToast={pushToast}
                                 />
                             )}
                         </div>
@@ -225,7 +226,7 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
     );
 }
 
-function Toasts({toasts, setToasts}) {
+function Toasts({ toasts, setToasts }) {
     const typeStyle = (tp) =>
         tp === "success"
             ? "border-emerald-500/40 bg-emerald-500/10"
