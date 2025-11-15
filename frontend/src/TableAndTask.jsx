@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
 
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
@@ -13,6 +14,7 @@ import { XIcon } from "./utils/icon.jsx";
 // Components Calling
 import { HeaderSection } from "@/components/layout/header.jsx";
 import { DrawerPanel } from "@/components/layout/drawerPanel.jsx";
+import ConfirmModal from "./components/assignments/assignmentConfirmModal";
 
 import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 
@@ -544,6 +546,8 @@ export default function ClassroomTimetableDashboard() {
   // searchArchived state
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [confirmUnarchiveOpen, setConfirmUnarchiveOpen] = useState(false);
+  const [confirmUnarchiveId, setConfirmUnarchiveId] = useState(null);
 
 
 
@@ -902,13 +906,23 @@ export default function ClassroomTimetableDashboard() {
   async function handleUnarchive(id) {
     try {
       await unarchiveTask(id);
-      alert("Task unarchived successfully!");
+      pushToast({
+        type: "success",
+        title: "Task unarchived",
+        desc: "The task has been moved back to your main list.",
+        icon: <UnarchiveIcon sx={{ fontSize: 20 }} />,
+      })
+      setShowArchivedPopup(false)
       await fetchTasks(); // refresh main list
       const refreshedArchived = await listArchivedTasks();
       setArchivedTasks(refreshedArchived.filter(t => t.is_archived === true));
     } catch (e) {
       console.error(e);
-      alert("Failed to unarchive task: " + e.message);
+      pushToast({
+        type: "error",
+        title: "Unarchive failed",
+        desc: e?.message || "Something went wrong while unarchive"
+      })
     }
   }
 
@@ -1047,6 +1061,22 @@ export default function ClassroomTimetableDashboard() {
         existingEvents={events}
       />
 
+      <ConfirmModal
+        open={confirmUnarchiveOpen}
+        title="Unarchive this task"
+        message="This will move the task back on your main list"
+        confirmLabel="Unarchive"
+        cancelLabel="Cancel"
+        onCancel={() => {
+          setConfirmUnarchiveOpen(false);
+          setConfirmUnarchiveId(null);
+        }}
+        onConfirm={async () => {
+          await handleUnarchive(confirmUnarchiveId);
+          setConfirmUnarchiveOpen(false);
+          setConfirmUnarchiveId(null);
+        }}
+      />
 
       {/* Archived Tasks Popup */}
       {showArchivedPopup && (
@@ -1124,7 +1154,10 @@ export default function ClassroomTimetableDashboard() {
                             </a>
                           )}
                           <button
-                            onClick={() => handleUnarchive(task.id)}
+                            onClick={() => {
+                              setConfirmUnarchiveId(task.id);
+                              setConfirmUnarchiveOpen(true);
+                            }}
                             className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
                           >
                             Unarchive
