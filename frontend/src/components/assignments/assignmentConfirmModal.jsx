@@ -32,7 +32,7 @@ export default function ConfirmModal({
 
     return (
         <div
-            className="fixed inset-0 z-50"
+            className="fixed inset-0 z-[10000]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"

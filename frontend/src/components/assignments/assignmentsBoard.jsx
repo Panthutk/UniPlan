@@ -2,10 +2,10 @@ import React, { useMemo, useState } from "react";
 import { TaskFilterElements } from "./assignmentsFilterButtons.jsx";
 import { AssignmentsGroup, TaskGroupBy } from "./assignmentsGroup.jsx";
 import { colorForDay } from "/src/utils/color.js"
-import {FULL_DAYS} from "/src/utils/time.js";
+import { FULL_DAYS } from "/src/utils/time.js";
 
 
-export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events }) {
+export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events, pushToast, }) {
 
     // console.log("-------------------------------------------------------");
     // console.log(TaskObjects);
@@ -124,7 +124,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
 
             {/*Utility buttons: Search bar + Filter + Group*/}
             <TaskFilterElements
-                subjectOptions = {subjectOptions}
+                subjectOptions={subjectOptions}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 groupByOption={groupByOption}
@@ -141,7 +141,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
             <div className="flex flex-col md:flex-row items-center gap-3 md:gap-5">
                 {legends.map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <span className={`h-3 w-3 rounded-full ${item.color}`}/>
+                        <span className={`h-3 w-3 rounded-full ${item.color}`} />
                         <span className="text-sm font-medium">{item.label}</span>
                     </div>
                 ))}
@@ -157,6 +157,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                         onUpdateTask={onUpdateTask}
                         onArchiveTask={onArchiveTask}
                         events={events}
+                        pushToast={pushToast}
                     />
                 ))}
             </div>
