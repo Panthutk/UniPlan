@@ -3,15 +3,15 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { XIcon } from "/src/utils/icon.jsx";
 
 export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
-                                setAppliedPriorityFilter, setAppliedSubjectFilter, setAppliedSourceFilter,
+                                setAppliedPriorityFilter, setAppliedSubjectFilter,
                                 setAppliedDaysLeftFilter, setAppliedOnTimetableFilter }) {
 
     // Filter Hooks
     const [priorityFilter, setPriorityFilter] = useState("");
     const [subjectFilter, setSubjectFilter] = useState("");
-    const [sourceFilter, setSourceFilter] = useState("");
     const [daysLeftFilter, setDaysLeftFilter] = useState("");
     const [onTimetableFilter, setOnTimetableFilter] = useState("");
+    const [filterNum, setFilterNum] = useState(0);
 
     // Filter Button Utility
     const toggleDropdown = () => setIsOpen(!isOpen);
@@ -24,9 +24,6 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const handleSubjectChange = (subject_value) => {
         setSubjectFilter(Number(subject_value));
     };
-    const handleSourceChange = (source_value) => {
-        setSourceFilter(prev => prev === source_value ? "" : source_value);
-    };
     const handleDaysLeftChange = (daysLeft_value) => {
         setDaysLeftFilter(prev => prev === daysLeft_value ? "" : daysLeft_value);
     };
@@ -38,14 +35,13 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
         setSearchTerm("");
         setPriorityFilter("");
         setSubjectFilter("");
-        setSourceFilter("");
         setDaysLeftFilter("");
         setOnTimetableFilter("");
         setAppliedPriorityFilter("");
         setAppliedSubjectFilter("");
-        setAppliedSourceFilter("");
         setAppliedDaysLeftFilter("");
         setAppliedOnTimetableFilter("");
+        setFilterNum(0);
         setGroupByOption("none");
     };
 
@@ -105,14 +101,14 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                     e.stopPropagation();
                     setIsOpen((prev) => !prev);
                 }}
-                className="relative px-4 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition "
+                className="flex flex-row relative px-4 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
             >
-                Filter
+                {filterNum ? formatFilters(filterNum) : "Filter"}
                 <span className="ml-2"> <ArrowDropDownIcon/> </span>
 
                 {/*Logic when the pop-up open*/}
                 {isOpen && (
-                    <div className=" my-1 flex flex-col absolute w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                    <div className=" mt-8 flex flex-col absolute w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
                          onClick={(e) => e.stopPropagation()}>
 
                         {/*filter by due date*/}
@@ -142,7 +138,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                 onChange={(e) => handleSubjectChange(e.target.value)}
                                 className="w-full max-w-xs truncate rounded-md border border-gray-500 bg-[#4c4949] px-3 py-2 text-sm shadow-sm focus:border-gray-300"
                             >
-                                <option value="">Select subject</option>
+                                <option value="" disabled hidden>Select subject</option>
                                 {SubjectObjects.map((subject_value) => (
                                     <option key={subject_value.id} value={subject_value.id} >
                                         {subject_value.name}
@@ -174,33 +170,40 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                             </div>
                         </div>
 
-
+                        {/*filter by Lecture*/}
                         <div className="flex flex-col items-start ps-2 pb-5">
                             Task's Lecture on Timetable:
-                            {tableLinked.map((timetable_value) => (
-                                <label
-                                    key={timetable_value.value}
-                                    className="items-center gap-2 cursor-pointer"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={onTimetableFilter === timetable_value.value}
-                                        onChange={() => handleOnTimeableChange(timetable_value.value)}
-                                        className="rounded "
-                                    />
-                                    <span className="capitalize">{timetable_value.label}</span>
-                                </label>
-                            ))}
+                            <div className="flex flex-row items-center gap-3">
+                                {tableLinked.map((timetable_value) => (
+                                    <label
+                                        key={timetable_value.value}
+                                        className="flex items-center gap-1 cursor-pointer "
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={onTimetableFilter === timetable_value.value}
+                                            onChange={() => handleOnTimeableChange(timetable_value.value)}
+                                            className="rounded "
+                                        />
+                                        <span className="capitalize">{timetable_value.label}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
 
+                        {/*Apply filter button*/}
                         <button
                             className="m-3 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition"
                             onClick={() => {
+                                setFilterNum(0);
                                 setAppliedPriorityFilter(priorityFilter);
                                 setAppliedSubjectFilter(subjectFilter);
-                                setAppliedSourceFilter(sourceFilter);
                                 setAppliedDaysLeftFilter(daysLeftFilter);
                                 setAppliedOnTimetableFilter(onTimetableFilter);
+                                priorityFilter !== "" && setFilterNum((prev) => prev + 1);
+                                subjectFilter !== "" && setFilterNum((prev) => prev + 1);
+                                daysLeftFilter !== "" && setFilterNum((prev) => prev + 1);
+                                onTimetableFilter !== "" && setFilterNum((prev) => prev + 1);
                                 toggleDropdown();
                             }}
                         >
@@ -235,14 +238,26 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
 
             {/*Clear filter Button*/}
-            <button
-                onClick={ClearFilters}
-                className="text-[#777777] underline pt-3 text-sm "
-            >
-                Clear all
-            </button>
+            {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
+                <button
+                    onClick={ClearFilters}
+                    className="text-[#b7b7b7] hover:text-[#dedada] underline pt-3 text-sm"
+                >
+                    Clear all
+                </button>
+            )}
 
 
         </div>
     )
+}
+
+
+function formatFilters(choice) {
+    return(
+        <div >
+            Filter <span className="text-[#545454]">|</span> <span className="text-[#69a064] text-[15px] ">{choice} applied</span>
+        </div>
+    );
+
 }

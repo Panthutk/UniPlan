@@ -55,7 +55,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
     return (
         <div>
             {/* Header with toggle button */}
-            <div className="flex items-center justify-start py-2 mb-2">
+            <div className="flex items-center justify-start my-2">
                 {label && (
                     <button
                         onClick={() => setIsOpen(!isOpen)}

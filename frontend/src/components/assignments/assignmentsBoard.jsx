@@ -34,12 +34,11 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     //5 Filters option (React Hook)
     const [appliedPriorityFilter, setAppliedPriorityFilter] = useState("");
     const [appliedSubjectFilter, setAppliedSubjectFilter] = useState("");
-    const [appliedSourceFilter, setAppliedSourceFilter] = useState("");
     const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
     const [appliedOnTimetableFilter, setAppliedOnTimetableFilter] = useState("");
 
     //Group by dropdown (React Hook)
-    const [groupByOption, setGroupByOption] = useState("");
+    const [groupByOption, setGroupByOption] = useState("none");
 
     //Add table link
     const TaskObjects_tableLinked = useMemo(
@@ -65,9 +64,6 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         if (appliedSubjectFilter) {
             result = result.filter(task => task.subject === appliedSubjectFilter);
         }
-        if (appliedSourceFilter) {
-            result = result.filter(task => task.source === appliedSourceFilter);
-        }
         if (appliedDaysLeftFilter) {
             if (appliedDaysLeftFilter < 1000) {
                 result = result.filter(task => task.days_left < appliedDaysLeftFilter);
@@ -84,7 +80,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         result = result.filter(task => !task.is_archived);
 
         return result;
-    }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter, appliedSourceFilter,
+    }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter,
         appliedDaysLeftFilter, appliedOnTimetableFilter]);
 
 
@@ -136,7 +132,6 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                 SubjectObjects={SubjectObjects}
                 setAppliedPriorityFilter={setAppliedPriorityFilter}
                 setAppliedSubjectFilter={setAppliedSubjectFilter}
-                setAppliedSourceFilter={setAppliedSourceFilter}
                 setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
                 setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
             />

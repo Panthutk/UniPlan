@@ -15,22 +15,22 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
         <div>
 
             {/*Hamburger Button*/}
-            <div className="sticky z-50 pl-2 pointer-events-none"
-                 style={{ top: "calc(var(--header-h, 72px))" }} // this is offset from the top equal to header height (default 72px) prevent overlap with header
+            <div
+                className="sticky z-50 pointer-events-none "
+                style={{ top: "calc(var(--header-h, 74px))" }}
             >
-                <div className=" pl-5 sm:pl-6 lg:pl-8 pr-5 sm:pr-6 lg:pr-8 py-2 ">
-                    <button
-                        onClick={() => setMenuOpen(true)}
-                        className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-sm pointer-events-auto"
-                        aria-expanded={menuOpen}
-                        aria-controls="app-drawer"
-                        title="Menu"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
-                        </svg>
-                    </button>
-                </div>
+                <button
+                    className="pointer-events-auto absolute left-4
+               inline-flex items-center gap-2 border rounded-lg px-3 ml-5 py-2 text-sm "
+                    onClick={() => setMenuOpen(true)}
+                    aria-expanded={menuOpen}
+                    aria-controls="app-drawer"
+                    title="Menu"
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+                    </svg>
+                </button>
             </div>
 
             {/* Layout: [CENTER MENU CARD][RIGHT MAIN] */}
@@ -129,7 +129,8 @@ export function DrawerPanel({menuOpen, setMenuOpen, user, timetableRef, activeMe
 
 
                     {/* RIGHT — timetable + tasks */}
-                    <main className="space-y-6 min-w-0 z-60">
+                    {/*Timetable Utility button e.g. clear, import */}
+                    <main className="mt-2 space-y-8 min-w-0 z-60">
                         {/* actions */}
                         <div className="flex justify-end gap-3">
                             <button

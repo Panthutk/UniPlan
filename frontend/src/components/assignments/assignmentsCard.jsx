@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { post } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
+import SchoolIcon from '@mui/icons-material/School';
 import ConfirmModal from "./assignmentConfirmModal.jsx";
 
 export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
@@ -174,11 +175,11 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             href={task.assignment_alt_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-[#18A15F] hover:bg-green-700 font-semibold"
                             title="Open in Classroom"
                         >
                             {/*<span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />*/}
-                            <span> 👨🏻‍💻 </span>
+                            <span> <SchoolIcon fontSize="small"/> </span>
                             Classroom
                         </a>
                     )}
@@ -218,7 +219,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
                             className={[
                                 "text-xs px-3 py-1.5 rounded-full font-semibold",
-                                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+                                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-800 hover:bg-emerald-900",
                             ].join(" ")}
                             title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
                         >
@@ -249,7 +250,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             });
 
                         }}
-                        className="ml-auto text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
+                        className="ml-auto text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-[#6D2B2C] font-semibold"
                         title="Archive this task"
                     >
                         Archive
