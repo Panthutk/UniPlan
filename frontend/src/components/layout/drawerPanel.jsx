@@ -133,53 +133,70 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                     {/*Timetable Utility button e.g. clear, import */}
                     <main className="mt-2 space-y-8 min-w-0 z-60">
                         {/* actions */}
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={handleClearEvents}
-                                className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
-                                title="Clear"
-                            >
-                                Clear
-                            </button>
-                            <button
-                                onClick={onImport}
-                                disabled={importBusy}
-                                className={[
-                                    "px-5 py-2 rounded-full font-semibold",
-                                    importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
-                                ].join(" ")}
-                            >
-                                {importBusy ? "Importing…" : "Import"}
-                            </button>
+                        {/* TOP TOOLBAR — align with timetable grid */}
+                        <div className="pl-[3.5rem] pr-4 py-3 flex items-center justify-between">
 
-                            <button
-                                onClick={onExport}
-                                disabled={exportBusy}
-                                className={[
-                                    "px-5 py-2 rounded-full font-semibold",
-                                    exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
-                                ].join(" ")}
-                            >
-                                {exportBusy ? "Exporting…" : "Export"}
-                            </button>
+                            {/* LEFT: User label */}
+                            <div className="flex items-center gap-2 text-neutral-300 text-lg font-semibold ml-[3.5rem]">
 
-                            {/* NEW: Send a test email */}
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const res = await sendTestEmail(); // <- uses the helper you added earlier
-                                        alert(res.detail || "Test email sent!");
-                                    } catch (e) {
-                                        console.error(e);
-                                        alert(e.message || "Failed to send test email");
-                                    }
-                                }}
-                                className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
-                                title="Send a test email to your account email"
-                            >
-                                Send Test Email
-                            </button>
+                                <span className="opacity-70 font-medium">Logged in as:</span>
+                                <span className="text-white">{user?.email}</span>
+                            </div>
+
+
+
+
+                            {/* RIGHT: Buttons */}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleClearEvents}
+                                    className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
+                                >
+                                    Clear
+                                </button>
+
+                                <button
+                                    onClick={onImport}
+                                    disabled={importBusy}
+                                    className={[
+                                        "px-5 py-2 rounded-full font-semibold",
+                                        importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                                    ].join(" ")}
+                                >
+                                    {importBusy ? "Importing…" : "Import"}
+                                </button>
+
+                                <button
+                                    onClick={onExport}
+                                    disabled={exportBusy}
+                                    className={[
+                                        "px-5 py-2 rounded-full font-semibold",
+                                        exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
+                                    ].join(" ")}
+                                >
+                                    {exportBusy ? "Exporting…" : "Export"}
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const res = await sendTestEmail();
+                                            alert(res.detail || "Test email sent!");
+                                        } catch (e) {
+                                            console.error(e);
+                                            alert(e.message || "Failed to send test email");
+                                        }
+                                    }}
+                                    className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
+                                >
+                                    Send Test Email
+                                </button>
+                            </div>
+
                         </div>
+
+
+
 
 
                         {/* Timetable (click cells to add; click events to edit) */}
