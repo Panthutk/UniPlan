@@ -134,7 +134,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                     <main className="mt-2 space-y-8 min-w-0 z-60">
                         {/* actions */}
                         {/* TOP TOOLBAR — align with timetable grid */}
-                        <div className="pl-[3.5rem] pr-4 py-3 flex items-center justify-between">
+                        <div className="pl-[3.5rem] pr-4 flex items-center justify-between">
 
                             {/* LEFT: User label */}
                             <div className="flex items-center gap-2 text-neutral-300 text-lg font-semibold ml-[3.5rem]">

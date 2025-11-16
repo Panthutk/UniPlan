@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import { XIcon } from "/src/utils/icon.jsx";
 
 export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
@@ -13,9 +14,22 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [onTimetableFilter, setOnTimetableFilter] = useState("");
     const [filterNum, setFilterNum] = useState(0);
 
-    // Filter Button Utility
-    const toggleDropdown = () => setIsOpen(!isOpen);
+    // Filter Button open/close logic
     const [isOpen, setIsOpen] = useState(false);
+    const toggleFilter = () => {
+        setIsOpen(prev => {
+            if (!prev) setIsOpenGroup(false); // if opening main, close group
+            return !prev;
+        });
+    };
+    // Group By Button open/close logic
+    const [isOpenGroup, setIsOpenGroup] = useState(false);
+    const toggleGroup = () => {
+        setIsOpenGroup(prev => {
+            if (!prev) setIsOpen(false); // if opening group, close main
+            return !prev;
+        });
+    };
 
     // Filter function logic
     const handlePriorityChange = (priority_value) => {
@@ -63,17 +77,26 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
         "high": "high",
     }
 
+    const ringStyleFilter = filterNum !== 0 ? { boxShadow: `0 0 0 1.25px  #759072` } : {};
+    const ringStyleGroupBy = groupByOption !== "none" ? { boxShadow: `0 0 0 1.25px #759072` } : {};
+
     useEffect(() => {
         const handleClickOutside = () => setIsOpen(false);
         if (isOpen) document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
     }, [isOpen]);
 
+    useEffect(() => {
+        const handleClickOutside = () => setIsOpenGroup(false);
+        if (isOpenGroup) document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, [isOpenGroup]);
+
     return (
-        <div className="flex flex-col md:flex-row items-center justify-start gap-4 pt-10 pb-2.5">
+        <div className="flex flex-col md:flex-row items-center justify-start gap-2 pt-10 pb-2.5">
 
             {/*Search Bar*/}
-            <div className="relative w-full md:w-[38%]">
+            <div className="relative w-full md:w-[38%] mr-[3px]">
                 {/* Input text*/}
                 <input
                     type="text"
@@ -96,19 +119,22 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
 
             {/*Filter Button*/}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOpen((prev) => !prev);
-                }}
-                className="flex flex-row relative px-4 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
-            >
-                {filterNum ? formatFilters(filterNum) : "Filter"}
-                <span className="ml-2"> <ArrowDropDownIcon/> </span>
+            <div className="relative inline-block ">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFilter();
+                    }}
+                    className="flex flex-row relative pl-3 pr-1 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
+                    style={ringStyleFilter}
+                >
+                    {filterNum ? formatFilters(filterNum) : "Filter"}
+                    <span> {isOpen ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
+                </button>
 
                 {/*Logic when the pop-up open*/}
                 {isOpen && (
-                    <div className=" mt-8 flex flex-col absolute w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                    <div className=" mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
                          onClick={(e) => e.stopPropagation()}>
 
                         {/*filter by due date*/}
@@ -136,7 +162,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                             <select
                                 value={subjectFilter}
                                 onChange={(e) => handleSubjectChange(e.target.value)}
-                                className="w-full max-w-xs truncate rounded-md border border-gray-500 bg-[#4c4949] px-3 py-2 text-sm shadow-sm focus:border-gray-300"
+                                className="w-[280px] max-w-xs truncate rounded-md border border-gray-500 bg-[#4c4949] px-3 py-2 text-sm shadow-sm focus:border-gray-300"
                             >
                                 <option value="" disabled hidden>Select subject</option>
                                 {SubjectObjects.map((subject_value) => (
@@ -204,38 +230,56 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                 subjectFilter !== "" && setFilterNum((prev) => prev + 1);
                                 daysLeftFilter !== "" && setFilterNum((prev) => prev + 1);
                                 onTimetableFilter !== "" && setFilterNum((prev) => prev + 1);
-                                toggleDropdown();
+                                toggleFilter();
                             }}
                         >
                             Apply Filter
                         </button>
 
                     </div>
-                )}
-            </button>
+                    )}
 
-
-            {/*GroupBy Drop-box*/}
-            <div className="relative inline-block">
-                <select
-                    value={groupByOption}
-                    onChange={(e) => setGroupByOption(e.target.value)}
-                    className="text-gray-200 p-2 pr-8 rounded-md bg-[#2e2e2e] hover:bg-[#252525] shadow appearance-none"
-                >
-                    <option value="none" disabled hidden>
-                        Group By
-                    </option>
-                    <option value="subject">By Subject</option>
-                    <option value="priority">By Priority</option>
-                    <option value="lecture day">By Lecture Day</option>
-                </select>
-
-                {/* Custom arrow icon */}
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <ArrowDropDownIcon/>
-                </span>
             </div>
 
+
+            {/*GroupBy drop-box Button*/}
+            <div className="relative inline-block">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroup();
+                    }}
+                    className="flex flex-row relative pl-3 pr-1 py-1.5 bg-[#2e2e2e] text-gray-200 text-md rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
+                    style={ringStyleGroupBy}
+                >
+                    {groupByOption!=="none" ? formatGroupBy(groupByOption) : "Group by"}
+                    <span> {isOpenGroup ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
+                </button>
+
+                {isOpenGroup && (
+                    <div className=" mt-1.5 flex flex-col py-1.5 gap-1 absolute left-1/2 -translate-x-1/2 w-[130px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                         onClick={(e) => e.stopPropagation()}>
+
+                        <button onClick={() => { setGroupByOption("subject"); toggleGroup(); }}
+                                className="flex items-start  pl-2 text-md hover:bg-[#1967d2]">
+                            Subject
+                        </button>
+                        <button onClick={() => { setGroupByOption("priority"); toggleGroup(); }}
+                                className="flex items-start  pl-2 text-md w-full hover:bg-[#1967d2]">
+                            Priority
+                        </button>
+                        <button onClick={() => { setGroupByOption("lecture day"); toggleGroup(); }}
+                                className="flex items-start  pl-2 text-md w-full hover:bg-[#1967d2]">
+                            Lecture Day
+                        </button>
+
+                    </div>
+
+
+                )}
+
+
+            </div>
 
             {/*Clear filter Button*/}
             {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
@@ -255,9 +299,24 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
 function formatFilters(choice) {
     return(
-        <div >
-            Filter <span className="text-[#545454]">|</span> <span className="text-[#69a064] text-[15px] ">{choice} applied</span>
+        <div className="flex items-center gap-2 text-md">
+            <span>Filter</span>
+
+            <div className="w-[1px] h-5 bg-[#759072]"></div>
+
+            <span className="text-[#69a064] text-[15px]">{choice} applied</span>
         </div>
     );
+}
 
+function formatGroupBy(choice) {
+    return(
+        <div className="flex items-center gap-2 text-md">
+            <span>Group by</span>
+
+            <div className="w-[1px] h-5 bg-[#759072]"></div>
+
+            <span className="text-[#69a064] text-[15px] capitalize">{choice}</span>
+        </div>
+    );
 }

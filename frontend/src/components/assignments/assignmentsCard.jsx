@@ -21,7 +21,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
     const [dayBg, dayRing] = getTasks_Ring_BG_Color(days_left);
 
-    const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2px ${color}` } : {};
+    const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2.5px ${color}` } : {};
     const ringClass = groupLabel === "" ? dayRing : "";
 
 
@@ -155,7 +155,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                     <div className="text-sm opacity-80 truncate">
                         <span className="tracking-wider">{subject.name || "Loading..."}</span>
                         {task.assignment_alt_link && linked === true ? (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                            <span className="ml-2 text-xs px-2 py-0.4 rounded-full bg-neutral-800 border border-white/10">
                                 {lectureText && (
                                     <span className="ml-2 text-xs opacity-70">{lectureText}</span>
                                 )}
