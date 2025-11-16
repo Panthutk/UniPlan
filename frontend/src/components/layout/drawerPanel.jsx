@@ -177,20 +177,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                                     {exportBusy ? "Exporting…" : "Export"}
                                 </button>
 
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const res = await sendTestEmail();
-                                            alert(res.detail || "Test email sent!");
-                                        } catch (e) {
-                                            console.error(e);
-                                            alert(e.message || "Failed to send test email");
-                                        }
-                                    }}
-                                    className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 font-semibold"
-                                >
-                                    Send Test Email
-                                </button>
+
                             </div>
 
                         </div>
