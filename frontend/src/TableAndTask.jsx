@@ -1028,6 +1028,8 @@ export default function ClassroomTimetableDashboard() {
     <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
+
+
       {/* Hidden input for Import */}
       <input
         ref={fileInputRef}
@@ -1062,6 +1064,7 @@ export default function ClassroomTimetableDashboard() {
         exportBusy={exportBusy}
         pushToast={pushToast}
       />
+
 
       {/* Modal */}
       <EventModal
