@@ -16,6 +16,7 @@ import { XIcon } from "./utils/icon.jsx";
 import { HeaderSection } from "@/components/layout/header.jsx";
 import { DrawerPanel } from "@/components/layout/drawerPanel.jsx";
 import ConfirmModal from "./components/assignments/assignmentConfirmModal";
+import DashboardSkeleton from "@/components/loading/DashboardSkeleton.jsx";
 
 import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 
@@ -1016,6 +1017,12 @@ export default function ClassroomTimetableDashboard() {
   }, []);
 
   if (!token) return null;
+
+  // Show full skeleton until EVERYTHING is ready
+  if (loading || meLoading || tasksLoading || !subjects.length) {
+    return <DashboardSkeleton />;
+  }
+
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
