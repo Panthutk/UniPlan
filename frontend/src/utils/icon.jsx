@@ -9,3 +9,11 @@ export function XIcon() {
         </div>
     )
 }
+
+export function Hamburger() {
+    return (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
+        </svg>
+    )
+}

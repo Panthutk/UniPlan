@@ -9,7 +9,7 @@ import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
-import { colorForDay } from "./utils/color.js";
+import { colorForDay, darkBG, whiteBG, whiteText } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
@@ -605,6 +605,9 @@ export default function ClassroomTimetableDashboard() {
   const [importBusy, setImportBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
 
+  // Change Theme
+  const [whiteMode, setWhiteMode] = useState(false);
+
   useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
 
   // Modal state
@@ -1025,7 +1028,7 @@ export default function ClassroomTimetableDashboard() {
 
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className={`min-h-screen ${ whiteMode===false? darkBG : whiteBG} ${ whiteMode===false? "text-white" : whiteText} `} style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
 
@@ -1063,6 +1066,8 @@ export default function ClassroomTimetableDashboard() {
         importBusy={importBusy}
         exportBusy={exportBusy}
         pushToast={pushToast}
+        whiteMode = {whiteMode}
+        setWhiteMode = {setWhiteMode}
       />
 
 

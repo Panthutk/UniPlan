@@ -51,3 +51,8 @@ export function getTasks_Ring_BG_Color(days_left) {
 
     return [dayBg, dayRing];
 }
+
+export const darkBG = "bg-neutral-900";
+export const whiteBG = "bg-[#e4e4e5]";
+
+export const whiteText = "#000000";

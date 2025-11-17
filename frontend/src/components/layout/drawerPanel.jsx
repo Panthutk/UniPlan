@@ -1,15 +1,18 @@
 import SaveIcon from "@mui/icons-material/Save";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import { API, authHeader } from "/src/utils/api.js";
-import { XIcon } from "/src/utils/icon.jsx";
+import { XIcon, Hamburger } from "/src/utils/icon.jsx";
 import { TimetableGrid } from '../timetable/timetableGrid.jsx';
 import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
 
 export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeMenu, tasksRef, handleShowArchived,
-    handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask
-    , archiveTask, subjects, toasts, setToasts, onImport, onExport, importBusy = false, exportBusy = false, pushToast, }) {
+    handleClearEvents, events, handleCellClick, handleEventClick, tasksLoading, taskObjects, handleUpdateTask,
+    archiveTask, subjects, toasts, setToasts, onImport, onExport, importBusy = false, exportBusy = false,
+    pushToast, whiteMode, setWhiteMode }) {
 
     return (
         <div>
@@ -27,9 +30,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                     aria-controls="app-drawer"
                     title="Menu"
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
-                    </svg>
+                    <Hamburger />
                 </button>
             </div>
 
@@ -60,7 +61,13 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                         {/* Header inside drawer */}
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div className="flex items-center gap-3 truncate">
-                                <div className="h-4 w-4 rounded-full bg-emerald-500" />
+                                {/*White/Black Mode setting*/}
+                                <button
+                                onClick={() => { setWhiteMode(prev => !prev);
+                                setMenuOpen(false)
+                                }}>
+                                    {whiteMode===false? <DarkModeIcon/> : <LightModeIcon/>}
+                                </button>
                                 <div className="text-lg font-semibold text-neutral-300">
                                     Navigation
                                 </div>
@@ -288,14 +295,3 @@ function Toasts({ toasts, setToasts }) {
     );
 }
 
-
-async function sendTestEmail() {
-    const r = await fetch(`${API}/api/test-email/`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data?.detail || `POST /api/test-email/ failed (${r.status})`);
-    return data;
-}

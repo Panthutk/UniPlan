@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import { XIcon } from "/src/utils/icon.jsx";
 
 export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
-                                setAppliedPriorityFilter, setAppliedSubjectFilter,
-                                setAppliedDaysLeftFilter, setAppliedOnTimetableFilter }) {
+                                setAppliedPriorityFilter, setAppliedSubjectFilter, setAppliedDaysLeftFilter,
+                                setAppliedOnTimetableFilter, reverseSort, setReverseSort }) {
 
     // Filter Hooks
     const [priorityFilter, setPriorityFilter] = useState("");
@@ -14,11 +16,25 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [onTimetableFilter, setOnTimetableFilter] = useState("");
     const [filterNum, setFilterNum] = useState(0);
 
+    // Direction of dropbox
+    const [buttonOpenUpward, setButtonOpenUpward] = useState(false);
     // Filter Button open/close logic
-    const [isOpen, setIsOpen] = useState(false);
+    const filterBtnRef = useRef(null);
+    const [isOpenFilter, setIsOpenFilter] = useState(false);
     const toggleFilter = () => {
-        setIsOpen(prev => {
-            if (!prev) setIsOpenGroup(false); // if opening main, close group
+        setIsOpenFilter(prev => {
+            if (!prev) {
+                // Decide direction
+                const pageHeight = document.documentElement.scrollHeight;
+
+                const rect = filterBtnRef.current.getBoundingClientRect();
+                const spaceBelow = pageHeight - (window.scrollY + rect.bottom);
+                const spaceAbove = window.scrollY + rect.top;
+                const expectedHeight = 450; // estimate filter-button dropbox height
+
+                setButtonOpenUpward(spaceBelow < expectedHeight && spaceAbove > spaceBelow);
+                setIsOpenGroup(false);
+            }
             return !prev;
         });
     };
@@ -26,7 +42,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [isOpenGroup, setIsOpenGroup] = useState(false);
     const toggleGroup = () => {
         setIsOpenGroup(prev => {
-            if (!prev) setIsOpen(false); // if opening group, close main
+            if (!prev) setIsOpenFilter(false); // if opening group, close main
             return !prev;
         });
     };
@@ -57,6 +73,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
         setAppliedOnTimetableFilter("");
         setFilterNum(0);
         setGroupByOption("none");
+        setReverseSort(false);
     };
 
     const due_date = [
@@ -81,10 +98,10 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const ringStyleGroupBy = groupByOption !== "none" ? { boxShadow: `0 0 0 1.25px #759072` } : {};
 
     useEffect(() => {
-        const handleClickOutside = () => setIsOpen(false);
-        if (isOpen) document.addEventListener("click", handleClickOutside);
+        const handleClickOutside = () => setIsOpenFilter(false);
+        if (isOpenFilter) document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
-    }, [isOpen]);
+    }, [isOpenFilter]);
 
     useEffect(() => {
         const handleClickOutside = () => setIsOpenGroup(false);
@@ -93,7 +110,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     }, [isOpenGroup]);
 
     return (
-        <div className="flex flex-col md:flex-row items-center justify-start gap-2 pt-10 pb-2.5">
+        <div className="flex flex-col md:flex-row items-center justify-start gap-2 pb-2.5">
 
             {/*Search Bar*/}
             <div className="relative w-full md:w-[38%] mr-[3px]">
@@ -127,14 +144,15 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                     }}
                     className="flex flex-row relative pl-3 pr-1 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
                     style={ringStyleFilter}
+                    ref={filterBtnRef}
                 >
                     {filterNum ? formatFilters(filterNum) : "Filter"}
-                    <span> {isOpen ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
+                    <span> {isOpenFilter ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
                 </button>
 
                 {/*Logic when the pop-up open*/}
-                {isOpen && (
-                    <div className=" mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                {isOpenFilter && (
+                    <div className= {` mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 ${buttonOpenUpward ? "bottom-full mb-2" : "top-full mt-2"} `}
                          onClick={(e) => e.stopPropagation()}>
 
                         {/*filter by due date*/}
@@ -257,7 +275,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                 </button>
 
                 {isOpenGroup && (
-                    <div className=" mt-1.5 flex flex-col py-1.5 gap-1 absolute left-1/2 -translate-x-1/2 w-[130px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                    <div className= {` mt-1.5 flex flex-col py-1.5 gap-1 absolute left-1/2 -translate-x-1/2 w-[130px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 ${buttonOpenUpward ? "bottom-full mb-2" : "top-full mt-2"} `}
                          onClick={(e) => e.stopPropagation()}>
 
                         <button onClick={() => { setGroupByOption("subject"); toggleGroup(); }}
@@ -281,6 +299,15 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
             </div>
 
+            {/*Sort Button*/}
+            <div>
+                <button onClick={() => setReverseSort(prev => !prev)}>
+                    {reverseSort === false ? <ArrowDownwardIcon fontSize="medium"/> : <ArrowUpwardIcon fontSize="medium"/> }
+                </button>
+
+            </div>
+
+
             {/*Clear filter Button*/}
             {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
                 <button
@@ -301,9 +328,7 @@ function formatFilters(choice) {
     return(
         <div className="flex items-center gap-2 text-md">
             <span>Filter</span>
-
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-
             <span className="text-[#69a064] text-[15px]">{choice} applied</span>
         </div>
     );
@@ -313,9 +338,7 @@ function formatGroupBy(choice) {
     return(
         <div className="flex items-center gap-2 text-md">
             <span>Group by</span>
-
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-
             <span className="text-[#69a064] text-[15px] capitalize">{choice}</span>
         </div>
     );
