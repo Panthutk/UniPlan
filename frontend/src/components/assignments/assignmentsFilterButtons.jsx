@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -16,19 +16,34 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [onTimetableFilter, setOnTimetableFilter] = useState("");
     const [filterNum, setFilterNum] = useState(0);
 
+    // Direction of dropbox 
+    const [buttonOpenUpward, setButtonOpenUpward] = useState(false);
     // Filter Button open/close logic
-    const [isOpen, setIsOpen] = useState(false);
+    const filterBtnRef = useRef(null);
+    const [isOpenFilter, setIsOpenFilter] = useState(false);
     const toggleFilter = () => {
-        setIsOpen(prev => {
-            if (!prev) setIsOpenGroup(false); // if opening main, close group
+        setIsOpenFilter(prev => {
+            if (!prev) {
+                // Decide direction
+                const pageHeight = document.documentElement.scrollHeight;
+
+                const rect = filterBtnRef.current.getBoundingClientRect();
+                const spaceBelow = pageHeight - (window.scrollY + rect.bottom);
+                const spaceAbove = window.scrollY + rect.top;
+                const expectedHeight = 450; // estimate filter-button dropbox height
+
+                setButtonOpenUpward(spaceBelow < expectedHeight && spaceAbove > spaceBelow);
+                setIsOpenGroup(false);
+            }
             return !prev;
         });
     };
+
     // Group By Button open/close logic
     const [isOpenGroup, setIsOpenGroup] = useState(false);
     const toggleGroup = () => {
         setIsOpenGroup(prev => {
-            if (!prev) setIsOpen(false); // if opening group, close main
+            if (!prev) setIsOpenFilter(false); // if opening group, close main
             return !prev;
         });
     };
@@ -84,10 +99,10 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const ringStyleGroupBy = groupByOption !== "none" ? { boxShadow: `0 0 0 1.25px #759072` } : {};
 
     useEffect(() => {
-        const handleClickOutside = () => setIsOpen(false);
-        if (isOpen) document.addEventListener("click", handleClickOutside);
+        const handleClickOutside = () => setIsOpenFilter(false);
+        if (isOpenFilter) document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
-    }, [isOpen]);
+    }, [isOpenFilter]);
 
     useEffect(() => {
         const handleClickOutside = () => setIsOpenGroup(false);
@@ -130,14 +145,15 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                     }}
                     className="flex flex-row relative pl-3 pr-1 py-1.5 bg-[#2e2e2e] text-gray-200 rounded-md hover:bg-[#252525] transition focus:ring-[1.25px] focus:ring-gray-300 "
                     style={ringStyleFilter}
+                    ref={filterBtnRef}
                 >
                     {filterNum ? formatFilters(filterNum) : "Filter"}
-                    <span> {isOpen ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
+                    <span> {isOpenFilter ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />} </span>
                 </button>
 
                 {/*Logic when the pop-up open*/}
-                {isOpen && (
-                    <div className=" mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                {isOpenFilter && (
+                    <div className= {` mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 ${buttonOpenUpward ? "bottom-full mb-2" : "top-full mt-2"} `}
                          onClick={(e) => e.stopPropagation()}>
 
                         {/*filter by due date*/}
@@ -260,7 +276,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                 </button>
 
                 {isOpenGroup && (
-                    <div className=" mt-1.5 flex flex-col py-1.5 gap-1 absolute left-1/2 -translate-x-1/2 w-[130px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 "
+                    <div className= {` mt-1.5 flex flex-col py-1.5 gap-1 absolute left-1/2 -translate-x-1/2 w-[130px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 ${buttonOpenUpward ? "bottom-full mb-2" : "top-full mt-2"} `}
                          onClick={(e) => e.stopPropagation()}>
 
                         <button onClick={() => { setGroupByOption("subject"); toggleGroup(); }}
@@ -294,7 +310,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
 
             {/*Clear filter Button*/}
-            {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none" || reverseSort !== false) && (
+            {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
                 <button
                     onClick={ClearFilters}
                     className="text-[#b7b7b7] hover:text-[#dedada] underline pt-3 text-sm"
