@@ -5,6 +5,7 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
@@ -521,12 +522,10 @@ export default function ClassroomTimetableDashboard() {
   const [err, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
-  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
-  const [reminders, setReminders] = useState([]);
 
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
@@ -550,6 +549,9 @@ export default function ClassroomTimetableDashboard() {
 
   const [confirmUnarchiveOpen, setConfirmUnarchiveOpen] = useState(false);
   const [confirmUnarchiveId, setConfirmUnarchiveId] = useState(null);
+
+  const [confirmExportOpen, setConfirmExportOpen] = useState(false);
+
 
 
 
@@ -616,11 +618,23 @@ export default function ClassroomTimetableDashboard() {
 
   const handleExportClick = async () => {
     try {
-      setExportBusy(true);
-      await exportTimetableCSV();
+      setExportBusy(true); //start exporting
+      await exportTimetableCSV(); // call api download file
+
+      pushToast({
+        type: "success",
+        title: "Timetable exported",
+        desc: "Your timetable has been download.",
+        icon: <FileDownloadIcon sx={{ fontSize: 20 }} />,
+      })
     } catch (e) {
       console.error(e);
-      alert(e.message || "Export failed");
+      pushToast({
+        type: "error",
+        title: "Export failed",
+        desc: e?.message || "Something went wrong while exporting.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      })
     } finally {
       setExportBusy(false);
     }
@@ -1028,7 +1042,7 @@ export default function ClassroomTimetableDashboard() {
 
 
   return (
-    <div className={`min-h-screen ${ whiteMode===false? darkBG : whiteBG} ${ whiteMode===false? "text-white" : whiteText} `} style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className={`min-h-screen ${whiteMode === false ? darkBG : whiteBG} ${whiteMode === false ? "text-white" : whiteText} `} style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
 
@@ -1062,12 +1076,12 @@ export default function ClassroomTimetableDashboard() {
         toasts={toasts}
         setToasts={setToasts}
         onImport={handleImportClick}
-        onExport={handleExportClick}
+        onExport={() => setConfirmExportOpen(true)}
         importBusy={importBusy}
         exportBusy={exportBusy}
         pushToast={pushToast}
-        whiteMode = {whiteMode}
-        setWhiteMode = {setWhiteMode}
+        whiteMode={whiteMode}
+        setWhiteMode={setWhiteMode}
       />
 
 
@@ -1096,6 +1110,24 @@ export default function ClassroomTimetableDashboard() {
           await handleUnarchive(confirmUnarchiveId);
           setConfirmUnarchiveOpen(false);
           setConfirmUnarchiveId(null);
+        }}
+      />
+
+      <ConfirmModal
+        open={confirmExportOpen}
+        title="Export timetable"
+        message="This will download your timetable as a CSV file."
+        confirmLabel={exportBusy ? "Exporting..." : "Export"}
+        cancelLabel="Cancel"
+        onCancel={() => {
+          setConfirmExportOpen(false);
+        }}
+        onConfirm={async () => {
+          try {
+            await handleExportClick(); // do export
+          } finally {
+            setConfirmExportOpen(false);
+          }
         }}
       />
 
