@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import { XIcon } from "/src/utils/icon.jsx";
 
 export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, setGroupByOption, SubjectObjects,
-                                setAppliedPriorityFilter, setAppliedSubjectFilter,
-                                setAppliedDaysLeftFilter, setAppliedOnTimetableFilter }) {
+                                setAppliedPriorityFilter, setAppliedSubjectFilter, setAppliedDaysLeftFilter,
+                                setAppliedOnTimetableFilter, reverseSort, setReverseSort }) {
 
     // Filter Hooks
     const [priorityFilter, setPriorityFilter] = useState("");
@@ -57,6 +59,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
         setAppliedOnTimetableFilter("");
         setFilterNum(0);
         setGroupByOption("none");
+        setReverseSort(false);
     };
 
     const due_date = [
@@ -93,7 +96,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     }, [isOpenGroup]);
 
     return (
-        <div className="flex flex-col md:flex-row items-center justify-start gap-2 pt-10 pb-2.5">
+        <div className="flex flex-col md:flex-row items-center justify-start gap-2 pb-2.5">
 
             {/*Search Bar*/}
             <div className="relative w-full md:w-[38%] mr-[3px]">
@@ -281,8 +284,17 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
             </div>
 
+            {/*Sort Button*/}
+            <div>
+                <button onClick={() => setReverseSort(prev => !prev)}>
+                    {reverseSort === false ? <ArrowDownwardIcon fontSize="medium"/> : <ArrowUpwardIcon fontSize="medium"/> }
+                </button>
+
+            </div>
+
+
             {/*Clear filter Button*/}
-            {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
+            {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none" || reverseSort !== false) && (
                 <button
                     onClick={ClearFilters}
                     className="text-[#b7b7b7] hover:text-[#dedada] underline pt-3 text-sm"
@@ -301,9 +313,7 @@ function formatFilters(choice) {
     return(
         <div className="flex items-center gap-2 text-md">
             <span>Filter</span>
-
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-
             <span className="text-[#69a064] text-[15px]">{choice} applied</span>
         </div>
     );
@@ -313,9 +323,7 @@ function formatGroupBy(choice) {
     return(
         <div className="flex items-center gap-2 text-md">
             <span>Group by</span>
-
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-
             <span className="text-[#69a064] text-[15px] capitalize">{choice}</span>
         </div>
     );

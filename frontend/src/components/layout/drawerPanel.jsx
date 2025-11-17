@@ -2,7 +2,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { API, authHeader } from "/src/utils/api.js";
-import { XIcon } from "/src/utils/icon.jsx";
+import { XIcon, Hamburger } from "/src/utils/icon.jsx";
 import { TimetableGrid } from '../timetable/timetableGrid.jsx';
 import { AssignmentsBoard } from '../assignments/assignmentsBoard.jsx';
 import React from "react";
@@ -27,9 +27,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                     aria-controls="app-drawer"
                     title="Menu"
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="currentColor" d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
-                    </svg>
+                    <Hamburger />
                 </button>
             </div>
 
@@ -288,14 +286,3 @@ function Toasts({ toasts, setToasts }) {
     );
 }
 
-
-async function sendTestEmail() {
-    const r = await fetch(`${API}/api/test-email/`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data?.detail || `POST /api/test-email/ failed (${r.status})`);
-    return data;
-}

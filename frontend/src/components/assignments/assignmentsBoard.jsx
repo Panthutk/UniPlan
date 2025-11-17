@@ -13,6 +13,11 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     // console.log("-------------------------------------------------------");
 
     //Legend Deadline indicator (Array)
+
+    const ReverseTasks = useMemo(() => {
+        return [...TaskObjects].reverse();
+    }, [TaskObjects]);
+
     const legends = [
         { color: "bg-red-600", label: "less than 3 days" },
         { color: "bg-amber-400", label: "less than 7 days" },
@@ -28,6 +33,8 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     }, [SubjectObjects]);
 
 
+    const [reverseSort, setReverseSort] = useState(false);
+
     //Search Bar (React Hook)
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -41,10 +48,12 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     const [groupByOption, setGroupByOption] = useState("none");
 
     //Add table link
-    const TaskObjects_tableLinked = useMemo(
-        () => annotateAssignmentsWithEvents(TaskObjects, events, SubjectMap),
-        [TaskObjects, events, SubjectMap]
-    );
+
+    const TaskObjects_tableLinked = useMemo(() => {
+        const object_base = reverseSort ? ReverseTasks : TaskObjects;
+        return annotateAssignmentsWithEvents(object_base, events, SubjectMap);
+    }, [reverseSort, ReverseTasks, TaskObjects, events, SubjectMap]);
+
 
     //Data filtered by Search Bar & Filter Button
     const filteredTasks = useMemo(() => {
@@ -120,7 +129,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     }, [filteredTasks, groupByOption, SubjectMap]);
 
     return (
-        <div>
+        <div className="pt-8 md:pt-12">
 
             {/*Utility buttons: Search bar + Filter + Group*/}
             <TaskFilterElements
@@ -134,11 +143,13 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                 setAppliedSubjectFilter={setAppliedSubjectFilter}
                 setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
                 setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
+                reverseSort = {reverseSort}
+                setReverseSort={setReverseSort}
             />
 
 
             {/* Colors legend : tell how far from deadline*/}
-            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-5">
+            <div className="flex flex-col md:flex-row items-center pt-[5px] gap-3 md:gap-5">
                 {legends.map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
                         <span className={`h-3 w-3 rounded-full ${item.color}`} />
