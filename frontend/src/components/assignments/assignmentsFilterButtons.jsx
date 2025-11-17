@@ -16,7 +16,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [onTimetableFilter, setOnTimetableFilter] = useState("");
     const [filterNum, setFilterNum] = useState(0);
 
-    // Direction of dropbox 
+    // Direction of dropbox
     const [buttonOpenUpward, setButtonOpenUpward] = useState(false);
     // Filter Button open/close logic
     const filterBtnRef = useRef(null);
