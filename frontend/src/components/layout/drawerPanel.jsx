@@ -63,10 +63,11 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                             <div className="flex items-center gap-3 truncate">
                                 {/*White/Black Mode setting*/}
                                 <button
-                                onClick={() => { setWhiteMode(prev => !prev);
-                                setMenuOpen(false)
-                                }}>
-                                    {whiteMode===false? <DarkModeIcon/> : <LightModeIcon/>}
+                                    onClick={() => {
+                                        setWhiteMode(prev => !prev);
+                                        setMenuOpen(false)
+                                    }}>
+                                    {whiteMode === false ? <DarkModeIcon /> : <LightModeIcon />}
                                 </button>
                                 <div className="text-lg font-semibold text-neutral-300">
                                     Navigation
@@ -138,13 +139,13 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
 
                     {/* RIGHT — timetable + tasks */}
                     {/*Timetable Utility button e.g. clear, import */}
-                    <main className="mt-2 space-y-8 min-w-0 z-60">
+                    <main className="mt-2 space-y-8 min-w-0">
                         {/* actions */}
                         {/* TOP TOOLBAR — align with timetable grid */}
-                        <div className="pl-[3.5rem] pr-4 flex items-center justify-between">
+                        <div className="px-4 md:pl-[3.5rem] md:pr-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 
                             {/* LEFT: User label */}
-                            <div className="flex items-center gap-2 text-neutral-300 text-lg font-semibold ml-[3.5rem]">
+                            <div className="flex flex-wrap items-center gap-2 text-neutral-300 text-sm sm:text-base md:text-lg font-semibold ml-16 sm:ml-20 md:ml-[3.5rem]">
 
                                 <span className="opacity-70 font-medium">Logged in as:</span>
                                 <span className="text-white">{user?.email}</span>
@@ -154,10 +155,10 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
 
 
                             {/* RIGHT: Buttons */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap justify-end gap-2 md:gap-3 ml-16 sm:ml-20 md:ml-0">
                                 <button
                                     onClick={handleClearEvents}
-                                    className="px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
+                                    className="px-4 md:px-5 py-2 rounded-full bg-rose-500 hover:bg-rose-600 font-semibold"
                                 >
                                     Clear
                                 </button>
@@ -166,7 +167,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                                     onClick={onImport}
                                     disabled={importBusy}
                                     className={[
-                                        "px-5 py-2 rounded-full font-semibold",
+                                        "px-4 md:px-5 py-2 rounded-full font-semibold",
                                         importBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
                                     ].join(" ")}
                                 >
@@ -177,7 +178,7 @@ export function DrawerPanel({ menuOpen, setMenuOpen, user, timetableRef, activeM
                                     onClick={onExport}
                                     disabled={exportBusy}
                                     className={[
-                                        "px-5 py-2 rounded-full font-semibold",
+                                        "px-4 md:px-5 py-2 rounded-full font-semibold",
                                         exportBusy ? "bg-neutral-700 cursor-not-allowed" : "bg-emerald-700 hover:bg-emerald-800",
                                     ].join(" ")}
                                 >
