@@ -642,11 +642,21 @@ export default function ClassroomTimetableDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click();
 
+  const ALLOWED_TYPES = new Set(["text/csv", "application/csv", "application/vnd.ms-excel"]);
+  const MAX_BYTES = 1_000_000; // 1 MB
+
   const handleImportChange = async (ev) => {
     const file = ev.target.files?.[0];
     // allow selecting the same file again next time
     ev.target.value = "";
     if (!file) return;
+    
+    // client guards
+    const name = file.name?.toLowerCase() || "";
+    if (!name.endsWith(".csv")) { alert("Only .csv files are accepted."); return; }
+    if (file.type && !ALLOWED_TYPES.has(file.type)) { alert(`Unsupported type: ${file.type}`); return; }
+    if (file.size > MAX_BYTES) { alert("CSV too large (>1MB)."); return; }
+
 
     try {
       setImportBusy(true);
