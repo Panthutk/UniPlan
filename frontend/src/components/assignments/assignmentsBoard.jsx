@@ -44,6 +44,10 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
     const [appliedOnTimetableFilter, setAppliedOnTimetableFilter] = useState("");
 
+
+    //visible only 5 tasks at first
+    const [visibleCount, setVisibleCount] = useState(5);
+
     //Group by dropdown (React Hook)
     const [groupByOption, setGroupByOption] = useState("none");
 
@@ -143,7 +147,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                 setAppliedSubjectFilter={setAppliedSubjectFilter}
                 setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
                 setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
-                reverseSort = {reverseSort}
+                reverseSort={reverseSort}
                 setReverseSort={setReverseSort}
             />
 
@@ -159,19 +163,59 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
             </div>
 
             <div>
-                {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => (
-                    <AssignmentsGroup
-                        key={label}
-                        label={label}
-                        GroupedTasks={tasks}
-                        SubjectMap={SubjectMap}
-                        onUpdateTask={onUpdateTask}
-                        onArchiveTask={onArchiveTask}
-                        events={events}
-                        pushToast={pushToast}
-                    />
-                ))}
+                <div>
+                    {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => {
+                        // Show only visibleCount items
+                        const visibleTasks = tasks.slice(0, visibleCount);
+
+                        return (
+                            <div key={label}>
+                                {/* Animated wrapper */}
+                                <div className="space-y-3 transition-all duration-500">
+                                    <AssignmentsGroup
+                                        label={label}
+                                        GroupedTasks={visibleTasks}
+                                        SubjectMap={SubjectMap}
+                                        onUpdateTask={onUpdateTask}
+                                        onArchiveTask={onArchiveTask}
+                                        events={events}
+                                        pushToast={pushToast}
+                                    />
+                                </div>
+
+                                {/* Buttons Section */}
+                                <div className="w-full flex justify-center mt-4 mb-6 gap-3">
+
+                                    {/* SHOW MORE */}
+                                    {visibleCount < tasks.length && (
+                                        <button
+                                            onClick={() => setVisibleCount(prev => prev + 5)}
+                                            className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
+                                       text-white text-sm font-semibold transition-all duration-300"
+                                        >
+                                            Show more ({tasks.length - visibleCount} left)
+                                        </button>
+                                    )}
+
+                                    {/* SHOW LESS */}
+                                    {visibleCount > 5 && (
+                                        <button
+                                            onClick={() => setVisibleCount(5)}
+                                            className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
+                                       text-white text-sm font-semibold transition-all duration-300"
+                                        >
+                                            Show less
+                                        </button>
+                                    )}
+
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
             </div>
+
 
 
         </div>
