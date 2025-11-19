@@ -275,7 +275,7 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=False, methods=["get"], url_path="export")
+    @action(detail=False, methods=["get"], url_path="export", url_name="export")
     def export_csv(self, request):
         user = request.user
         if not user or not user.is_authenticated:
@@ -304,7 +304,7 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
             ])
         return resp
 
-    @action(detail=False, methods=["post"], url_path="import")
+    @action(detail=False, methods=["post"], url_path="import", url_name="import")
     def import_csv(self, request):
         MAX_BYTES = 1_000_000  # 1 MB
         ALLOWED_MIMES = {"text/csv", "application/csv", "application/vnd.ms-excel"}  # browsers vary
