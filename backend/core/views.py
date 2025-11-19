@@ -1,6 +1,7 @@
 # backend/core/views.py
 import csv
 import io
+import re
 import json, os, urllib.parse
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
@@ -32,6 +33,7 @@ from .serializers import (
 )
 from rest_framework.permissions import IsAuthenticated
 
+from django.core.files.uploadedfile import UploadedFile
 from django.utils.dateparse import parse_datetime
 
 
@@ -304,98 +306,114 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="import")
     def import_csv(self, request):
+        MAX_BYTES = 1_000_000  # 1 MB
+        ALLOWED_MIMES = {"text/csv", "application/csv", "application/vnd.ms-excel"}  # browsers vary
+        TIME_RE = re.compile(r"^\d{2}:\d{2}(:\d{2})?$")
+
         user = request.user
         if not user or not user.is_authenticated:
             return Response({"detail": "Authentication required."}, status=401)
 
-        f = request.FILES.get("file")
+        f: UploadedFile | None = request.FILES.get("file")
         if not f:
             return Response({"detail": "No file uploaded (field name must be 'file')."}, status=400)
 
-        # read bytes → text
-        data = f.read()
+        # 1) quick guards
+        name = (f.name or "").lower()
+        ctype = (f.content_type or "").lower()
+        if not name.endswith(".csv"):
+            return Response({"detail": "Only .csv files are accepted."}, status=400)
+        if ctype and ctype not in ALLOWED_MIMES:
+            return Response({"detail": f"Unsupported content-type '{ctype}'."}, status=415)
+        if f.size and f.size > MAX_BYTES:
+            return Response({"detail": f"File too large (> {MAX_BYTES//1000} KB)."}, status=413)
+
+        # 2) decode (tolerate BOM)
+        raw = f.read()
         try:
-            text = data.decode("utf-8-sig")  # tolerate BOM
+            text = raw.decode("utf-8-sig")
         except Exception:
-            text = data.decode("utf-8")
+            try:
+                text = raw.decode("utf-8")
+            except Exception:
+                return Response({"detail": "File is not valid UTF-8 text."}, status=400)
 
-        reader = csv.DictReader(io.StringIO(text))
-        # accepted column names
-        # subject | subject_name (either)
-        # day_of_week (0..6 or MON..SUN ok)
-        # start_time/end_time ("HH:MM" or "HH:MM:SS")
-        # room (optional)
+        # 3) sniff CSV
+        sample = text[:4096]
+        if "," not in sample and ";" not in sample and "\t" not in sample:
+            return Response({"detail": "Not a CSV-like text file."}, status=400)
 
-        # wipe current user’s rows and rebuild
-        TimetableEntry.objects.filter(user=user).delete()
-        created = 0
+        # 4) dialect + reader
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+        except Exception:
+            dialect = csv.excel
+            dialect.delimiter = ","
 
-        day_map = {
-            "sun": 0, "sunday": 0,
-            "mon": 1, "monday": 1,
-            "tue": 2, "tuesday": 2,
-            "wed": 3, "wednesday": 3,
-            "thu": 4, "thursday": 4,
-            "fri": 5, "friday": 5,
-            "sat": 6, "saturday": 6,
-        }
+        reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+
+        required_any = {"subject", "subject_name"}
+        required_all = {"day_of_week", "start_time", "end_time"}  # 'room' optional
+
+        header = {h.strip().lower() for h in (reader.fieldnames or [])}
+        if not header:
+            return Response({"detail": "CSV has no header row."}, status=400)
+        if header.isdisjoint(required_any) or not required_all.issubset(header):
+            return Response({"detail": "Missing required columns. Need: subject(or subject_name), day_of_week, start_time, end_time."}, status=400)
+
+        # 5) validate rows first (collect errors; do NOT write yet)
+        errors = []
+        rows = []
+        day_map = {"sun":0,"sunday":0,"mon":1,"monday":1,"tue":2,"tuesday":2,"wed":3,"wednesday":3,"thu":4,"thursday":4,"fri":5,"friday":5,"sat":6,"saturday":6}
 
         def norm_time(s):
-            if not s:
-                return None
-            s = s.strip()
-            if len(s) == 5:  # HH:MM
-                s = s + ":00"
-            return s  # Django will parse "HH:MM:SS" for TimeField
+            s = (s or "").strip()
+            if not s or not TIME_RE.match(s): return None
+            return s if len(s) == 8 else s + ":00"  # HH:MM -> HH:MM:SS
 
-        for row in reader:
-            subj_name = (
-                row.get("subject") or
-                row.get("subject_name") or
-                ""
-            ).strip()
+        for i, row in enumerate(reader, start=2):  # data starts at line 2
+            subj = (row.get("subject") or row.get("subject_name") or "").strip()
+            dow_raw = (row.get("day_of_week") or "").strip()
+            st = norm_time(row.get("start_time"))
+            et = norm_time(row.get("end_time"))
+            rm = (row.get("room") or "").strip()
 
-            if not subj_name:
-                # skip empty subject lines
-                continue
+            if not subj:
+                errors.append(f"Line {i}: subject empty"); continue
+            if dow_raw == "":
+                errors.append(f"Line {i}: day_of_week empty"); continue
+            try:
+                dow = int(dow_raw)
+            except ValueError:
+                dow = day_map.get(dow_raw.lower())
+            if dow is None or not (0 <= dow <= 6):
+                errors.append(f"Line {i}: invalid day_of_week '{dow_raw}'"); continue
+            if not st or not et:
+                errors.append(f"Line {i}: invalid time (use HH:MM or HH:MM:SS)"); continue
 
-            # find or create subject for this user
+            rows.append((subj, dow, st, et, rm))
+
+        if errors:
+            return Response({"detail": "CSV validation failed.", "errors": errors[:50]}, status=400)
+
+        # 6) apply (replace)
+        Subject = self.serializer_class.Meta.model._meta.apps.get_model("core", "Subject")
+        TimetableEntry = self.serializer_class.Meta.model
+
+        TimetableEntry.objects.filter(user=user).delete()
+        created = 0
+        for subj_name, dow, st, et, rm in rows:
             subj, _ = Subject.objects.get_or_create(
                 user=user,
                 name=subj_name,
                 defaults={"code": subj_name.lower().replace(" ", "-")[:30], "color_hex": "#888888"},
             )
-
-            dow_raw = (row.get("day_of_week") or "").strip()
-            if dow_raw == "":
-                continue
-            try:
-                # numeric 0..6
-                dow = int(dow_raw)
-            except ValueError:
-                dow = day_map.get(dow_raw.lower())
-            if dow is None or dow < 0 or dow > 6:
-                continue
-
-            start = norm_time(row.get("start_time"))
-            end   = norm_time(row.get("end_time"))
-            room  = (row.get("room") or "").strip()
-
-            if not start or not end:
-                continue
-
             TimetableEntry.objects.create(
-                user=user,
-                subject=subj,
-                day_of_week=dow,
-                start_time=start,
-                end_time=end,
-                room=room,
+                user=user, subject=subj, day_of_week=dow, start_time=st, end_time=et, room=rm
             )
             created += 1
 
-        return Response({"replaced": created}, status=status.HTTP_200_OK)
-
+        return Response({"replaced": created}, status=200)
 
 from rest_framework.decorators import action
 
