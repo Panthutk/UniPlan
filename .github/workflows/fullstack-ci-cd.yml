@@ -8,73 +8,74 @@ on:
 
 jobs:
   backend-tests:
-    name: Backend tests (Django + Pytest)
-    runs-on: ubuntu-latest
+  name: Backend tests (Django + Pytest)
+  runs-on: ubuntu-latest
 
-    services:
-      db:
-        image: mysql:8.0
-        env:
-          MYSQL_DATABASE: uniplan
-          MYSQL_USER: root
-          MYSQL_PASSWORD: rootpassword
-          MYSQL_ROOT_PASSWORD: rootpassword
-        ports:
-          - "3306:3306"
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+  services:
+    db:
+      image: mysql:8.0
+      env:
+        MYSQL_DATABASE: uniplan
+        MYSQL_USER: uniplan
+        MYSQL_PASSWORD: uniplan
+        MYSQL_ROOT_PASSWORD: rootpassword
+      ports:
+        - "3306:3306"
+      options: >-
+        --health-cmd="mysqladmin ping -h db -uuniplan -puniplan --silent"
+        --health-interval=10s
+        --health-timeout=5s
+        --health-retries=5
 
-    env:
-      DB_NAME: uniplan
-      DB_USER: uniplan
-      DB_PASSWORD: uniplan
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DJANGO_SECRET: test-secret
-      GOOGLE_CLIENT_ID: fake
-      GOOGLE_CLIENT_SECRET: fake
-      GOOGLE_REDIRECT_URI: http://localhost/dummy
+  env:
+    DB_NAME: uniplan
+    DB_USER: uniplan
+    DB_PASSWORD: uniplan
+    DB_HOST: db      # <- important: use the service name
+    DB_PORT: 3306
+    DJANGO_SECRET: test-secret
+    GOOGLE_CLIENT_ID: fake
+    GOOGLE_CLIENT_SECRET: fake
+    GOOGLE_REDIRECT_URI: http://localhost/dummy
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-      - name: Install backend dependencies
-        working-directory: backend
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-django ruff
+    - name: Install backend dependencies
+      working-directory: backend
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-django ruff
 
-      - name: Soft lint backend (Ruff)
-        working-directory: backend
-        run: |
-          echo "::group::Backend Lint"
-          ruff . || true
-          echo "::endgroup::"
+    - name: Soft lint backend (Ruff)
+      working-directory: backend
+      run: |
+        echo "::group::Backend Lint"
+        ruff . || true
+        echo "::endgroup::"
 
-      - name: Wait for MySQL
-        run: |
-          for i in {1..20}; do
-            if mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent; then
-              echo "MySQL is up";
-              break;
-            fi
-            echo "Waiting for MySQL..."
-            sleep 3
-          done
+    - name: Wait for MySQL
+      run: |
+        for i in {1..20}; do
+          if mysqladmin ping -h db -uuniplan -puniplan --silent; then
+            echo "MySQL is up";
+            break;
+          fi
+          echo "Waiting for MySQL..."
+          sleep 3
+        done
 
-      - name: Run backend tests
-        working-directory: backend
-        run: pytest
+    - name: Run backend tests
+      working-directory: backend
+      run: pytest
+
 
   frontend-build:
     name: Frontend build (Vite)
