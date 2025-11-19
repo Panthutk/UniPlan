@@ -15,10 +15,10 @@ jobs:
       db:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: uniplan
           MYSQL_USER: uniplan
           MYSQL_PASSWORD: uniplan
+          MYSQL_ROOT_PASSWORD: rootpassword
         ports:
           - "3306:3306"
         options: >-
