@@ -23,7 +23,7 @@ jobs:
         ports:
           - "3306:3306"
         options: >-
-          --health-cmd="mysqladmin ping -h db -uuniplan -puniplan --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uuniplan -puniplan --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -32,7 +32,7 @@ jobs:
       DB_NAME: uniplan
       DB_USER: uniplan
       DB_PASSWORD: uniplan
-      DB_HOST: db
+      DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DJANGO_SECRET: test-secret
       GOOGLE_CLIENT_ID: fake
@@ -65,7 +65,7 @@ jobs:
       - name: Wait for MySQL
         run: |
           for i in {1..20}; do
-            if mysqladmin ping -h db -uuniplan -puniplan --silent; then
+            if mysqladmin ping -h 127.0.0.1 -uuniplan -puniplan --silent; then
               echo "MySQL is up";
               break;
             fi
