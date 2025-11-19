@@ -7,7 +7,7 @@ from core.views import ReminderIntakeViewSet
 
 router = routers.DefaultRouter()
 router.register(r"subjects", views.SubjectViewSet)
-router.register(r"timetable", views.TimetableEntryViewSet)
+router.register(r"timetable", views.TimetableEntryViewSet, basename="timetable")
 router.register(r"tasks", views.TaskViewSet, basename="task")
 router.register(r"reminders", views.ReminderViewSet, basename="reminder")
 router.register(r"classroom-assignments", views.ClassroomAssignmentViewSet)
