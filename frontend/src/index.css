@@ -110,5 +110,12 @@ body {
   .scrollbar-transparent:hover::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.4); /* visible on hover */
   }
+  .scrollbar-top{
+    transform: scaleY(-1);
+  }
+
+  .scrollbar-top >*{
+    transform: scaleY(-1);
+  }
 }
 
