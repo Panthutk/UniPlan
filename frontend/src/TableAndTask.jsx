@@ -357,7 +357,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
         <div className="relative mb-4">
           <input
             list="subject-options"
-            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none border border-neutral-700 focus:ring-2 ring-emerald-500/50"
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none border border-neutral-600 focus:ring-2 ring-emerald-500/50"
             placeholder="Start typing to choose…"
             value={title}
             onChange={(e) => {
@@ -372,7 +372,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
 
           {showSuggestions && filteredSubjects.length > 0 && (
             <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md
-                          bg-neutral-900 border border-neutral-700 shadow-lg text-sm">
+                          bg-neutral-800 border border-neutral-600 shadow-lg text-sm">
               {filteredSubjects.map((opt) => (
                 <button
                   key={opt}
