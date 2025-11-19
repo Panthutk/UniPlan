@@ -1,0 +1,141 @@
+name: Fullstack CI/CD
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  backend-tests:
+    name: Backend tests (Django + Pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: uniplan
+          MYSQL_USER: uniplan
+          MYSQL_PASSWORD: uniplan
+        ports:
+          - "3306:3306"
+        options: >-
+          --health-cmd="mysqladmin ping -h db -uuniplan -puniplan --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_NAME: uniplan
+      DB_USER: uniplan
+      DB_PASSWORD: uniplan
+      DB_HOST: db
+      DB_PORT: 3306
+      DJANGO_SECRET: test-secret
+      GOOGLE_CLIENT_ID: fake
+      GOOGLE_CLIENT_SECRET: fake
+      GOOGLE_REDIRECT_URI: http://localhost/dummy
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django ruff
+
+      - name: Soft lint backend (Ruff)
+        working-directory: backend
+        run: |
+          echo "::group::Backend Lint"
+          ruff . || true
+          echo "::endgroup::"
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..20}; do
+            if mysqladmin ping -h db -uuniplan -puniplan --silent; then
+              echo "MySQL is up";
+              break;
+            fi
+            echo "Waiting for MySQL..."
+            sleep 3
+          done
+
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest
+
+  frontend-build:
+    name: Frontend build (Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm ci || npm install
+
+      - name: Soft lint frontend (ESLint)
+        working-directory: frontend
+        run: |
+          echo "::group::Frontend Lint"
+          npm run lint || true
+          echo "::endgroup::"
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+        run: npm run build
+
+  build-and-push-images:
+    name: Build & push Docker images (backend + frontend)
+    runs-on: ubuntu-latest
+    needs:
+      - backend-tests
+      - frontend-build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/uniplan-backend:latest
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/uniplan-frontend:latest
