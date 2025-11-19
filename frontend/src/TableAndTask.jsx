@@ -650,18 +650,49 @@ export default function ClassroomTimetableDashboard() {
     // allow selecting the same file again next time
     ev.target.value = "";
     if (!file) return;
-    
+
     // client guards
     const name = file.name?.toLowerCase() || "";
-    if (!name.endsWith(".csv")) { alert("Only .csv files are accepted."); return; }
-    if (file.type && !ALLOWED_TYPES.has(file.type)) { alert(`Unsupported type: ${file.type}`); return; }
-    if (file.size > MAX_BYTES) { alert("CSV too large (>1MB)."); return; }
+    if (!name.endsWith(".csv")) {
+      pushToast({
+        type: "error",
+        title: "Invalid file",
+        desc: "Only .csv files are accepted.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      });
+      return;
+    }
+    if (file.type && !ALLOWED_TYPES.has(file.type)) {
+      pushToast({
+        type: "error",
+        title: "Unsupported file type",
+        desc: `Got: ${file.type}. Please upload a CSV file.`,
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
+
+    if (file.size > MAX_BYTES) {
+      pushToast({
+        type: "error",
+        title: "File too large",
+        desc: "CSV is larger than 1 MB. Please upload a smaller file.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
 
 
     try {
       setImportBusy(true);
       const res = await importTimetableCSV(file);
-      alert(`Import success: replaced ${res?.replaced ?? 0} entries`);
+
+      pushToast({
+        type: "success",
+        title: "Timetable imported",
+        desc: `Import success: replaced ${res?.replaced ?? 0} entries.`,
+        icon: <FileDownloadIcon sx={{ fontSize: 20 }} />
+      });
 
       // refresh timetable from DB and rebuild events
       const [subj, tte] = await Promise.all([listSubjects(), listTimetable()]);
@@ -680,7 +711,14 @@ export default function ClassroomTimetableDashboard() {
       setEvents(evs);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Import failed");
+
+
+      pushToast({
+        type: "error",
+        title: "Import failed",
+        desc: e?.message || "Something went wrong while importing.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     } finally {
       setImportBusy(false);
     }
@@ -985,7 +1023,12 @@ export default function ClassroomTimetableDashboard() {
       setShowArchivedPopup(true);
     } catch (e) {
       console.error(e);
-      alert("Failed to load archived tasks: " + e.message);
+      pushToast({
+        type: "error",
+        title: "Failed to load archived task",
+        desc: e?.message || "Something went wrong while loading archived tasks.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     }
   }
 
