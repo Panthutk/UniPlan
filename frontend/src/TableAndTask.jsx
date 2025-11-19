@@ -289,6 +289,15 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   const [desc, setDesc] = useState(initial.desc || "");
   const [error, setError] = useState("");
   const isNew = !initial?.id
+  const [showSuggestions, setShowSuggestions] = useState(false); //control dropdown subject
+
+  const filteredSubjects = React.useMemo(() => {
+    const opts = subjectOptions || [];
+    const q = (title || "").toLowerCase().trim();
+
+    if (!q) return opts; // when nothing typed, show all api subject
+    return opts.filter(opt => opt.toLowerCase().includes(q))
+  }, [subjectOptions, title]);
 
   useEffect(() => {
     if (!open) return;
@@ -345,18 +354,43 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
         </div>
 
         {/* Combo box */}
-        <input
-          list="subject-options"
-          className="w-full mb-4 rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-          placeholder="Start typing to choose…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <datalist id="subject-options">
-          {subjectOptions.map((opt) => (
-            <option key={opt} value={opt} />
-          ))}
-        </datalist>
+        <div className="relative mb-4">
+          <input
+            list="subject-options"
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none border border-neutral-700 focus:ring-2 ring-emerald-500/50"
+            placeholder="Start typing to choose…"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowSuggestions(false), 120)
+            }}
+          />
+
+          {showSuggestions && filteredSubjects.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md
+                          bg-neutral-900 border border-neutral-700 shadow-lg text-sm">
+              {filteredSubjects.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-800"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setTitle(opt);
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
