@@ -10,7 +10,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
-import { colorForDay, darkBG, whiteBG, whiteText } from "./utils/color.js";
+import { colorForDay } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
@@ -289,6 +289,15 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   const [desc, setDesc] = useState(initial.desc || "");
   const [error, setError] = useState("");
   const isNew = !initial?.id
+  const [showSuggestions, setShowSuggestions] = useState(false); //control dropdown subject
+
+  const filteredSubjects = React.useMemo(() => {
+    const opts = subjectOptions || [];
+    const q = (title || "").toLowerCase().trim();
+
+    if (!q) return opts; // when nothing typed, show all api subject
+    return opts.filter(opt => opt.toLowerCase().includes(q))
+  }, [subjectOptions, title]);
 
   useEffect(() => {
     if (!open) return;
@@ -345,18 +354,43 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
         </div>
 
         {/* Combo box */}
-        <input
-          list="subject-options"
-          className="w-full mb-4 rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-          placeholder="Start typing to choose…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <datalist id="subject-options">
-          {subjectOptions.map((opt) => (
-            <option key={opt} value={opt} />
-          ))}
-        </datalist>
+        <div className="relative mb-4">
+          <input
+            list="subject-options"
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none border border-neutral-600 focus:ring-2 ring-emerald-500/50"
+            placeholder="Start typing to choose…"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowSuggestions(false), 120)
+            }}
+          />
+
+          {showSuggestions && filteredSubjects.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md
+                          bg-neutral-800 border border-neutral-600 shadow-lg text-sm">
+              {filteredSubjects.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-800"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setTitle(opt);
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -607,8 +641,6 @@ export default function ClassroomTimetableDashboard() {
   const [importBusy, setImportBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
 
-  // Change Theme
-  const [whiteMode, setWhiteMode] = useState(false);
 
   useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
 
@@ -650,18 +682,49 @@ export default function ClassroomTimetableDashboard() {
     // allow selecting the same file again next time
     ev.target.value = "";
     if (!file) return;
-    
+
     // client guards
     const name = file.name?.toLowerCase() || "";
-    if (!name.endsWith(".csv")) { alert("Only .csv files are accepted."); return; }
-    if (file.type && !ALLOWED_TYPES.has(file.type)) { alert(`Unsupported type: ${file.type}`); return; }
-    if (file.size > MAX_BYTES) { alert("CSV too large (>1MB)."); return; }
+    if (!name.endsWith(".csv")) {
+      pushToast({
+        type: "error",
+        title: "Invalid file",
+        desc: "Only .csv files are accepted.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      });
+      return;
+    }
+    if (file.type && !ALLOWED_TYPES.has(file.type)) {
+      pushToast({
+        type: "error",
+        title: "Unsupported file type",
+        desc: `Got: ${file.type}. Please upload a CSV file.`,
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
+
+    if (file.size > MAX_BYTES) {
+      pushToast({
+        type: "error",
+        title: "File too large",
+        desc: "CSV is larger than 1 MB. Please upload a smaller file.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
 
 
     try {
       setImportBusy(true);
       const res = await importTimetableCSV(file);
-      alert(`Import success: replaced ${res?.replaced ?? 0} entries`);
+
+      pushToast({
+        type: "success",
+        title: "Timetable imported",
+        desc: `Import success: replaced ${res?.replaced ?? 0} entries.`,
+        icon: <FileDownloadIcon sx={{ fontSize: 20 }} />
+      });
 
       // refresh timetable from DB and rebuild events
       const [subj, tte] = await Promise.all([listSubjects(), listTimetable()]);
@@ -680,7 +743,14 @@ export default function ClassroomTimetableDashboard() {
       setEvents(evs);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Import failed");
+
+
+      pushToast({
+        type: "error",
+        title: "Import failed",
+        desc: e?.message || "Something went wrong while importing.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     } finally {
       setImportBusy(false);
     }
@@ -985,7 +1055,12 @@ export default function ClassroomTimetableDashboard() {
       setShowArchivedPopup(true);
     } catch (e) {
       console.error(e);
-      alert("Failed to load archived tasks: " + e.message);
+      pushToast({
+        type: "error",
+        title: "Failed to load archived task",
+        desc: e?.message || "Something went wrong while loading archived tasks.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     }
   }
 
@@ -1052,7 +1127,7 @@ export default function ClassroomTimetableDashboard() {
 
 
   return (
-    <div className={`min-h-screen ${whiteMode === false ? darkBG : whiteBG} ${whiteMode === false ? "text-white" : whiteText} `} style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
 
@@ -1090,8 +1165,6 @@ export default function ClassroomTimetableDashboard() {
         importBusy={importBusy}
         exportBusy={exportBusy}
         pushToast={pushToast}
-        whiteMode={whiteMode}
-        setWhiteMode={setWhiteMode}
       />
 
 
