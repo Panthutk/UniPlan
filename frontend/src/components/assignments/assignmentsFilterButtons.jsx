@@ -49,6 +49,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     };
 
     // Filter function logic
+
     const handlePriorityChange = (priority_value) => {
         setPriorityFilter(prev => prev === priority_value ? "" : priority_value);
     };
@@ -64,10 +65,12 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
     const ClearFilters = () => {
         setSearchTerm("");
+        setMoreThanZeroFilter(false);
         setPriorityFilter("");
         setSubjectFilter("");
         setDaysLeftFilter("");
         setOnTimetableFilter("");
+        setAppliedMoreThanZeroFilter(false);
         setAppliedPriorityFilter("");
         setAppliedSubjectFilter("");
         setAppliedDaysLeftFilter("");
@@ -234,45 +237,47 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                 </div>
                             </div>
 
-                        {/*filter by Lecture*/}
-                        <div className="flex flex-col items-start ps-2 pb-5">
-                            Task's Lecture on Timetable:
-                            <div className="flex flex-row items-center gap-3">
-                                {tableLinked.map((timetable_value) => (
-                                    <label
-                                        key={timetable_value.value}
-                                        className="flex items-center gap-1 cursor-pointer "
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={onTimetableFilter === timetable_value.value}
-                                            onChange={() => handleOnTimeableChange(timetable_value.value)}
-                                            className="rounded "
-                                        />
-                                        <span className="capitalize">{timetable_value.label}</span>
-                                    </label>
-                                ))}
+                            {/*filter by Lecture*/}
+                            <div className="flex flex-col items-start ps-2 pb-5">
+                                Task's Lecture on Timetable:
+                                <div className="flex flex-row items-center gap-3">
+                                    {tableLinked.map((timetable_value) => (
+                                        <label
+                                            key={timetable_value.value}
+                                            className="flex items-center gap-1 cursor-pointer "
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={onTimetableFilter === timetable_value.value}
+                                                onChange={() => handleOnTimeableChange(timetable_value.value)}
+                                                className="rounded "
+                                            />
+                                            <span className="capitalize">{timetable_value.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/*Apply filter button*/}
-                        <button
-                            className="m-3 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition"
-                            onClick={() => {
-                                setFilterNum(0);
-                                setAppliedPriorityFilter(priorityFilter);
-                                setAppliedSubjectFilter(subjectFilter);
-                                setAppliedDaysLeftFilter(daysLeftFilter);
-                                setAppliedOnTimetableFilter(onTimetableFilter);
-                                priorityFilter !== "" && setFilterNum((prev) => prev + 1);
-                                subjectFilter !== "" && setFilterNum((prev) => prev + 1);
-                                daysLeftFilter !== "" && setFilterNum((prev) => prev + 1);
-                                onTimetableFilter !== "" && setFilterNum((prev) => prev + 1);
-                                toggleFilter();
-                            }}
-                        >
-                            Apply Filter
-                        </button>
+                            {/*Apply filter button*/}
+                            <button
+                                className="m-3 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition"
+                                onClick={() => {
+                                    setFilterNum(0);
+                                    setAppliedMoreThanZeroFilter(moreThanZeroFilter);
+                                    setAppliedPriorityFilter(priorityFilter);
+                                    setAppliedSubjectFilter(subjectFilter);
+                                    setAppliedDaysLeftFilter(daysLeftFilter);
+                                    setAppliedOnTimetableFilter(onTimetableFilter);
+                                    moreThanZeroFilter !== false && setFilterNum((prev) => prev + 1);
+                                    priorityFilter !== "" && setFilterNum((prev) => prev + 1);
+                                    subjectFilter !== "" && setFilterNum((prev) => prev + 1);
+                                    daysLeftFilter !== "" && setFilterNum((prev) => prev + 1);
+                                    onTimetableFilter !== "" && setFilterNum((prev) => prev + 1);
+                                    toggleFilter();
+                                }}
+                            >
+                                Apply Filter
+                            </button>
 
                         </div>
                         )}
