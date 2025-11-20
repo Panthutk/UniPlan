@@ -177,7 +177,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     return (
         <div
             key={task.id}
-            className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-hidden`}
+            className={`my-3 mr-4 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-y-hidden scrollbar-transparent`}
             style={ringStyle}
         >
             {/* Left label (day color only when linked) */}
