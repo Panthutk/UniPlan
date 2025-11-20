@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import { AssignmentsCard } from "./assignmentsCard.jsx";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
@@ -29,7 +29,7 @@ export function TaskGroupBy(filteredTasks, getKey) {
 }
 
 // Group Tasks Element Logic
-export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask, pushToast}) {
+export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask, numberOfTasks, pushToast}) {
     const [isOpen, setIsOpen] = useState(true);
 
     function getColor(label) {
@@ -41,6 +41,10 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
         if (subjectEntry?.color_hex) return subjectEntry.color_hex;
         return defaultGrayColor;
     }
+
+    useEffect(() => {
+        setIsOpen(true);
+    }, [GroupedTasks.length]);
 
     const color = getColor(label);
 
@@ -68,7 +72,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
                 <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
                     {label}
                     {label !== "" && (
-                        <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
+                        <span className="text-gray-400 text-base px-1">({numberOfTasks})</span>
                     )}
                 </h2>
 

@@ -11,7 +11,7 @@ import SchoolIcon from '@mui/icons-material/School';
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
-import { colorForDay } from "./utils/color.js";
+import { colorForDay, CreateNewColorHex } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
@@ -45,10 +45,6 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
-function CreateNewColorHex() {
-  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
-  return `#${randomColor.padStart(6, "0")}`;
-}
 
 
 // UI uses 0=Mon..6=Sun, backend uses 0=Sun..6=Sat
@@ -153,6 +149,20 @@ async function syncAssignmentsToTasks(assignments, setSubjects) {
 }
 
 
+async function SetupTasks(courses, subsByCourse, setSubjects) {
+    // Build live assignments from classroom API
+    const liveAssignments = buildAssignments(courses, subsByCourse);
+
+    // push to Task DB
+    if (liveAssignments?.length) {
+        await syncAssignmentsToTasks(liveAssignments, setSubjects);
+    }
+
+    // Get task data from DB
+    const tasksObject = await get("/api/tasks/");
+    return tasksObject;
+}
+
 
 
 
@@ -236,23 +246,6 @@ function buildAssignments(courses, subsByCourse) {
 
   return items;
 }
-
-async function SetupTasks(courses, subsByCourse, setSubjects) {
-  // Build live assignments from classroom API
-  const liveAssignments = buildAssignments(courses, subsByCourse);
-
-  // push to Task DB
-  if (liveAssignments?.length) {
-    await syncAssignmentsToTasks(liveAssignments, setSubjects);
-  }
-
-  // Get task data from DB
-  const tasksObject = await get("/api/tasks/");
-  return tasksObject;
-}
-
-
-
 
 
 

@@ -48,7 +48,6 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     const [groupByOption, setGroupByOption] = useState("none");
 
     //Add table link
-
     const TaskObjects_tableLinked = useMemo(() => {
         const object_base = reverseSort ? ReverseTasks : TaskObjects;
         return annotateAssignmentsWithEvents(object_base, events, SubjectMap);
@@ -181,6 +180,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                         onUpdateTask={onUpdateTask}
                                         onArchiveTask={onArchiveTask}
                                         events={events}
+                                        numberOfTasks={tasks.length}
                                         pushToast={pushToast}
                                     />
                                 </div>
@@ -194,7 +194,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                                 <button
                                                     onClick={() => setVisibleCount(prev => prev + 5)}
                                                     className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
-                                       text-white text-sm font-semibold transition-all duration-300"
+                                                    text-white text-sm font-semibold transition-all duration-300"
                                                 >
                                                     Show more ({tasks.length - visibleCount} left)
                                                 </button>
@@ -205,7 +205,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                                 <button
                                                     onClick={() => setVisibleCount(5)}
                                                     className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
-                                       text-white text-sm font-semibold transition-all duration-300"
+                                                  text-white text-sm font-semibold transition-all duration-300"
                                                 >
                                                     Show less
                                                 </button>

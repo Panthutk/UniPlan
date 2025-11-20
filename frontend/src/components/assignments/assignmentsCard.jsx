@@ -110,7 +110,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
         }
 
         const offset = Number(choice ?? 3); // default 3 days
-        console.log(choice);
         const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
         openConfirm({
@@ -291,7 +290,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
                         <button
                             onClick={() => {
-                                console.log(scheduled);
                                 if (scheduled === true) {
                                     cancelReminder(reminder, task);
                                 } else {

@@ -10,11 +10,11 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                 setAppliedOnTimetableFilter, reverseSort, setReverseSort, setAppliedMoreThanZeroFilter }) {
 
     // Filter Hooks
+    const [onTimetableFilter, setOnTimetableFilter] = useState(false);
     const [moreThanZeroFilter, setMoreThanZeroFilter] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState("");
     const [subjectFilter, setSubjectFilter] = useState("");
     const [daysLeftFilter, setDaysLeftFilter] = useState("");
-    const [onTimetableFilter, setOnTimetableFilter] = useState("");
     const [filterNum, setFilterNum] = useState(0);
 
     // Direction of dropbox
@@ -31,7 +31,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                 const rect = filterBtnRef.current.getBoundingClientRect();
                 const spaceBelow = pageHeight - (window.scrollY + rect.bottom);
                 const spaceAbove = window.scrollY + rect.top;
-                const expectedHeight = 450; // estimate filter-button dropbox height
+                const expectedHeight = 400; // estimate filter-button dropbox height
 
                 setButtonOpenUpward(spaceBelow < expectedHeight && spaceAbove > spaceBelow);
                 setIsOpenGroup(false);
@@ -43,7 +43,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const [isOpenGroup, setIsOpenGroup] = useState(false);
     const toggleGroup = () => {
         setIsOpenGroup(prev => {
-            if (!prev) setIsOpenFilter(false); // if opening group, close main
+            if (!prev) setIsOpenFilter(false);
             return !prev;
         });
     };
@@ -59,9 +59,9 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
     const handleDaysLeftChange = (daysLeft_value) => {
         setDaysLeftFilter(prev => prev === daysLeft_value ? "" : daysLeft_value);
     };
-    const handleOnTimeableChange = (timetable_value) => {
-        setOnTimetableFilter(prev => prev === timetable_value ? "" : timetable_value);
-    };
+    // const handleOnTimeableChange = (timetable_value) => {
+    //     setOnTimetableFilter(prev => prev === timetable_value ? "" : timetable_value);
+    // };
 
     const ClearFilters = () => {
         setSearchTerm("");
@@ -69,7 +69,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
         setPriorityFilter("");
         setSubjectFilter("");
         setDaysLeftFilter("");
-        setOnTimetableFilter("");
+        setOnTimetableFilter(false);
         setAppliedMoreThanZeroFilter(false);
         setAppliedPriorityFilter("");
         setAppliedSubjectFilter("");
@@ -139,7 +139,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
             </div>
 
 
-            <div className="flex flex-row  items-center justify-start flex-wrap gap-1.5  ">
+            <div className="flex flex-row  items-center justify-start flex-wrap gap-1.5  text-sm ">
                 {/*Filter Button*/}
                 <div className="relative inline-block ">
                     <button
@@ -160,17 +160,34 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                         <div className= {` mt-1.5 flex flex-col absolute left-1/2 -translate-x-1/2 w-[300px] bg-[#2e2e2e] border border-gray-700 rounded-lg shadow-lg z-10 ${buttonOpenUpward ? "bottom-full mb-2" : "top-full mt-2"} `}
                              onClick={(e) => e.stopPropagation()}>
 
+                            {/*filter by Lecture*/}
+                            <div className="flex flex-row items-start ps-2 pt-4 ">
+                                Show Tasks with Lecture:
+                                <div className="ml-2">
+                                    <div
+                                        onClick={() => setOnTimetableFilter(!onTimetableFilter)}
+                                        className={`w-9 h-4 flex items-center rounded-full cursor-pointer transition 
+                                        ${onTimetableFilter ? "bg-[#7EA07A]" : "bg-gray-400"}`}
+                                    >
+                                        <div
+                                            className={`w-2.5 h-2.5 bg-white rounded-full transform transition 
+                                          ${onTimetableFilter ? "translate-x-6" : "translate-x-1"}`}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             {/*filter by days left*/}
-                            <div className="flex items-center ps-2 pb-2 pt-3 ">
-                                Days Left more than 0
+                            <div className="flex items-center ps-2 pt-2 ">
+                                Show Tasks with days left:
                                 <div className="ml-2">
                                     <div
                                         onClick={() => setMoreThanZeroFilter(!moreThanZeroFilter)}
-                                        className={`w-11 h-5 flex items-center rounded-full cursor-pointer transition 
-                                        ${moreThanZeroFilter ? "bg-blue-500" : "bg-gray-400"}`}
+                                        className={`w-9 h-4 flex items-center rounded-full cursor-pointer transition 
+                                        ${moreThanZeroFilter ? "bg-[#7EA07A]" : "bg-gray-400"}`}
                                     >
                                         <div
-                                            className={`w-4 h-4 bg-white rounded-full transform transition 
+                                            className={`w-2.5 h-2.5 bg-white rounded-full transform transition 
                                           ${moreThanZeroFilter ? "translate-x-6" : "translate-x-1"}`}
                                         />
                                     </div>
@@ -179,8 +196,8 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
 
 
                             {/*filter by due date*/}
-                            <div className="flex flex-col items-start ps-2 pb-5 ">
-                                Due date in:
+                            <div className="flex flex-col items-start ps-2 pt-2 ">
+                                Due in:
                                 {due_date.map((daysLeft_value) => (
                                     <label
                                         key={daysLeft_value.value}
@@ -190,25 +207,27 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                             type="checkbox"
                                             checked={daysLeftFilter === daysLeft_value.value}
                                             onChange={() => handleDaysLeftChange(daysLeft_value.value)}
-                                            className="rounded text-pink-500 focus:ring-pink-400"
+                                            className="rounded "
                                         />
-                                        <span className="capitalize">{daysLeft_value.label}</span>
+                                        <span className="capitalize px-1 text-[13px] text-white/70">{daysLeft_value.label}</span>
                                     </label>
                                 ))}
                             </div>
 
                             {/*filter by subject*/}
-                            <div className="flex flex-col items-start ps-2 pb-5">
-                                Subject:
+                            <div className="flex flex-col items-start ps-2 pt-2 ">
+                                <span className="text-sm">Subject: </span>
                                 <select
                                     value={subjectFilter}
                                     onChange={(e) => handleSubjectChange(e.target.value)}
-                                    className="w-[280px] max-w-xs truncate rounded-md border border-gray-500 bg-[#4c4949] px-3 py-2 text-sm shadow-sm focus:border-gray-300"
+                                    className="w-[280px] max-w-xs truncate rounded-md border border-gray-500 bg-[#4c4949] px-1 py-2 text-[13px] shadow-sm focus:border-gray-300"
                                 >
                                     <option value="" disabled hidden>Select subject</option>
                                     {SubjectObjects.map((subject_value) => (
                                         <option key={subject_value.id} value={subject_value.id} >
-                                            {subject_value.name}
+                                            {subject_value.name.length > 40
+                                                ? subject_value.name.slice(0, 40) + "..."
+                                                : subject_value.name}
                                         </option>
                                     ))}
                                 </select>
@@ -216,7 +235,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                             </div>
 
                             {/*filter by priority */}
-                            <div className="flex flex-col items-start ps-2 pb-5">
+                            <div className="flex flex-col items-start ps-2 pt-3 ">
                                 Priority:
                                 <div
                                     className="flex flex-rol gap-3"
@@ -237,30 +256,9 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                 </div>
                             </div>
 
-                            {/*filter by Lecture*/}
-                            <div className="flex flex-col items-start ps-2 pb-5">
-                                Task's Lecture on Timetable:
-                                <div className="flex flex-row items-center gap-3">
-                                    {tableLinked.map((timetable_value) => (
-                                        <label
-                                            key={timetable_value.value}
-                                            className="flex items-center gap-1 cursor-pointer "
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={onTimetableFilter === timetable_value.value}
-                                                onChange={() => handleOnTimeableChange(timetable_value.value)}
-                                                className="rounded "
-                                            />
-                                            <span className="capitalize">{timetable_value.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
                             {/*Apply filter button*/}
                             <button
-                                className="m-3 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition"
+                                className="mt-5 m-3 px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition"
                                 onClick={() => {
                                     setFilterNum(0);
                                     setAppliedMoreThanZeroFilter(moreThanZeroFilter);
@@ -268,11 +266,11 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                                     setAppliedSubjectFilter(subjectFilter);
                                     setAppliedDaysLeftFilter(daysLeftFilter);
                                     setAppliedOnTimetableFilter(onTimetableFilter);
+                                    onTimetableFilter !== false && setFilterNum((prev) => prev + 1);
                                     moreThanZeroFilter !== false && setFilterNum((prev) => prev + 1);
                                     priorityFilter !== "" && setFilterNum((prev) => prev + 1);
                                     subjectFilter !== "" && setFilterNum((prev) => prev + 1);
                                     daysLeftFilter !== "" && setFilterNum((prev) => prev + 1);
-                                    onTimetableFilter !== "" && setFilterNum((prev) => prev + 1);
                                     toggleFilter();
                                 }}
                             >
@@ -336,7 +334,7 @@ export function TaskFilterElements({ searchTerm, setSearchTerm, groupByOption, s
                 {(filterNum !== 0 || searchTerm !== "" || groupByOption !== "none") && (
                     <button
                         onClick={ClearFilters}
-                        className="text-[#b7b7b7] hover:text-[#dedada] underline ml-2 pt-5 text-sm"
+                        className="text-[#b7b7b7] hover:text-[#dedada] underline ml-2 pt-5 text-xs"
                     >
                         Clear all
                     </button>
@@ -354,7 +352,7 @@ function formatFilters(choice) {
         <div className="flex items-center gap-2 text-md">
             <span>Filter</span>
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-            <span className="text-[#69a064] text-[15px]">{choice} applied</span>
+            <span className="text-[#69a064] text-[14px]">{choice} applied</span>
         </div>
     );
 }
@@ -364,7 +362,7 @@ function formatGroupBy(choice) {
         <div className="flex items-center gap-2 text-md">
             <span>Group by</span>
             <div className="w-[1px] h-5 bg-[#759072]"></div>
-            <span className="text-[#69a064] text-[15px] capitalize">{choice}</span>
+            <span className="text-[#69a064] text-[14px] capitalize">{choice}</span>
         </div>
     );
 }
