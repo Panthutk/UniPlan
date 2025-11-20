@@ -271,7 +271,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                     <div className="flex items-center gap-2">
                         <label className="text-xs opacity-75">Remind me:</label>
                         <select
-                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
+                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none "
                             value={(choice?? 3)}
                             onChange={(e) => setChoice(Number(e.target.value))}
                             disabled={!task.due_at || days_left < 0 || scheduled === true || pending === true}
@@ -293,32 +293,40 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             }}
                             disabled={!task.due_at || days_left < 0 || pending === true}
                             className={[
-                                "group relative text-xs py-1.5 rounded-full font-semibold transition-all duration-150",
+                                "group relative flex items-center justify-center text-xs py-1.5 px-3 rounded-full font-semibold transition-colors duration-150",
                                 scheduled === true
-                                    ? days_left > 0? "px-3 hover:px-0 bg-white/10  hover:bg-[#6D2B2C] cursor-default "  : "px-3 bg-white/5 text-[#afafaf] cursor-default "
-                                    : days_left > 0? "px-3 bg-emerald-800 hover:bg-emerald-900 " : "px-3 bg-white/5 text-[#afafaf] cursor-default ",
+                                    ? days_left > 0
+                                        ? "bg-white/10 hover:bg-transparent"
+                                        : "bg-white/5 text-[#afafaf]"
+                                    : days_left > 0
+                                        ? "bg-emerald-800 hover:bg-emerald-900"
+                                        : "bg-white/5 text-[#afafaf]"
                             ].join(" ")}
                             title={!task.due_at ? "No due date" : (scheduled === true ? "Already scheduled" : "Schedule email reminder")}
                         >
-                            {scheduled === true? (
+                            {scheduled ? (
                                 days_left > 0 ? (
-                                    <span className="inline-block">
+                                    <span className="relative block w-[60px] text-center">
                                         {/* normal text */}
-                                        <span className="group-hover:opacity-0">
-                                          Scheduled
+                                        <span className="transition-opacity duration-150 group-hover:opacity-0">
+                                            Scheduled
                                         </span>
 
                                         {/* hover text */}
-                                        <span className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 ">
-                                          Cancel
+                                        <span
+                                            className="
+                                              absolute -left-3 top-1/2 -translate-y-1/2
+                                              bg-red-700 text-white text-xs font-semibold
+                                              px-2.5 py-1.5 rounded-full
+                                              opacity-0 group-hover:opacity-100
+                                              transition-all duration-150
+                                            "
+                                        >
+                                            Cancel
                                         </span>
-                                    </span>
+                                      </span>
                                 ) : (
-                                    <span className="inline-block">
-                                        <span>
-                                          Scheduled
-                                        </span>
-                                    </span>
+                                    "Scheduled"
                                 )
                             ) : pending ? (
                                 "Scheduling..."
