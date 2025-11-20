@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export default function ConfirmModal({
     open,
@@ -11,7 +12,6 @@ export default function ConfirmModal({
     onConfirm,
     onCancel,
 }) {
-    const dialogRef = useRef(null);
     const confirmBtnRef = useRef(null);
 
     useEffect(() => {
@@ -30,21 +30,27 @@ export default function ConfirmModal({
         if (e.key === "Escape" && !loading) onCancel?.();
     };
 
-    return (
+
+    const modalBody = (
         <div
-            className="fixed inset-0 z-[10000]"
+            className="fixed inset-0 z-[10000] flex items-center justify-center"
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
             aria-describedby="confirm-desc"
             onKeyDown={onKeyDown}
         >
-            <div className="absolute inset-0 bg-black/60" onClick={handleBackdrop} />
+            {/* Backdrop overlay*/}
             <div
-                ref={dialogRef}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-                        w-[min(520px,92vw)] rounded-2xl bg-neutral-900 text-white p-5 shadow-xl"
+                className="absolute inset-0 bg-black/60"
+                onClick={handleBackdrop}
+            />
+
+            {/* Dialog window*/}
+            <div
+                className="relative z-10 w-[min(520px,92vw)] rounded-2xl bg-neutral-900 text-white p-5 shadow-xl"
             >
+
                 <div className="text-lg font-semibold mb-1" id="confirm-title">
                     {title}
                 </div>
@@ -68,13 +74,14 @@ export default function ConfirmModal({
                             {cancelLabel}
                         </button>
                     ) : null}
+
                     <button
                         ref={confirmBtnRef}
                         onClick={onConfirm}
                         disabled={loading}
-                        className={`px-6 py-2 rounded-full font-semibold border border-emerald-500
-                                bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-400/60 
-                                disabled:opacity-60`}
+                        className="px-6 py-2 rounded-full font-semibold border border-emerald-500
+                                    bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-2
+                                    focus-visible:ring-emerald-400/60 disabled:opacity-60"
                     >
                         {confirmLabel}
                     </button>
@@ -82,4 +89,6 @@ export default function ConfirmModal({
             </div>
         </div>
     );
+
+    return createPortal(modalBody, document.body);
 }

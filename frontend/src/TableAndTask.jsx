@@ -504,7 +504,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-full bg-neutral-700 hover:bg-neutral-600 font-semibold"
+              className="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-700 font-semibold"
             >
               Cancel
             </button>
@@ -1280,7 +1280,7 @@ export default function ClassroomTimetableDashboard() {
                               className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 font-semibold"
                               title="Open in Google Classroom"
                             >
-                              <SchoolIcon/>
+                              <SchoolIcon fontSize="inherit" className="text-xs" />
                               Classroom
                             </a>
                           )}
