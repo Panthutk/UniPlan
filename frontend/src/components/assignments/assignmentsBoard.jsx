@@ -1,23 +1,23 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState} from "react";
 import { TaskFilterElements } from "./assignmentsFilterButtons.jsx";
 import { AssignmentsGroup, TaskGroupBy } from "./assignmentsGroup.jsx";
 import { colorForDay } from "/src/utils/color.js"
-import {FULL_DAYS} from "/src/utils/time.js";
+import { FULL_DAYS } from "/src/utils/time.js";
 
 
-export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events }) {
+export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events, pushToast, }) {
 
-    // console.log("-------------------------------------------------------");
-    // console.log(TaskObjects);
-    // console.log(SubjectObjects);
-    // console.log("-------------------------------------------------------");
 
-    //Legend Deadline indicator (Array)
+    const ReverseTasks = useMemo(() => {
+        return [...TaskObjects].reverse();
+    }, [TaskObjects]);
+
     const legends = [
         { color: "bg-red-600", label: "less than 3 days" },
         { color: "bg-amber-400", label: "less than 7 days" },
         { color: "bg-green-400", label: "more than 7 days" },
     ];
+
     // Make Subject ID to be Key for easier to use Subject data
     const SubjectMap = useMemo(() => {
         const map = {};
@@ -28,24 +28,31 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     }, [SubjectObjects]);
 
 
+    const [reverseSort, setReverseSort] = useState(false);
+
     //Search Bar (React Hook)
     const [searchTerm, setSearchTerm] = useState("");
 
     //5 Filters option (React Hook)
+    const [appliedMoreThanZeroFilter, setAppliedMoreThanZeroFilter] = useState(false);
     const [appliedPriorityFilter, setAppliedPriorityFilter] = useState("");
     const [appliedSubjectFilter, setAppliedSubjectFilter] = useState("");
-    const [appliedSourceFilter, setAppliedSourceFilter] = useState("");
     const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
     const [appliedOnTimetableFilter, setAppliedOnTimetableFilter] = useState("");
 
+
+    //visible only 5 tasks at first
+    const [visibleCount, setVisibleCount] = useState(5);
+
     //Group by dropdown (React Hook)
-    const [groupByOption, setGroupByOption] = useState("");
+    const [groupByOption, setGroupByOption] = useState("none");
 
     //Add table link
-    const TaskObjects_tableLinked = useMemo(
-        () => annotateAssignmentsWithEvents(TaskObjects, events, SubjectMap),
-        [TaskObjects, events, SubjectMap]
-    );
+    const TaskObjects_tableLinked = useMemo(() => {
+        const object_base = reverseSort ? ReverseTasks : TaskObjects;
+        return annotateAssignmentsWithEvents(object_base, events, SubjectMap);
+    }, [reverseSort, ReverseTasks, TaskObjects, events, SubjectMap]);
+
 
     //Data filtered by Search Bar & Filter Button
     const filteredTasks = useMemo(() => {
@@ -58,15 +65,16 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
             );
         }
 
+        if (appliedMoreThanZeroFilter === true) {
+            result = result.filter(task => task.days_left > 0);
+        }
+
         // must match all the selected to show the result
         if (appliedPriorityFilter) {
             result = result.filter(task => task.priority === appliedPriorityFilter);
         }
         if (appliedSubjectFilter) {
             result = result.filter(task => task.subject === appliedSubjectFilter);
-        }
-        if (appliedSourceFilter) {
-            result = result.filter(task => task.source === appliedSourceFilter);
         }
         if (appliedDaysLeftFilter) {
             if (appliedDaysLeftFilter < 1000) {
@@ -84,7 +92,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         result = result.filter(task => !task.is_archived);
 
         return result;
-    }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter, appliedSourceFilter,
+    }, [TaskObjects_tableLinked, searchTerm, appliedMoreThanZeroFilter, appliedPriorityFilter, appliedSubjectFilter,
         appliedDaysLeftFilter, appliedOnTimetableFilter]);
 
 
@@ -124,48 +132,96 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     }, [filteredTasks, groupByOption, SubjectMap]);
 
     return (
-        <div>
+        <div className="pt-8 md:pt-12">
 
             {/*Utility buttons: Search bar + Filter + Group*/}
             <TaskFilterElements
-                subjectOptions = {subjectOptions}
+                subjectOptions={subjectOptions}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 groupByOption={groupByOption}
                 setGroupByOption={setGroupByOption}
                 SubjectObjects={SubjectObjects}
+                setAppliedMoreThanZeroFilter={setAppliedMoreThanZeroFilter}
                 setAppliedPriorityFilter={setAppliedPriorityFilter}
                 setAppliedSubjectFilter={setAppliedSubjectFilter}
-                setAppliedSourceFilter={setAppliedSourceFilter}
                 setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
                 setAppliedOnTimetableFilter={setAppliedOnTimetableFilter}
+                reverseSort={reverseSort}
+                setReverseSort={setReverseSort}
             />
 
 
             {/* Colors legend : tell how far from deadline*/}
-            <div className="flex flex-col md:flex-row items-center gap-3 md:gap-5">
+            <div className="flex flex-col md:flex-row items-center pt-[5px] gap-3 md:gap-5">
                 {legends.map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <span className={`h-3 w-3 rounded-full ${item.color}`}/>
+                        <span className={`h-3 w-3 rounded-full ${item.color}`} />
                         <span className="text-sm font-medium">{item.label}</span>
                     </div>
                 ))}
             </div>
 
             <div>
-                {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => (
-                    <AssignmentsGroup
-                        key={label}
-                        label={label}
-                        GroupedTasks={tasks}
-                        SubjectMap={SubjectMap}
-                        onUpdateTask={onUpdateTask}
-                        onArchiveTask={onArchiveTask}
-                        events={events}
-                    />
-                ))}
-            </div>
+                <div className="mt-4 overflow-x-auto md:overflow-x-visible scrollbar-transparent scrollbar-top">
+                    <div className="min-w-[720px] md:min-w-0">
+                        {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => {
+                            // Show only visibleCount items
+                            const visibleTasks = tasks.slice(0, visibleCount);
 
+                        return (
+                            <div key={label}>
+                                {/* Animated wrapper */}
+                                <div className="space-y-3 transition-all duration-500">
+                                    <AssignmentsGroup
+                                        label={label}
+                                        GroupedTasks={visibleTasks}
+                                        SubjectMap={SubjectMap}
+                                        onUpdateTask={onUpdateTask}
+                                        onArchiveTask={onArchiveTask}
+                                        events={events}
+                                        numberOfTasks={tasks.length}
+                                        pushToast={pushToast}
+                                    />
+                                </div>
+
+                                    {/* Buttons Section */}
+                                    { tasks.length > 5 && (
+                                        <div className="w-full flex justify-center mt-2 mb-2.5 gap-3">
+
+                                            {/* SHOW MORE */}
+                                            {visibleCount < tasks.length && (
+                                                <button
+                                                    onClick={() => setVisibleCount(prev => prev + 5)}
+                                                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
+                                                    text-white text-sm font-semibold transition-all duration-300"
+                                                >
+                                                    Show more ({tasks.length - visibleCount} left)
+                                                </button>
+                                            )}
+
+                                            {/* SHOW LESS */}
+                                            {visibleCount > 5 && (
+                                                <button
+                                                    onClick={() => setVisibleCount(5)}
+                                                    className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
+                                                  text-white text-sm font-semibold transition-all duration-300"
+                                                >
+                                                    Show less
+                                                </button>
+                                            )}
+
+                                        </div>
+                                    )}
+
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                </div>
+
+            </div>
 
         </div>
     );

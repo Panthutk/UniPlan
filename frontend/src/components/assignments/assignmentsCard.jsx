@@ -1,10 +1,15 @@
-import React, { useState } from "react";
-import { post } from "/src/utils/api.js";
+import React, { useState, useEffect } from "react";
+import { post, del, get } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
-import ConfirmModal from "./assignmentConfirmModal";
+import SchoolIcon from '@mui/icons-material/School';
+import ConfirmModal from "./assignmentConfirmModal.jsx";
+import ArchiveIcon from '@mui/icons-material/Archive';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import EventIcon from '@mui/icons-material/Event';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
 
-export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask }) {
+export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast = () => { } }) {
 
     const subject = SubjectMap[task.subject];
 
@@ -18,16 +23,46 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
     const [dayBg, dayRing] = getTasks_Ring_BG_Color(days_left);
 
-    const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2px ${color}` } : {};
+    const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2.5px ${color}` } : {};
     const ringClass = groupLabel === "" ? dayRing : "";
 
+    const [choice, setChoice] = useState(3);       // { [assignmentId]: 1|3|7 }
+    const [pending, setPending] = useState(false);     // { [assignmentId]: boolean }
+    const [scheduled, setScheduled] = useState(false); // { [assignmentId]: true }
+    const [reminder, setReminder] = useState(null);
 
-    const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
-    const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
-    const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+
+    useEffect(() => {
+        (async () => {
+            const all = await getReminder();
+            const r = all.find(x => x.task === task.id);
+            if (r && r.status === "sent") {
+                cancelReminder(r, task);
+            }
+            else {
+                setReminder(r);
+                setScheduled(!!r);
+            }
+        })();
+    }, [task]);
+
+
 
     // parse due date
-    const format_due = task.due_at instanceof Date ? task.due_at : new Date(task.due_at);
+    // Force +7 hours (Bangkok)
+    const format_due = (() => {
+        if (!task.due_at) return null;
+
+        const s = String(task.due_at).trim();
+        if (!s) return null;
+
+        try {
+            const d = /(?:Z|[+\-]\d{2}:?\d{2})$/i.test(s) ? new Date(s) : new Date(s + "Z");
+            return isNaN(+d) ? null : new Date(d.getTime() + 7 * 60 * 60 * 1000);
+        } catch {
+            return null;
+        }
+    })();
 
 
     // get object that has the same key with this task
@@ -48,7 +83,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     })();
 
 
-    const scheduleReminder = async (task) => {
+    const scheduleReminder = async () => {
         if (!task?.due_at) {
             openConfirm({
                 title: "No due date",
@@ -74,7 +109,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             return;
         }
 
-        const offset = Number(choice[id] ?? 3); // default 3 days
+        const offset = Number(choice ?? 3); // default 3 days
         const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
         openConfirm({
@@ -86,26 +121,67 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                 setConfirm((s) => ({ ...s, loading: true }));
 
                 try {
-                    setPending(p => ({ ...p, [id]: true }));
-                    await createReminder({
-                        assignmentId: id,
-                        remindAtISO: remindAt.toISOString(),
-                        offsetDays: offset,
+                    await postReminder(id, remindAt, offset);
+
+                    pushToast({
+                        type: "success",
+                        title: "Reminder scheduled",
+                        desc: `We'll remind you ${offset} day(s) before the due date for "${task.title}".`,
+                        icon: <EventIcon sx={{ fontSize: 20 }} />,
                     });
-                    setScheduled(s => ({ ...s, [id]: true }));
                 } catch (e) {
-                    console.error(e);
+
+                    pushToast({
+                        type: "error",
+                        title: "Failed to schedule reminder",
+                        desc: e?.message || "Something went wrong while scheduling the reminder.",
+                        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+                    });
                 } finally {
-                    setPending(p => ({ ...p, [id]: false }));
+                    setPending(false);
                     closeConfirm();
                 }
             },
         });
     };
 
+    async function postReminder(id, remindAt, offset) {
+        setPending(true);
+        try {
+            await createReminder({
+                assignmentId: id,
+                remindAtISO: remindAt.toISOString(),
+                offsetDays: offset,
+            });
+            const all = await getReminder();
+            const r = all.find(remindObject => remindObject.task === task.id);
+            setReminder(r);
+            setScheduled(!!r);
+        } finally {
+            setPending(false);
+        }
+    }
 
+    async function cancelReminder(del_reminder, _task) {
+        setPending(true);
+        try {
+            await del(`/api/reminders/${del_reminder.id}/`);
+            const all = await getReminder();
+            const r = all.find(remindObject => remindObject.task === _task.id);
 
+            setReminder(r);
+            setScheduled(!!r);
 
+            pushToast({
+                type: "success",
+                title: "Reminder cancelled",
+                desc: `The reminder for "${_task.title}" has been cancelled.`,
+                icon: <EventBusyIcon sx={{ fontSize: 20 }} />
+            });
+        } finally {
+            setPending(false);
+        }
+    }
 
 
     const [confirm, setConfirm] = useState({
@@ -124,7 +200,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     return (
         <div
             key={task.id}
-            className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-hidden`}
+            className={`my-3 mr-4 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-y-hidden scrollbar-transparent`}
             style={ringStyle}
         >
             {/* Left label (day color only when linked) */}
@@ -138,7 +214,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                     <div className="text-sm opacity-80 truncate">
                         <span className="tracking-wider">{subject.name || "Loading..."}</span>
                         {task.assignment_alt_link && linked === true ? (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-neutral-800 border border-white/10">
+                            <span className="ml-2 text-xs px-2 py-0.4 rounded-full bg-neutral-800 border border-white/10">
                                 {lectureText && (
                                     <span className="ml-2 text-xs opacity-70">{lectureText}</span>
                                 )}
@@ -161,10 +237,9 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                 {format_due && (
                     <div className="mt-1 text-xs opacity-80">
                         <span className="font-semibold">Due:</span>{" "}
-                        {fmtDueDateObj(format_due)}
+                        {fmtDueDateObj(format_due)} <span className="opacity-60">(GMT+7)</span>
                     </div>
                 )}
-
 
 
                 {/*Classroom link button*/}
@@ -174,11 +249,10 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             href={task.assignment_alt_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                            className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-[#18A15F] hover:bg-green-700 font-semibold"
                             title="Open in Classroom"
                         >
-                            {/*<span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />*/}
-                            <span> 👨🏻‍💻 </span>
+                            <span> <SchoolIcon fontSize="small" /> </span>
                             Classroom
                         </a>
                     )}
@@ -203,28 +277,76 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                     <div className="flex items-center gap-2">
                         <label className="text-xs opacity-75">Remind me:</label>
                         <select
-                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-                            value={(choice[task.id] ?? 3)}
-                            onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+                            className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none "
+                            value={(choice?? 3)}
+                            onChange={(e) => setChoice(Number(e.target.value))}
+                            disabled={!task.due_at || days_left < 0 || scheduled === true || pending === true}
                             title={task.due ? "Choose how many days before due date" : "No due date"}
                         >
                             <option value={1}>1 day before</option>
                             <option value={3}>3 days before</option>
                             <option value={7}>7 days before</option>
                         </select>
+
                         <button
-                            onClick={() => scheduleReminder(task)}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+                            onClick={() => {
+                                if (scheduled === true) {
+                                    cancelReminder(reminder, task);
+                                } else {
+                                    scheduleReminder();
+                                }
+                            }}
+                            disabled={!task.due_at || days_left < 0 || pending === true}
                             className={[
-                                "text-xs px-3 py-1.5 rounded-full font-semibold",
-                                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-700 hover:bg-emerald-800",
+                                "group relative flex items-center justify-center text-xs py-1.5 px-3 rounded-full font-semibold transition-colors duration-150",
+                                scheduled === true
+                                    ? days_left > 0
+                                        ? "bg-white/10 hover:bg-transparent"
+                                        : "bg-white/5 text-[#afafaf]"
+                                    : days_left > 0
+                                        ? "bg-emerald-800 hover:bg-emerald-900"
+                                        : "bg-white/5 text-[#afafaf]"
                             ].join(" ")}
-                            title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
+                            title={!task.due_at ? "No due date" : (scheduled === true ? "Already scheduled" : "Schedule email reminder")}
                         >
-                            {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
+                            {scheduled ? (
+                                days_left > 0 ? (
+                                    <span className="relative block w-[60px] text-center ">
+                                        {/* normal text */}
+                                        <span
+                                            className="
+                                            transition-all duration-150
+                                            group-hover:opacity-0
+                                            group-hover:scale-90
+                                            group-hover:-translate-x-1"
+                                        >
+                                            Scheduled
+                                        </span>
+
+                                        {/* hover text */}
+                                        <span
+                                            className="
+                                            absolute -left-3 top-1/2 -translate-y-1/2
+                                            bg-red-700 text-white text-xs font-semibold
+                                            px-3 py-1.5 rounded-full
+                                            opacity-0 group-hover:opacity-100
+                                            transition-all duration-150"
+                                        >
+                                            Cancel
+                                        </span>
+                                      </span>
+                                ) : (
+                                    "Scheduled"
+                                )
+                            ) : pending ? (
+                                "Scheduling..."
+                            ) : (
+                                "Remind"
+                            )}
                         </button>
+
                     </div>
+
                     {/*Archive button*/}
                     <button
                         onClick={async () => {
@@ -238,8 +360,22 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                                         await onArchiveTask(task.id);
                                         onUpdateTask(task.id, { is_archived: true });
 
+                                        pushToast({
+                                            type: "success",
+                                            title: "Task archived",
+                                            desc: `"${task.title}" has been moved to Archive.`,
+                                            icon: <ArchiveIcon sx={{ fontSize: 20 }} />,
+                                        });
+
                                     } catch (e) {
-                                        console.error(e);
+
+
+                                        pushToast({
+                                            type: "error",
+                                            title: "Archive failed",
+                                            desc: e?.message || "Something went wrong while archiving this task.",
+                                            icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+                                        })
 
                                     } finally {
                                         closeConfirm();
@@ -249,7 +385,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             });
 
                         }}
-                        className="ml-auto text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 font-semibold"
+                        className="ml-auto text-xs px-3 py-1.5 rounded-full bg-gray-700 hover:bg-[#6D2B2C] font-semibold"
                         title="Archive this task"
                     >
                         Archive
@@ -293,4 +429,6 @@ function fmtDueDateObj(d) {
     });
 }
 
-
+async function getReminder() {
+    return get('/api/reminders/');
+}

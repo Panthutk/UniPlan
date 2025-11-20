@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import { AssignmentsCard } from "./assignmentsCard.jsx";
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
@@ -29,7 +29,7 @@ export function TaskGroupBy(filteredTasks, getKey) {
 }
 
 // Group Tasks Element Logic
-export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask }) {
+export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask, numberOfTasks, pushToast}) {
     const [isOpen, setIsOpen] = useState(true);
 
     function getColor(label) {
@@ -41,6 +41,10 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
         if (subjectEntry?.color_hex) return subjectEntry.color_hex;
         return defaultGrayColor;
     }
+
+    useEffect(() => {
+        setIsOpen(true);
+    }, [GroupedTasks.length]);
 
     const color = getColor(label);
 
@@ -55,7 +59,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
     return (
         <div>
             {/* Header with toggle button */}
-            <div className="flex items-center justify-start py-2 mb-2">
+            <div className="flex items-center justify-start my-2">
                 {label && (
                     <button
                         onClick={() => setIsOpen(!isOpen)}
@@ -68,7 +72,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
                 <h2 className={`text-lg font-bold uppercase`} style={{ color }}>
                     {label}
                     {label !== "" && (
-                        <span className="text-gray-400 text-base px-1">({GroupedTasks.length})</span>
+                        <span className="text-gray-400 text-base px-1">({numberOfTasks})</span>
                     )}
                 </h2>
 
@@ -86,6 +90,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
                             onArchiveTask={onArchiveTask}
                             color={color}
                             groupLabel={label}
+                            pushToast={pushToast}
                         />
 
                     ))}

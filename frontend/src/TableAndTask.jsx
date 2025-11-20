@@ -3,16 +3,22 @@ import { useNavigate } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import SchoolIcon from '@mui/icons-material/School';
 
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
-import { colorForDay } from "./utils/color.js";
+import { colorForDay, CreateNewColorHex } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
 
 // Components Calling
-import { HeaderSection } from "../components/layout/header.jsx";
-import { DrawerPanel } from "../components/layout/drawerPanel.jsx";
+import { HeaderSection } from "@/components/layout/header.jsx";
+import { DrawerPanel } from "@/components/layout/drawerPanel.jsx";
+import ConfirmModal from "./components/assignments/assignmentConfirmModal";
+import DashboardSkeleton from "@/components/loading/DashboardSkeleton.jsx";
 
 import { exportTimetableCSV, importTimetableCSV, listSubjects, listTimetable } from "./utils/api";
 
@@ -39,10 +45,6 @@ async function deleteTimetableEntry(id) {
   return del(`/api/timetable/${id}/`);
 }
 
-function CreateNewColorHex() {
-  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
-  return `#${randomColor.padStart(6, "0")}`;
-}
 
 
 // UI uses 0=Mon..6=Sun, backend uses 0=Sun..6=Sat
@@ -87,12 +89,6 @@ const getMinute = (m) => m % 60;
 // options for hour/minute selects
 const HOURS = Array.from({ length: DAY_END_H - DAY_START_H + 1 }, (_, i) => DAY_START_H + i);
 const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
-
-
-// help for adjust the column card
-const COL_W = 120;
-
-
 
 
 async function getSubjectKeyByCourse(courseName, setSubjects) {
@@ -152,6 +148,20 @@ async function syncAssignmentsToTasks(assignments, setSubjects) {
   }
 }
 
+
+async function SetupTasks(courses, subsByCourse, setSubjects) {
+    // Build live assignments from classroom API
+    const liveAssignments = buildAssignments(courses, subsByCourse);
+
+    // push to Task DB
+    if (liveAssignments?.length) {
+        await syncAssignmentsToTasks(liveAssignments, setSubjects);
+    }
+
+    // Get task data from DB
+    const tasksObject = await get("/api/tasks/");
+    return tasksObject;
+}
 
 
 
@@ -237,23 +247,6 @@ function buildAssignments(courses, subsByCourse) {
   return items;
 }
 
-async function SetupTasks(courses, subsByCourse, setSubjects) {
-  // Build live assignments from classroom API
-  const liveAssignments = buildAssignments(courses, subsByCourse);
-
-  // push to Task DB
-  if (liveAssignments?.length) {
-    await syncAssignmentsToTasks(liveAssignments, setSubjects);
-  }
-
-  // Get task data from DB
-  const tasksObject = await get("/api/tasks/");
-  return tasksObject;
-}
-
-
-
-
 
 
 /* ----------------- API (from google classroom) ----------------- */
@@ -282,18 +275,27 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
   const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + 60));
   const [desc, setDesc] = useState(initial.desc || "");
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const isNew = !initial?.id
+  const [showSuggestions, setShowSuggestions] = useState(false); //control dropdown subject
+
+  const filteredSubjects = React.useMemo(() => {
+    const opts = subjectOptions || [];
+    const q = (title || "").toLowerCase().trim();
+
+    if (!q) return opts; // when nothing typed, show all api subject
+    return opts.filter(opt => opt.toLowerCase().includes(q))
+  }, [subjectOptions, title]);
 
   useEffect(() => {
-    if (!open) return;
+
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
     setStart(initial.startMin ?? DAY_START_H * 60);
     setEnd(isNew ? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60) : (initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60)));
     setDesc(initial.desc || "");
     setError("");
-  }, [open, initial]);
+  }, [initial]);
 
   // Derived validations
   const timeError = end <= start; // strictly after required (raw values)
@@ -340,18 +342,43 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
         </div>
 
         {/* Combo box */}
-        <input
-          list="subject-options"
-          className="w-full mb-4 rounded-md bg-neutral-800 px-3 py-2 outline-none focus:ring-2 ring-emerald-500/50"
-          placeholder="Start typing to choose…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <datalist id="subject-options">
-          {subjectOptions.map((opt) => (
-            <option key={opt} value={opt} />
-          ))}
-        </datalist>
+        <div className="relative mb-4">
+          <input
+            list="subject-options"
+            className="w-full rounded-md bg-neutral-800 px-3 py-2 outline-none border border-neutral-600 focus:ring-2 ring-emerald-500/50"
+            placeholder="Start typing to choose…"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowSuggestions(false), 120)
+            }}
+          />
+
+          {showSuggestions && filteredSubjects.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md
+                          bg-neutral-800 border border-neutral-600 shadow-lg text-sm">
+              {filteredSubjects.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-neutral-800"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setTitle(opt);
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -470,7 +497,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-full bg-neutral-700 hover:bg-neutral-600 font-semibold"
+              className="px-5 py-2 rounded-full bg-rose-800 hover:bg-rose-900 font-semibold"
             >
               Cancel
             </button>
@@ -514,15 +541,13 @@ export default function ClassroomTimetableDashboard() {
   const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
 
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
+  const [, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
-  const [showRaw, setShowRaw] = useState(false);
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
-  const [reminders, setReminders] = useState([]);
 
   // local timetable events created via the modal
   const [events, setEvents] = useState([]);
@@ -543,6 +568,11 @@ export default function ClassroomTimetableDashboard() {
 
   // searchArchived state
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [confirmUnarchiveOpen, setConfirmUnarchiveOpen] = useState(false);
+  const [confirmUnarchiveId, setConfirmUnarchiveId] = useState(null);
+
+  const [confirmExportOpen, setConfirmExportOpen] = useState(false);
 
 
 
@@ -599,6 +629,7 @@ export default function ClassroomTimetableDashboard() {
   const [importBusy, setImportBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
 
+
   useEffect(() => { activeRef.current = activeMenu; }, [activeMenu]);
 
   // Modal state
@@ -607,11 +638,23 @@ export default function ClassroomTimetableDashboard() {
 
   const handleExportClick = async () => {
     try {
-      setExportBusy(true);
-      await exportTimetableCSV();
+      setExportBusy(true); //start exporting
+      await exportTimetableCSV(); // call api download file
+
+      pushToast({
+        type: "success",
+        title: "Timetable exported",
+        desc: "Your timetable has been download.",
+        icon: <FileDownloadIcon sx={{ fontSize: 20 }} />,
+      })
     } catch (e) {
-      console.error(e);
-      alert(e.message || "Export failed");
+
+      pushToast({
+        type: "error",
+        title: "Export failed",
+        desc: e?.message || "Something went wrong while exporting.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      })
     } finally {
       setExportBusy(false);
     }
@@ -619,16 +662,57 @@ export default function ClassroomTimetableDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click();
 
+  const ALLOWED_TYPES = new Set(["text/csv", "application/csv", "application/vnd.ms-excel"]);
+  const MAX_BYTES = 1_000_000; // 1 MB
+
   const handleImportChange = async (ev) => {
     const file = ev.target.files?.[0];
     // allow selecting the same file again next time
     ev.target.value = "";
     if (!file) return;
 
+    // client guards
+    const name = file.name?.toLowerCase() || "";
+    if (!name.endsWith(".csv")) {
+      pushToast({
+        type: "error",
+        title: "Invalid file",
+        desc: "Only .csv files are accepted.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      });
+      return;
+    }
+    if (file.type && !ALLOWED_TYPES.has(file.type)) {
+      pushToast({
+        type: "error",
+        title: "Unsupported file type",
+        desc: `Got: ${file.type}. Please upload a CSV file.`,
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
+
+    if (file.size > MAX_BYTES) {
+      pushToast({
+        type: "error",
+        title: "File too large",
+        desc: "CSV is larger than 1 MB. Please upload a smaller file.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
+      return;
+    }
+
+
     try {
       setImportBusy(true);
       const res = await importTimetableCSV(file);
-      alert(`Import success: replaced ${res?.replaced ?? 0} entries`);
+
+      pushToast({
+        type: "success",
+        title: "Timetable imported",
+        desc: `Import success: replaced ${res?.replaced ?? 0} entries.`,
+        icon: <FileDownloadIcon sx={{ fontSize: 20 }} />
+      });
 
       // refresh timetable from DB and rebuild events
       const [subj, tte] = await Promise.all([listSubjects(), listTimetable()]);
@@ -646,8 +730,15 @@ export default function ClassroomTimetableDashboard() {
       }));
       setEvents(evs);
     } catch (e) {
-      console.error(e);
-      alert(e.message || "Import failed");
+
+
+
+      pushToast({
+        type: "error",
+        title: "Import failed",
+        desc: e?.message || "Something went wrong while importing.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     } finally {
       setImportBusy(false);
     }
@@ -756,11 +847,12 @@ export default function ClassroomTimetableDashboard() {
 
       setModalOpen(false);
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Save failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
     }
   };
@@ -783,11 +875,12 @@ export default function ClassroomTimetableDashboard() {
       });
 
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Delete failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
     }
   };
@@ -808,11 +901,12 @@ export default function ClassroomTimetableDashboard() {
 
 
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Clear failed",
         desc: String(err?.message || err),
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
       });
 
     }
@@ -842,7 +936,7 @@ export default function ClassroomTimetableDashboard() {
         for (const r of results) if (r.status === "fulfilled") byId[r.value.id] = r.value.list;
         setSubsByCourse(byId);
       } catch (e) {
-        console.error(e);
+
         setErr(String(e));
       } finally {
         setLoading(false);
@@ -902,13 +996,23 @@ export default function ClassroomTimetableDashboard() {
   async function handleUnarchive(id) {
     try {
       await unarchiveTask(id);
-      alert("Task unarchived successfully!");
+      pushToast({
+        type: "success",
+        title: "Task unarchived",
+        desc: "The task has been moved back to your main list.",
+        icon: <UnarchiveIcon sx={{ fontSize: 20 }} />,
+      })
+      setShowArchivedPopup(false)
       await fetchTasks(); // refresh main list
       const refreshedArchived = await listArchivedTasks();
       setArchivedTasks(refreshedArchived.filter(t => t.is_archived === true));
     } catch (e) {
-      console.error(e);
-      alert("Failed to unarchive task: " + e.message);
+      pushToast({
+        type: "error",
+        title: "Unarchive failed",
+        desc: e?.message || "Something went wrong while unarchive",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
+      })
     }
   }
 
@@ -937,8 +1041,12 @@ export default function ClassroomTimetableDashboard() {
       setArchivedTasks(archivedOnly);
       setShowArchivedPopup(true);
     } catch (e) {
-      console.error(e);
-      alert("Failed to load archived tasks: " + e.message);
+      pushToast({
+        type: "error",
+        title: "Failed to load archived task",
+        desc: e?.message || "Something went wrong while loading archived tasks.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      });
     }
   }
 
@@ -998,10 +1106,18 @@ export default function ClassroomTimetableDashboard() {
 
   if (!token) return null;
 
+  // Show full skeleton until EVERYTHING is ready
+  if (loading || meLoading || tasksLoading || !subjects.length) {
+    return <DashboardSkeleton />;
+  }
+
+
   return (
     <div className="min-h-screen bg-neutral-900 text-white " style={{ fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
       <HeaderSection />
+
+
       {/* Hidden input for Import */}
       <input
         ref={fileInputRef}
@@ -1031,13 +1147,16 @@ export default function ClassroomTimetableDashboard() {
         toasts={toasts}
         setToasts={setToasts}
         onImport={handleImportClick}
-        onExport={handleExportClick}
+        onExport={() => setConfirmExportOpen(true)}
         importBusy={importBusy}
         exportBusy={exportBusy}
+        pushToast={pushToast}
       />
+
 
       {/* Modal */}
       <EventModal
+        key={modalInitial.id ?? `new-${modalInitial.day}-${modalInitial.startMin}-${modalInitial.endMin}`}
         open={modalOpen}
         initial={modalInitial}
         onClose={() => setModalOpen(false)}
@@ -1047,6 +1166,40 @@ export default function ClassroomTimetableDashboard() {
         existingEvents={events}
       />
 
+      <ConfirmModal
+        open={confirmUnarchiveOpen}
+        title="Unarchive this task"
+        message="This will move the task back on your main list"
+        confirmLabel="Unarchive"
+        cancelLabel="Cancel"
+        onCancel={() => {
+          setConfirmUnarchiveOpen(false);
+          setConfirmUnarchiveId(null);
+        }}
+        onConfirm={async () => {
+          await handleUnarchive(confirmUnarchiveId);
+          setConfirmUnarchiveOpen(false);
+          setConfirmUnarchiveId(null);
+        }}
+      />
+
+      <ConfirmModal
+        open={confirmExportOpen}
+        title="Export timetable"
+        message="This will download your timetable as a CSV file."
+        confirmLabel={exportBusy ? "Exporting..." : "Export"}
+        cancelLabel="Cancel"
+        onCancel={() => {
+          setConfirmExportOpen(false);
+        }}
+        onConfirm={async () => {
+          try {
+            await handleExportClick(); // do export
+          } finally {
+            setConfirmExportOpen(false);
+          }
+        }}
+      />
 
       {/* Archived Tasks Popup */}
       {showArchivedPopup && (
@@ -1116,15 +1269,18 @@ export default function ClassroomTimetableDashboard() {
                               href={task.assignment_alt_link}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 font-semibold"
                               title="Open in Google Classroom"
                             >
-                              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                              <SchoolIcon fontSize="inherit" className="text-xs" />
                               Classroom
                             </a>
                           )}
                           <button
-                            onClick={() => handleUnarchive(task.id)}
+                            onClick={() => {
+                              setConfirmUnarchiveId(task.id);
+                              setConfirmUnarchiveOpen(true);
+                            }}
                             className="px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
                           >
                             Unarchive
