@@ -282,7 +282,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   const [start, setStart] = useState(initial.startMin ?? DAY_START_H * 60); // store minute since midnight 480 min (8 am)
   const [end, setEnd] = useState(initial.endMin ?? (DAY_START_H * 60 + 60));
   const [desc, setDesc] = useState(initial.desc || "");
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const isNew = !initial?.id
   const [showSuggestions, setShowSuggestions] = useState(false); //control dropdown subject
 
@@ -295,14 +295,14 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
   }, [subjectOptions, title]);
 
   useEffect(() => {
-    if (!open) return;
+
     setTitle(initial.title || "");
     setDay(initial.day ?? 0);
     setStart(initial.startMin ?? DAY_START_H * 60);
     setEnd(isNew ? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60) : (initial.endMin ?? Math.min((initial.startMin ?? DAY_START_H * 60) + 60, DAY_END_H * 60)));
     setDesc(initial.desc || "");
     setError("");
-  }, [open, initial]);
+  }, [initial]);
 
   // Derived validations
   const timeError = end <= start; // strictly after required (raw values)
@@ -504,7 +504,7 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-700 font-semibold"
+              className="px-5 py-2 rounded-full bg-rose-800 hover:bg-rose-900 font-semibold"
             >
               Cancel
             </button>
@@ -548,7 +548,7 @@ export default function ClassroomTimetableDashboard() {
   const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
 
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
+  const [, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
   const [subsByCourse, setSubsByCourse] = useState({});
   // DB-backed subjects and user id (temp)
@@ -655,7 +655,7 @@ export default function ClassroomTimetableDashboard() {
         icon: <FileDownloadIcon sx={{ fontSize: 20 }} />,
       })
     } catch (e) {
-      console.error(e);
+
       pushToast({
         type: "error",
         title: "Export failed",
@@ -737,7 +737,7 @@ export default function ClassroomTimetableDashboard() {
       }));
       setEvents(evs);
     } catch (e) {
-      console.error(e);
+
 
 
       pushToast({
@@ -854,7 +854,7 @@ export default function ClassroomTimetableDashboard() {
 
       setModalOpen(false);
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Save failed",
@@ -882,7 +882,7 @@ export default function ClassroomTimetableDashboard() {
       });
 
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Delete failed",
@@ -908,7 +908,7 @@ export default function ClassroomTimetableDashboard() {
 
 
     } catch (err) {
-      console.error(err);
+
       pushToast({
         type: "error",
         title: "Clear failed",
@@ -943,7 +943,7 @@ export default function ClassroomTimetableDashboard() {
         for (const r of results) if (r.status === "fulfilled") byId[r.value.id] = r.value.list;
         setSubsByCourse(byId);
       } catch (e) {
-        console.error(e);
+
         setErr(String(e));
       } finally {
         setLoading(false);
@@ -1014,7 +1014,6 @@ export default function ClassroomTimetableDashboard() {
       const refreshedArchived = await listArchivedTasks();
       setArchivedTasks(refreshedArchived.filter(t => t.is_archived === true));
     } catch (e) {
-      console.error(e);
       pushToast({
         type: "error",
         title: "Unarchive failed",
@@ -1049,7 +1048,6 @@ export default function ClassroomTimetableDashboard() {
       setArchivedTasks(archivedOnly);
       setShowArchivedPopup(true);
     } catch (e) {
-      console.error(e);
       pushToast({
         type: "error",
         title: "Failed to load archived task",
@@ -1165,6 +1163,7 @@ export default function ClassroomTimetableDashboard() {
 
       {/* Modal */}
       <EventModal
+        key={modalInitial.id ?? `new-${modalInitial.day}-${modalInitial.startMin}-${modalInitial.endMin}`}
         open={modalOpen}
         initial={modalInitial}
         onClose={() => setModalOpen(false)}
