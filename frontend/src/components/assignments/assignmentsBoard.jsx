@@ -1,18 +1,30 @@
-import React, { useMemo, useState } from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import { TaskFilterElements } from "./assignmentsFilterButtons.jsx";
 import { AssignmentsGroup, TaskGroupBy } from "./assignmentsGroup.jsx";
 import { colorForDay } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
+import { get } from "/src/utils/api.js";
 
 
 export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events, pushToast, }) {
 
-    // console.log("-------------------------------------------------------");
-    // console.log(TaskObjects);
-    // console.log(SubjectObjects);
-    // console.log("-------------------------------------------------------");
+    const [reminders, setReminders] = useState([]);
 
-    //Legend Deadline indicator (Array)
+    useEffect(() => {
+        (async () => {
+            const data = await getReminder();
+            setReminders(data);
+        })();
+    }, [TaskObjects]);
+
+    const reminderMap = useMemo(() => {
+        const reminderMap = {};
+        reminders.forEach(r => {
+            reminderMap[r.task] = r;
+        });
+        return reminderMap;
+    }, [reminders]);
+
 
     const ReverseTasks = useMemo(() => {
         return [...TaskObjects].reverse();
@@ -23,6 +35,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         { color: "bg-amber-400", label: "less than 7 days" },
         { color: "bg-green-400", label: "more than 7 days" },
     ];
+
     // Make Subject ID to be Key for easier to use Subject data
     const SubjectMap = useMemo(() => {
         const map = {};
@@ -180,6 +193,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                         onArchiveTask={onArchiveTask}
                                         events={events}
                                         pushToast={pushToast}
+                                        reminderMap={reminderMap}
                                     />
                                 </div>
 
@@ -289,4 +303,9 @@ function linkOneAssignmentToEvents(assignment, events, subjectName) {
 // format the Course Name
 function norm(s) {
     return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+
+async function getReminder() {
+    return get('/api/reminders/');
 }

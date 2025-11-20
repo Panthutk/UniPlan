@@ -94,12 +94,6 @@ const HOURS = Array.from({ length: DAY_END_H - DAY_START_H + 1 }, (_, i) => DAY_
 const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
 
 
-// help for adjust the column card
-const COL_W = 120;
-
-
-
-
 async function getSubjectKeyByCourse(courseName, setSubjects) {
   // get all subjects from backend
   const subjects = await listSubjects();

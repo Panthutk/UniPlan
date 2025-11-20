@@ -29,7 +29,7 @@ export function TaskGroupBy(filteredTasks, getKey) {
 }
 
 // Group Tasks Element Logic
-export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask, pushToast, }) {
+export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask, onArchiveTask, pushToast, reminderMap}) {
     const [isOpen, setIsOpen] = useState(true);
 
     function getColor(label) {
@@ -87,6 +87,7 @@ export function AssignmentsGroup({ label, GroupedTasks, SubjectMap, onUpdateTask
                             color={color}
                             groupLabel={label}
                             pushToast={pushToast}
+                            reminderMap={reminderMap}
                         />
 
                     ))}
