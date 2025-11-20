@@ -40,7 +40,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             }
             else {
                 setReminder(r);
-                setScheduled(!!r);   
+                setScheduled(!!r);
             }
         })();
     }, [task]);
@@ -151,9 +151,9 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
         setPending(true);
         try {
             await createReminder({
-              assignmentId: id,
-              remindAtISO: remindAt.toISOString(),
-              offsetDays: offset,
+                assignmentId: id,
+                remindAtISO: remindAt.toISOString(),
+                offsetDays: offset,
             });
             const all = await getReminder();
             const r = all.find(remindObject => remindObject.task === task.id);
@@ -272,7 +272,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         <label className="text-xs opacity-75">Remind me:</label>
                         <select
                             className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-                            value={(choice?? 3)}
+                            value={(choice ?? 3)}
                             onChange={(e) => setChoice(Number(e.target.value))}
                             disabled={!task.due_at || days_left < 0 || scheduled === true || pending === true}
                             title={task.due ? "Choose how many days before due date" : "No due date"}
@@ -295,28 +295,28 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             className={[
                                 "group relative text-xs py-1.5 rounded-full font-semibold transition-all duration-150",
                                 scheduled === true
-                                    ? days_left > 0? "px-3 hover:px-0 bg-white/10  hover:bg-[#6D2B2C] cursor-default "  : "px-3 bg-white/5 text-[#afafaf] cursor-default "
-                                    : days_left > 0? "px-3 bg-emerald-800 hover:bg-emerald-900 " : "px-3 bg-white/5 text-[#afafaf] cursor-default ",
+                                    ? days_left > 0 ? "px-3  bg-white/10  hover:bg-[#6D2B2C] cursor-default " : "px-3 bg-white/5 text-[#afafaf] cursor-default "
+                                    : days_left > 0 ? "px-3 bg-emerald-800 hover:bg-emerald-900 " : "px-3 bg-white/5 text-[#afafaf] cursor-default ",
                             ].join(" ")}
                             title={!task.due_at ? "No due date" : (scheduled === true ? "Already scheduled" : "Schedule email reminder")}
                         >
-                            {scheduled === true? (
+                            {scheduled === true ? (
                                 days_left > 0 ? (
                                     <span className="inline-block">
                                         {/* normal text */}
                                         <span className="group-hover:opacity-0">
-                                          Scheduled
+                                            Scheduled
                                         </span>
 
                                         {/* hover text */}
                                         <span className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 ">
-                                          Cancel
+                                            Cancel
                                         </span>
                                     </span>
                                 ) : (
                                     <span className="inline-block">
                                         <span>
-                                          Scheduled
+                                            Scheduled
                                         </span>
                                     </span>
                                 )
