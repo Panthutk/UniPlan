@@ -1276,7 +1276,7 @@ export default function ClassroomTimetableDashboard() {
                               href={task.assignment_alt_link}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
+                              className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 font-semibold"
                               title="Open in Google Classroom"
                             >
                               <SchoolIcon fontSize="inherit" className="text-xs" />

@@ -34,6 +34,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     const [searchTerm, setSearchTerm] = useState("");
 
     //5 Filters option (React Hook)
+    const [appliedMoreThanZeroFilter, setAppliedMoreThanZeroFilter] = useState(false);
     const [appliedPriorityFilter, setAppliedPriorityFilter] = useState("");
     const [appliedSubjectFilter, setAppliedSubjectFilter] = useState("");
     const [appliedDaysLeftFilter, setAppliedDaysLeftFilter] = useState("");
@@ -65,6 +66,10 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
             );
         }
 
+        if (appliedMoreThanZeroFilter === true) {
+            result = result.filter(task => task.days_left > 0);
+        }
+
         // must match all the selected to show the result
         if (appliedPriorityFilter) {
             result = result.filter(task => task.priority === appliedPriorityFilter);
@@ -88,7 +93,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         result = result.filter(task => !task.is_archived);
 
         return result;
-    }, [TaskObjects_tableLinked, searchTerm, appliedPriorityFilter, appliedSubjectFilter,
+    }, [TaskObjects_tableLinked, searchTerm, appliedMoreThanZeroFilter, appliedPriorityFilter, appliedSubjectFilter,
         appliedDaysLeftFilter, appliedOnTimetableFilter]);
 
 
@@ -138,6 +143,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                 groupByOption={groupByOption}
                 setGroupByOption={setGroupByOption}
                 SubjectObjects={SubjectObjects}
+                setAppliedMoreThanZeroFilter={setAppliedMoreThanZeroFilter}
                 setAppliedPriorityFilter={setAppliedPriorityFilter}
                 setAppliedSubjectFilter={setAppliedSubjectFilter}
                 setAppliedDaysLeftFilter={setAppliedDaysLeftFilter}
