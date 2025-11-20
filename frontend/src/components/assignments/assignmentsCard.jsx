@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { post, del } from "/src/utils/api.js";
+import { post, del, get } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
 import SchoolIcon from '@mui/icons-material/School';
@@ -8,7 +8,7 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import EventIcon from '@mui/icons-material/Event';
 
-export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast, reminderMap = () => { } }) {
+export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast = () => { } }) {
 
     const subject = SubjectMap[task.subject];
 
@@ -25,20 +25,28 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2.5px ${color}` } : {};
     const ringClass = groupLabel === "" ? dayRing : "";
 
-    const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
-    const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
-    const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+    const [choice, setChoice] = useState(1);       // { [assignmentId]: 1|3|7 }
+    const [pending, setPending] = useState(false);     // { [assignmentId]: boolean }
+    const [scheduled, setScheduled] = useState(false); // { [assignmentId]: true }
+    const [reminder, setReminder] = useState(null);
 
-
-    const reminder = reminderMap[task.id];
-    console.log(reminder);
 
     useEffect(() => {
-        // Show that this task already in schedule
-        if (reminder && reminder.status === "pending") {
-            setScheduled(s => ({ ...s, [task.id]: true }));
-        }
-    }, [task.id, reminder]);
+        (async () => {
+            const all = await getReminder();
+            const r = all.find(x => x.task === task.id);
+            if (r && r.status === "sent") {
+                cancelReminder();
+            }
+            else {
+                setReminder(r);
+                setScheduled(!!r);   
+            }
+        })();
+    }, [task]);
+
+    // console.log(reminder)
+    // console.log(scheduled)
 
 
     // parse due date
@@ -56,7 +64,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             return null;
         }
     })();
-
 
 
     // get object that has the same key with this task
@@ -115,13 +122,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                 setConfirm((s) => ({ ...s, loading: true }));
 
                 try {
-                    setPending(p => ({ ...p, [id]: true }));
-                    await createReminder({
-                        assignmentId: id,
-                        remindAtISO: remindAt.toISOString(),
-                        offsetDays: offset,
-                    });
-                    setScheduled(s => ({ ...s, [id]: true }));
+                    await postReminder(id, remindAt, offset);
 
                     pushToast({
                         type: "success",
@@ -139,24 +140,40 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         icon: <GppMaybeIcon sx={{ fontSize: 20 }} />,
                     });
                 } finally {
-                    setPending(p => ({ ...p, [id]: false }));
+                    setPending(false);
                     closeConfirm();
                 }
             },
         });
     };
 
-    const cancelReminder = async () => {
+    async function postReminder(id, remindAt, offset) {
+        setPending(true);
+        try {
+            await createReminder({
+              assignmentId: id,
+              remindAtISO: remindAt.toISOString(),
+              offsetDays: offset,
+            });
+            const all = await getReminder();
+            const r = all.find(remindObject => remindObject.task === task.id);
+            setReminder(r);
+            setScheduled(!!r);
+        } finally {
+            setPending(false);
+        }
+    }
+
+    async function cancelReminder() {
+        setPending(true);
         try {
             await del(`/api/reminders/${reminder.id}/`);
-            setScheduled((prev) => {
-                const copy = { ...prev };
-                delete copy[task.id];
-                return copy;
-            });
-        } catch (err) {
-            console.error(err);
-            alert("Failed to delete");
+            const all = await getReminder();
+            const r = all.find(remindObject => remindObject.task === task.id);
+            setReminder(r);
+            setScheduled(!!r);
+        } finally {
+            setPending(false);
         }
     }
 
@@ -229,7 +246,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-[#18A15F] hover:bg-green-700 font-semibold"
                             title="Open in Classroom"
                         >
-                            {/*<span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />*/}
                             <span> <SchoolIcon fontSize="small" /> </span>
                             Classroom
                         </a>
@@ -256,9 +272,9 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         <label className="text-xs opacity-75">Remind me:</label>
                         <select
                             className="text-xs rounded-full bg-neutral-800 border border-white/10 px-2 py-1 outline-none"
-                            value={(choice[task.id] ?? 3)}
-                            onChange={(e) => setChoice(c => ({ ...c, [task.id]: Number(e.target.value) }))}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+                            value={(choice?? 3)}
+                            onChange={(e) => setChoice(Number(e.target.value))}
+                            disabled={!task.due_at || days_left < 0 || scheduled === true || pending === true}
                             title={task.due ? "Choose how many days before due date" : "No due date"}
                         >
                             <option value={1}>1 day before</option>
@@ -268,20 +284,47 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
                         <button
                             onClick={() => {
-                                if (scheduled[task.id]) {
-                                    cancelReminder();
+                                console.log(scheduled);
+                                if (scheduled === true) {
+                                    cancelReminder(task.id, reminder.id);
                                 } else {
                                     scheduleReminder();
                                 }
                             }}
-                            // disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+                            disabled={!task.due_at || days_left < 0 || pending === true}
                             className={[
-                                "text-xs px-3 py-1.5 rounded-full font-semibold",
-                                scheduled[task.id] ? "bg-neutral-700 hover:bg-red-700 cursor-default " : "bg-emerald-800 hover:bg-emerald-900",
+                                "group relative text-xs py-1.5 rounded-full font-semibold transition-all duration-150",
+                                scheduled === true
+                                    ? days_left > 0? "px-3 hover:px-0 bg-white/10  hover:bg-[#6D2B2C] cursor-default "  : "px-3 bg-white/5 text-[#afafaf] cursor-default "
+                                    : days_left > 0? "px-3 bg-emerald-800 hover:bg-emerald-900 " : "px-3 bg-white/5 text-[#afafaf] cursor-default ",
                             ].join(" ")}
-                            title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
+                            title={!task.due_at ? "No due date" : (scheduled === true ? "Already scheduled" : "Schedule email reminder")}
                         >
-                            {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
+                            {scheduled === true? (
+                                days_left > 0 ? (
+                                    <span className="inline-block">
+                                        {/* normal text */}
+                                        <span className="group-hover:opacity-0">
+                                          Scheduled
+                                        </span>
+
+                                        {/* hover text */}
+                                        <span className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 ">
+                                          Cancel
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span className="inline-block">
+                                        <span>
+                                          Scheduled
+                                        </span>
+                                    </span>
+                                )
+                            ) : pending ? (
+                                "Scheduling..."
+                            ) : (
+                                "Remind"
+                            )}
                         </button>
 
                     </div>
@@ -368,3 +411,6 @@ function fmtDueDateObj(d) {
     });
 }
 
+async function getReminder() {
+    return get('/api/reminders/');
+}

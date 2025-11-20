@@ -6,6 +6,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import SchoolIcon from '@mui/icons-material/School';
 
 // Helper Calling
 import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
@@ -1279,7 +1280,7 @@ export default function ClassroomTimetableDashboard() {
                               className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 font-semibold"
                               title="Open in Google Classroom"
                             >
-                              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-black/70" />
+                              <SchoolIcon/>
                               Classroom
                             </a>
                           )}
