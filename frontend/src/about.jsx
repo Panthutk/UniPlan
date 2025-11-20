@@ -10,7 +10,6 @@ import company_logo from "./assets/TawanRapfa_logo2.svg";
 
 export default function About() {
     const location = useLocation();
-    console.log(location.state);
     const [activeTab, setActiveTab] = useState(0);
     const tabs = ["Member no.1", "Member no.2", "Member no.3", "Member no.4"];
     const members_info = [

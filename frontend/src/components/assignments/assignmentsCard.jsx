@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { post } from "/src/utils/api.js";
+import React, { useState, useEffect } from "react";
+import { post, del } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
 import SchoolIcon from '@mui/icons-material/School';
@@ -7,7 +7,8 @@ import ConfirmModal from "./assignmentConfirmModal.jsx";
 import ArchiveIcon from '@mui/icons-material/Archive';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import EventIcon from '@mui/icons-material/Event';
-export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast = () => { } }) {
+
+export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast, reminderMap = () => { } }) {
 
     const subject = SubjectMap[task.subject];
 
@@ -24,10 +25,21 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2.5px ${color}` } : {};
     const ringClass = groupLabel === "" ? dayRing : "";
 
-
-    const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
     const [choice, setChoice] = useState({});       // { [assignmentId]: 1|3|7 }
+    const [pending, setPending] = useState({});     // { [assignmentId]: boolean }
     const [scheduled, setScheduled] = useState({}); // { [assignmentId]: true }
+
+
+    const reminder = reminderMap[task.id];
+    console.log(reminder);
+
+    useEffect(() => {
+        // Show that this task already in schedule
+        if (reminder && reminder.status === "pending") {
+            setScheduled(s => ({ ...s, [task.id]: true }));
+        }
+    }, [task.id, reminder]);
+
 
     // parse due date
     // Force +7 hours (Bangkok)
@@ -65,7 +77,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     })();
 
 
-    const scheduleReminder = async (task) => {
+    const scheduleReminder = async () => {
         if (!task?.due_at) {
             openConfirm({
                 title: "No due date",
@@ -134,9 +146,19 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
         });
     };
 
-
-
-
+    const cancelReminder = async () => {
+        try {
+            await del(`/api/reminders/${reminder.id}/`);
+            setScheduled((prev) => {
+                const copy = { ...prev };
+                delete copy[task.id];
+                return copy;
+            });
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete");
+        }
+    }
 
 
     const [confirm, setConfirm] = useState({
@@ -155,7 +177,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     return (
         <div
             key={task.id}
-            className={`my-3 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-hidden`}
+            className={`my-3 mr-4 grid grid-cols-[160px,1fr] rounded-xl border border-white/10 ring-1 ${ringClass} bg-white/5 overflow-y-hidden scrollbar-transparent`}
             style={ringStyle}
         >
             {/* Left label (day color only when linked) */}
@@ -195,8 +217,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         {fmtDueDateObj(format_due)} <span className="opacity-60">(GMT+7)</span>
                     </div>
                 )}
-
-
 
 
                 {/*Classroom link button*/}
@@ -245,18 +265,27 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             <option value={3}>3 days before</option>
                             <option value={7}>7 days before</option>
                         </select>
+
                         <button
-                            onClick={() => scheduleReminder(task)}
-                            disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
+                            onClick={() => {
+                                if (scheduled[task.id]) {
+                                    cancelReminder();
+                                } else {
+                                    scheduleReminder();
+                                }
+                            }}
+                            // disabled={!task.due_at || scheduled[task.id] || pending[task.id]}
                             className={[
                                 "text-xs px-3 py-1.5 rounded-full font-semibold",
-                                scheduled[task.id] ? "bg-neutral-700 cursor-default" : "bg-emerald-800 hover:bg-emerald-900",
+                                scheduled[task.id] ? "bg-neutral-700 hover:bg-red-700 cursor-default " : "bg-emerald-800 hover:bg-emerald-900",
                             ].join(" ")}
                             title={!task.due_at ? "No due date" : (scheduled[task.id] ? "Already scheduled" : "Schedule email reminder")}
                         >
                             {scheduled[task.id] ? "Scheduled" : (pending[task.id] ? "Scheduling..." : "Remind")}
                         </button>
+
                     </div>
+
                     {/*Archive button*/}
                     <button
                         onClick={async () => {

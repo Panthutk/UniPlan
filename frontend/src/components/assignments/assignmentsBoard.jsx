@@ -1,18 +1,30 @@
-import React, { useMemo, useState } from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import { TaskFilterElements } from "./assignmentsFilterButtons.jsx";
 import { AssignmentsGroup, TaskGroupBy } from "./assignmentsGroup.jsx";
 import { colorForDay } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
+import { get } from "/src/utils/api.js";
 
 
 export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, SubjectObjects, subjectOptions, events, pushToast, }) {
 
-    // console.log("-------------------------------------------------------");
-    // console.log(TaskObjects);
-    // console.log(SubjectObjects);
-    // console.log("-------------------------------------------------------");
+    const [reminders, setReminders] = useState([]);
 
-    //Legend Deadline indicator (Array)
+    useEffect(() => {
+        (async () => {
+            const data = await getReminder();
+            setReminders(data);
+        })();
+    }, [TaskObjects]);
+
+    const reminderMap = useMemo(() => {
+        const reminderMap = {};
+        reminders.forEach(r => {
+            reminderMap[r.task] = r;
+        });
+        return reminderMap;
+    }, [reminders]);
+
 
     const ReverseTasks = useMemo(() => {
         return [...TaskObjects].reverse();
@@ -23,6 +35,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
         { color: "bg-amber-400", label: "less than 7 days" },
         { color: "bg-green-400", label: "more than 7 days" },
     ];
+
     // Make Subject ID to be Key for easier to use Subject data
     const SubjectMap = useMemo(() => {
         const map = {};
@@ -163,10 +176,11 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
             </div>
 
             <div>
-                <div>
-                    {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => {
-                        // Show only visibleCount items
-                        const visibleTasks = tasks.slice(0, visibleCount);
+                <div className="mt-4 overflow-x-auto md:overflow-x-visible scrollbar-transparent scrollbar-top">
+                    <div className="min-w-[720px] md:min-w-0">
+                        {sortTasks(groupedTasks, groupByOption).map(([label, tasks]) => {
+                            // Show only visibleCount items
+                            const visibleTasks = tasks.slice(0, visibleCount);
 
                         return (
                             <div key={label}>
@@ -180,43 +194,44 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                         onArchiveTask={onArchiveTask}
                                         events={events}
                                         pushToast={pushToast}
+                                        reminderMap={reminderMap}
                                     />
                                 </div>
 
-                                {/* Buttons Section */}
-                                <div className="w-full flex justify-center mt-4 mb-6 gap-3">
+                                    {/* Buttons Section */}
+                                    <div className="w-full flex justify-center mt-4 mb-6 gap-3">
 
-                                    {/* SHOW MORE */}
-                                    {visibleCount < tasks.length && (
-                                        <button
-                                            onClick={() => setVisibleCount(prev => prev + 5)}
-                                            className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
+                                        {/* SHOW MORE */}
+                                        {visibleCount < tasks.length && (
+                                            <button
+                                                onClick={() => setVisibleCount(prev => prev + 5)}
+                                                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
                                        text-white text-sm font-semibold transition-all duration-300"
-                                        >
-                                            Show more ({tasks.length - visibleCount} left)
-                                        </button>
-                                    )}
+                                            >
+                                                Show more ({tasks.length - visibleCount} left)
+                                            </button>
+                                        )}
 
-                                    {/* SHOW LESS */}
-                                    {visibleCount > 5 && (
-                                        <button
-                                            onClick={() => setVisibleCount(5)}
-                                            className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
+                                        {/* SHOW LESS */}
+                                        {visibleCount > 5 && (
+                                            <button
+                                                onClick={() => setVisibleCount(5)}
+                                                className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
                                        text-white text-sm font-semibold transition-all duration-300"
-                                        >
-                                            Show less
-                                        </button>
-                                    )}
+                                            >
+                                                Show less
+                                            </button>
+                                        )}
 
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
+
                 </div>
 
             </div>
-
-
 
         </div>
     );
@@ -289,4 +304,9 @@ function linkOneAssignmentToEvents(assignment, events, subjectName) {
 // format the Course Name
 function norm(s) {
     return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+
+async function getReminder() {
+    return get('/api/reminders/');
 }
