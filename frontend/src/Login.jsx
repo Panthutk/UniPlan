@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "@mui/material/Button";
 import GoogleIcon from "@mui/icons-material/Google";
 import EventIcon from "@mui/icons-material/Event";
@@ -6,6 +6,8 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import SchoolIcon from "@mui/icons-material/School";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import uniplanLogo from "./assets/uniplanLogo.svg";
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import { Toasts } from '@/components/popup/Toasts';
 const auth = {
   get token() { return localStorage.getItem("jwt"); },
   set token(v) { v ? localStorage.setItem("jwt", v) : localStorage.removeItem("jwt"); },
@@ -23,6 +25,14 @@ async function getGoogleAuthUrl() {
 
 export default function Login() {
   const navigate = useNavigate();
+  const [toasts, setToasts] = useState([]);
+
+
+  function pushToast({ type = "info", title, desc = "", duration = 3500, icon = null }) {
+    const id = (crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
+    setToasts((t) => [...t, { id, type, title, desc, icon }]);
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
+  }
 
   // If we arrive with ?token=..., store and continue
   useEffect(() => {
@@ -47,8 +57,12 @@ export default function Login() {
       const { auth_url } = await getGoogleAuthUrl();
       window.location.href = auth_url;
     } catch (e) {
-      console.error(e);
-      alert("Failed to start Google sign-in.");
+      pushToast({
+        type: "error",
+        title: "Sign-in failed",
+        desc: e?.message || "Could not start Google sign-in. Please try again.",
+        icon: <GppMaybeIcon sx={{ fontSize: 20 }} />
+      })
     }
   };
 
@@ -203,6 +217,7 @@ export default function Login() {
           © {new Date().getFullYear()} UniPlan · All rights reserved
         </div>
       </footer>
+      <Toasts toasts={toasts} setToasts={setToasts} />
     </div>
   );
 }

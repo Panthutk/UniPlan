@@ -7,6 +7,7 @@ import ConfirmModal from "./assignmentConfirmModal.jsx";
 import ArchiveIcon from '@mui/icons-material/Archive';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import EventIcon from '@mui/icons-material/Event';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
 
 export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLabel, onArchiveTask, pushToast = () => { } }) {
 
@@ -131,7 +132,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         icon: <EventIcon sx={{ fontSize: 20 }} />,
                     });
                 } catch (e) {
-                    console.error(e);
 
                     pushToast({
                         type: "error",
@@ -172,6 +172,13 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             const r = all.find(remindObject => remindObject.task === task.id);
             setReminder(r);
             setScheduled(!!r);
+
+            pushToast({
+                type: "success",
+                title: "Reminder cancelled",
+                desc: `The reminder for "${task.title}" has been cancelled.`,
+                icon: <EventBusyIcon sx={{ fontSize: 20 }} />
+            });
         } finally {
             setPending(false);
         }
@@ -350,7 +357,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                                         });
 
                                     } catch (e) {
-                                        console.error(e);
+
 
                                         pushToast({
                                             type: "error",
