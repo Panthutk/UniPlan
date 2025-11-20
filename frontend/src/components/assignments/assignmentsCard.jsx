@@ -26,7 +26,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     const ringStyle = groupLabel !== "" ? { boxShadow: `0 0 0 2.5px ${color}` } : {};
     const ringClass = groupLabel === "" ? dayRing : "";
 
-    const [choice, setChoice] = useState(1);       // { [assignmentId]: 1|3|7 }
+    const [choice, setChoice] = useState(3);       // { [assignmentId]: 1|3|7 }
     const [pending, setPending] = useState(false);     // { [assignmentId]: boolean }
     const [scheduled, setScheduled] = useState(false); // { [assignmentId]: true }
     const [reminder, setReminder] = useState(null);
@@ -37,7 +37,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             const all = await getReminder();
             const r = all.find(x => x.task === task.id);
             if (r && r.status === "sent") {
-                cancelReminder();
+                cancelReminder(r, task);
             }
             else {
                 setReminder(r);
@@ -46,8 +46,6 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
         })();
     }, [task]);
 
-    // console.log(reminder)
-    // console.log(scheduled)
 
 
     // parse due date
@@ -111,7 +109,8 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             return;
         }
 
-        const offset = Number(choice[id] ?? 3); // default 3 days
+        const offset = Number(choice ?? 3); // default 3 days
+        console.log(choice);
         const remindAt = new Date(due.getTime() - offset * 24 * 60 * 60 * 1000);
 
         openConfirm({
@@ -164,19 +163,20 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
         }
     }
 
-    async function cancelReminder() {
+    async function cancelReminder(del_reminder, _task) {
         setPending(true);
         try {
-            await del(`/api/reminders/${reminder.id}/`);
+            await del(`/api/reminders/${del_reminder.id}/`);
             const all = await getReminder();
-            const r = all.find(remindObject => remindObject.task === task.id);
+            const r = all.find(remindObject => remindObject.task === _task.id);
+
             setReminder(r);
             setScheduled(!!r);
 
             pushToast({
                 type: "success",
                 title: "Reminder cancelled",
-                desc: `The reminder for "${task.title}" has been cancelled.`,
+                desc: `The reminder for "${_task.title}" has been cancelled.`,
                 icon: <EventBusyIcon sx={{ fontSize: 20 }} />
             });
         } finally {
@@ -293,7 +293,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                             onClick={() => {
                                 console.log(scheduled);
                                 if (scheduled === true) {
-                                    cancelReminder(task.id, reminder.id);
+                                    cancelReminder(reminder, task);
                                 } else {
                                     scheduleReminder();
                                 }
@@ -313,21 +313,26 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
                         >
                             {scheduled ? (
                                 days_left > 0 ? (
-                                    <span className="relative block w-[60px] text-center">
+                                    <span className="relative block w-[60px] text-center ">
                                         {/* normal text */}
-                                        <span className="transition-opacity duration-150 group-hover:opacity-0">
+                                        <span
+                                            className="
+                                            transition-all duration-150
+                                            group-hover:opacity-0
+                                            group-hover:scale-90
+                                            group-hover:-translate-x-1"
+                                        >
                                             Scheduled
                                         </span>
 
                                         {/* hover text */}
                                         <span
                                             className="
-                                              absolute -left-3 top-1/2 -translate-y-1/2
-                                              bg-red-700 text-white text-xs font-semibold
-                                              px-2.5 py-1.5 rounded-full
-                                              opacity-0 group-hover:opacity-100
-                                              transition-all duration-150
-                                            "
+                                            absolute -left-3 top-1/2 -translate-y-1/2
+                                            bg-red-700 text-white text-xs font-semibold
+                                            px-3 py-1.5 rounded-full
+                                            opacity-0 group-hover:opacity-100
+                                            transition-all duration-150"
                                         >
                                             Cancel
                                         </span>

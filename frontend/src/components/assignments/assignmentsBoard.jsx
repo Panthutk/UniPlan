@@ -186,31 +186,34 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
                                 </div>
 
                                     {/* Buttons Section */}
-                                    <div className="w-full flex justify-center mt-4 mb-6 gap-3">
+                                    { tasks.length > 5 && (
+                                        <div className="w-full flex justify-center mt-2 mb-2.5 gap-3">
 
-                                        {/* SHOW MORE */}
-                                        {visibleCount < tasks.length && (
-                                            <button
-                                                onClick={() => setVisibleCount(prev => prev + 5)}
-                                                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
+                                            {/* SHOW MORE */}
+                                            {visibleCount < tasks.length && (
+                                                <button
+                                                    onClick={() => setVisibleCount(prev => prev + 5)}
+                                                    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700
                                        text-white text-sm font-semibold transition-all duration-300"
-                                            >
-                                                Show more ({tasks.length - visibleCount} left)
-                                            </button>
-                                        )}
+                                                >
+                                                    Show more ({tasks.length - visibleCount} left)
+                                                </button>
+                                            )}
 
-                                        {/* SHOW LESS */}
-                                        {visibleCount > 5 && (
-                                            <button
-                                                onClick={() => setVisibleCount(5)}
-                                                className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
+                                            {/* SHOW LESS */}
+                                            {visibleCount > 5 && (
+                                                <button
+                                                    onClick={() => setVisibleCount(5)}
+                                                    className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600
                                        text-white text-sm font-semibold transition-all duration-300"
-                                            >
-                                                Show less
-                                            </button>
-                                        )}
+                                                >
+                                                    Show less
+                                                </button>
+                                            )}
 
-                                    </div>
+                                        </div>
+                                    )}
+
                                 </div>
                             );
                         })}
