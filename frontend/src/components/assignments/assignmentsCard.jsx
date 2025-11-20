@@ -77,7 +77,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
     })();
 
 
-    const scheduleReminder = async (task) => {
+    const scheduleReminder = async () => {
         if (!task?.due_at) {
             openConfirm({
                 title: "No due date",
