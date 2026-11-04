@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: uniplan_backend
+    env_file:
+      - backend/.env
     environment:
       # Django DB settings (your settings.py already reads these)
       DB_NAME: uniplan
@@ -80,6 +82,8 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
+    env_file:
+      - backend/.env
     environment:
       DB_NAME: uniplan
       DB_USER: uniplan
