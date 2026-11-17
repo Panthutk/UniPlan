@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { post, del, get } from "/src/utils/api.js";
+import { post, del, get, safeExternalUrl } from "/src/utils/api.js";
 import { getTasks_Ring_BG_Color } from "/src/utils/color.js"
 import { FULL_DAYS } from "/src/utils/time.js";
 import SchoolIcon from '@mui/icons-material/School';
@@ -244,9 +244,9 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
 
                 {/*Classroom link button*/}
                 <div className="mt-3 flex items-center gap-3">
-                    {task.assignment_alt_link && (
+                    {safeExternalUrl(task.assignment_alt_link) && (
                         <a
-                            href={task.assignment_alt_link}
+                            href={safeExternalUrl(task.assignment_alt_link)}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-[#18A15F] hover:bg-green-700 font-semibold"

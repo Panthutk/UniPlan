@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
+from urllib.parse import urlparse
 from .models import (
     Subject, TimetableEntry, Task, Reminder, ClassroomCourse,
     ClassroomAssignment, OAuthAccount, ReminderChannel
@@ -83,6 +84,14 @@ class TaskSerializer(serializers.ModelSerializer):
             "reminder_days_before","next_reminder_at","days_left","day_of_week",
         ]
         read_only_fields = ["user","created_at","updated_at","completed_at","days_left","day_of_week"]
+
+    def validate_assignment_alt_link(self, value):
+        if not value:
+            return value
+        parsed = urlparse(value.strip())
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+            raise serializers.ValidationError("Only http:// and https:// URLs are permitted.")
+        return value.strip()
 
     def get_days_left(self, obj):
         if not obj.due_at:
