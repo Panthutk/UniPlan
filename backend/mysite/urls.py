@@ -19,6 +19,7 @@ urlpatterns = [
     # OAuth
     path("api/auth/google/login", views.google_login),
     path("api/auth/google/callback", views.google_callback),
+    path("api/auth/logout", views.logout_view),  # V7.4.2 + V14.3.1
 
     # Classroom
     path("api/classroom/courses", views.list_courses),

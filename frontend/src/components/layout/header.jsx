@@ -1,9 +1,22 @@
 import { useNavigate, Link } from "react-router-dom";
 import React from "react";
 import uniplanLogo from '../../assets/uniplanLogo.svg';
+import { logout } from "@/utils/api";
 
 export function HeaderSection() {
     const navigate = useNavigate();
+
+    /**
+     * V7.4.2 + V14.3.1: Proper logout
+     * 1. Call backend to invalidate the token (token_valid_after = now)
+     * 2. Backend sends Clear-Site-Data header to wipe cookies + storage
+     * 3. Clear localStorage / sessionStorage client-side as backup
+     * 4. Redirect to login page
+     */
+    const handleLogout = async () => {
+        await logout();
+        navigate("/", { replace: true });
+    };
 
     return (
         <header className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
@@ -26,10 +39,7 @@ export function HeaderSection() {
                     </Link>
                     <button
                         className="border rounded-lg px-3 py-2"
-                        onClick={() => {
-                            localStorage.clear();
-                            navigate("/", { replace: true });
-                        }}
+                        onClick={handleLogout}
                     >
                         Logout
                     </button>

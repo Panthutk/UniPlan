@@ -1,10 +1,36 @@
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 export const API = BASE_URL;
 
+/**
+ * V14.2.1 / V3.3.1: Auth token is now in an HttpOnly cookie, sent
+ * automatically via credentials: "include". The Authorization header
+ * is kept ONLY as a fallback for non-browser API clients.
+ * For browser requests, authHeader() returns {} — the cookie handles auth.
+ */
 export const authHeader = () => {
-    const t = localStorage.getItem("jwt");
-    return t ? { Authorization: `Bearer ${t}` } : {};
+    // Token is in HttpOnly cookie now — no need to send Authorization header
+    // from the browser. The cookie is sent automatically.
+    return {};
 };
+
+/**
+ * V14.3.1: Call the backend logout endpoint, then clear local storage.
+ */
+export async function logout() {
+    try {
+        await fetch(`${API}/api/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+        });
+    } catch (e) {
+        // Even if the server call fails, clear client-side data
+        console.warn("Logout API call failed:", e);
+    }
+    // V14.3.1: Clear all client-side storage
+    localStorage.clear();
+    sessionStorage.clear();
+}
 
 export async function get(path) {
     const r = await fetch(`${API}${path}`, {

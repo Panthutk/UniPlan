@@ -2,12 +2,13 @@
 import csv
 import io
 import re
-import json, os, urllib.parse
+import json, os, secrets, time, urllib.parse
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.core.signing import dumps, loads, BadSignature, SignatureExpired
+from django.utils import timezone
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -36,6 +37,9 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.dateparse import parse_datetime
 
+import logging
+logger = logging.getLogger("security")
+
 
 # ---- Scopes----
 SCOPES = [
@@ -60,15 +64,51 @@ def _client_config():
         }
     }
 
-# ---- signed token helpers (demo) ----
+
+# ---- V7.2.3 / V14.2.1: Signed token helpers ----
+# Token now includes a random `jti` (JWT ID) for ≥128 bits of entropy,
+# and an `iat` (issued-at) timestamp for session invalidation checks.
+
 def _sign(email: str) -> str:
-    return dumps({"sub": email}, salt="uniplan", key=settings.SECRET_KEY)
+    """Create a signed token with ≥128 bits of entropy (V7.2.3)."""
+    return dumps(
+        {
+            "sub": email,
+            "jti": secrets.token_urlsafe(24),  # 192 bits of randomness
+            "iat": int(time.time()),
+        },
+        salt="uniplan",
+        key=settings.SECRET_KEY,
+    )
 
 def _unsign(token: str):
+    """
+    Verify and decode a signed token.
+    Returns (email, issued_at_timestamp) or (None, None).
+    Also checks V7.4.2: reject tokens issued before account's token_valid_after.
+    """
     try:
-        return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8)["sub"]
+        data = loads(
+            token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8
+        )
+        email = data.get("sub")
+        iat = data.get("iat", 0)
+        if not email:
+            return None, None
+
+        # V7.4.2 — Check if token was issued before a forced invalidation
+        try:
+            acc = GoogleAccount.objects.get(pk=email)
+            if acc.token_valid_after:
+                if iat < acc.token_valid_after.timestamp():
+                    logger.info("Token rejected (issued before invalidation) for %s", email)
+                    return None, None
+        except GoogleAccount.DoesNotExist:
+            pass
+
+        return email, iat
     except (BadSignature, SignatureExpired, KeyError):
-        return None
+        return None, None
 
 def _creds_for(email: str):
     try:
@@ -76,6 +116,51 @@ def _creds_for(email: str):
     except GoogleAccount.DoesNotExist:
         return None
     return Credentials.from_authorized_user_info(acc.credentials, SCOPES)
+
+
+# ---- V3.3.1 / V14.2.1: Cookie helpers ----
+
+def _set_auth_cookie(response, token):
+    """Set a secure, HttpOnly auth cookie (V3.3.1, V3.3.4, V14.2.1)."""
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        value=token,
+        max_age=settings.AUTH_COOKIE_MAX_AGE,
+        httponly=settings.AUTH_COOKIE_HTTPONLY,  # V3.3.4
+        secure=settings.AUTH_COOKIE_SECURE,      # V3.3.1
+        samesite=settings.AUTH_COOKIE_SAMESITE,  # V3.3.2
+        path=settings.AUTH_COOKIE_PATH,
+        domain=settings.AUTH_COOKIE_DOMAIN,
+    )
+    return response
+
+def _clear_auth_cookie(response):
+    """Clear the auth cookie on logout (V14.3.1)."""
+    response.delete_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        path=settings.AUTH_COOKIE_PATH,
+        domain=settings.AUTH_COOKIE_DOMAIN,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+    )
+    return response
+
+def _get_token_from_request(request):
+    """
+    Read the auth token from (1) HttpOnly cookie or (2) Authorization header.
+    Cookie is preferred (V14.2.1); header kept for backward compatibility.
+    """
+    # Try cookie first
+    token = request.COOKIES.get(settings.AUTH_COOKIE_NAME)
+    if token:
+        return token
+
+    # Fallback: Authorization header (for API clients / mobile)
+    authz = request.META.get("HTTP_AUTHORIZATION", "")
+    if authz.startswith("Bearer "):
+        return authz.split(" ", 1)[1].strip()
+
+    return None
+
 
 @require_GET
 def hello(request):
@@ -94,8 +179,14 @@ def google_login(request):
     )
     return JsonResponse({"auth_url": auth_url})
 
+
 @require_GET
 def google_callback(request):
+    """
+    OAuth callback — V14.2.1: No longer passes token/email/name in URL.
+    Sets an HttpOnly cookie with the signed token and passes only non-sensitive
+    user info via a short-lived query param.
+    """
     code = request.GET.get("code")
     if not code:
         return HttpResponseBadRequest("Missing code")
@@ -117,19 +208,57 @@ def google_callback(request):
         defaults={"credentials": json.loads(creds.to_json()), "name": name, "picture": picture},
     )
 
+    # V14.2.1 — Token goes into HttpOnly cookie, NOT in URL
     token = _sign(email)
-    frontend_redirect = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
+    frontend_url = settings.FRONTEND_URL
 
-    qs = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
-    return redirect(f"{frontend_redirect}?{qs}")
+    # Only pass non-sensitive display info via URL (name & picture are public profile data)
+    qs = urllib.parse.urlencode({"login": "success", "name": name, "picture": picture})
+    response = redirect(f"{frontend_url}?{qs}")
+    _set_auth_cookie(response, token)
 
-# ---- auth guard ----
+    logger.info("Successful OAuth login for %s", email)
+    return response
+
+
+# ---- V7.4.2 + V14.3.1: Logout endpoint ----
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def logout_view(request):
+    """
+    Logout: invalidate token (V7.4.2) + clear client storage (V14.3.1).
+    """
+    token = _get_token_from_request(request)
+    if token:
+        email, _ = _unsign(token)
+        if email:
+            # V7.4.2 — Invalidate all tokens issued before now
+            try:
+                acc = GoogleAccount.objects.get(pk=email)
+                acc.token_valid_after = timezone.now()
+                acc.save(update_fields=["token_valid_after"])
+                logger.info("Logout: invalidated all sessions for %s", email)
+            except GoogleAccount.DoesNotExist:
+                pass
+
+    response = Response({"detail": "Logged out"})
+
+    # V14.3.1 — Clear auth cookie
+    _clear_auth_cookie(response)
+
+    # V14.3.1 — Clear-Site-Data header to wipe browser storage
+    response["Clear-Site-Data"] = '"cookies", "storage"'
+
+    return response
+
+
+# ---- auth guard (for non-DRF views) ----
 def _require_auth(request):
-    authz = request.META.get("HTTP_AUTHORIZATION", "")
-    if not authz.startswith("Bearer "):
-        return None, JsonResponse({"detail": "Missing bearer token"}, status=401)
+    token = _get_token_from_request(request)
+    if not token:
+        return None, JsonResponse({"detail": "Missing authentication"}, status=401)
 
-    email = _unsign(authz.split(" ", 1)[1])
+    email, _ = _unsign(token)
     if not email:
         return None, JsonResponse({"detail": "Invalid/expired token"}, status=401)
 

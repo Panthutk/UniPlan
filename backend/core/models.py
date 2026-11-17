@@ -8,6 +8,10 @@ class GoogleAccount(models.Model):
     name = models.CharField(max_length=255, blank=True, default="")
     picture = models.URLField(blank=True, default="")
 
+    # V7.4.2 — Session invalidation: tokens issued before this timestamp
+    # are rejected. Set to now() on logout / account disable / password change.
+    token_valid_after = models.DateTimeField(null=True, blank=True)
+
     def __str__(self):
         return self.email
 
