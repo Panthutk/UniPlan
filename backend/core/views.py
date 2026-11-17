@@ -1,6 +1,7 @@
 # backend/core/views.py
 import csv
 import io
+import logging
 import re
 import json, os, urllib.parse
 from django.conf import settings
@@ -8,6 +9,10 @@ from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.core.signing import dumps, loads, BadSignature, SignatureExpired
+from core.exceptions import get_client_ip, sanitize_log_value
+
+auth_logger = logging.getLogger("security.auth")
+error_logger = logging.getLogger("security.errors")
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -67,7 +72,15 @@ def _sign(email: str) -> str:
 def _unsign(token: str):
     try:
         return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8)["sub"]
-    except (BadSignature, SignatureExpired, KeyError):
+    except SignatureExpired:
+        auth_logger.warning(
+            "event=token_validation_failed reason=expired_signature auth_type=bearer_signed_token"
+        )
+        return None
+    except (BadSignature, KeyError):
+        auth_logger.warning(
+            "event=token_validation_failed reason=bad_signature auth_type=bearer_signed_token"
+        )
         return None
 
 def _creds_for(email: str):
@@ -84,6 +97,7 @@ def hello(request):
 # ---- OAuth ----
 @require_GET
 def google_login(request):
+    ip = get_client_ip(request)
     flow = Flow.from_client_config(
         _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
     )
@@ -92,22 +106,46 @@ def google_login(request):
         include_granted_scopes="true",
         prompt="consent",
     )
+    auth_logger.info(
+        "event=oauth_login_initiated provider=google auth_type=oauth2 ip=%s",
+        ip,
+    )
     return JsonResponse({"auth_url": auth_url})
 
 @require_GET
 def google_callback(request):
+    ip = get_client_ip(request)
     code = request.GET.get("code")
     if not code:
+        auth_logger.warning(
+            "event=oauth_callback_failure reason=missing_code provider=google auth_type=oauth2 ip=%s",
+            ip,
+        )
         return HttpResponseBadRequest("Missing code")
 
-    flow = Flow.from_client_config(
-        _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
-    )
-    flow.fetch_token(code=code)
-    creds: Credentials = flow.credentials
+    try:
+        flow = Flow.from_client_config(
+            _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
+        )
+        flow.fetch_token(code=code)
+        creds: Credentials = flow.credentials
 
-    oauth2 = build("oauth2", "v2", credentials=creds)
-    me = oauth2.userinfo().get().execute()
+        oauth2 = build("oauth2", "v2", credentials=creds)
+        me = oauth2.userinfo().get().execute()
+    except Exception as exc:
+        auth_logger.error(
+            "event=oauth_callback_error provider=google auth_type=oauth2 ip=%s error=%s",
+            ip,
+            sanitize_log_value(str(exc)),
+        )
+        error_logger.error(
+            "event=oauth_token_exchange_failed provider=google ip=%s error=%s",
+            ip,
+            sanitize_log_value(str(exc)),
+            exc_info=True,
+        )
+        return HttpResponseBadRequest("OAuth authentication failed")
+
     email = me.get("email")
     name = me.get("name", "")
     picture = me.get("picture", "")
@@ -118,6 +156,11 @@ def google_callback(request):
     )
 
     token = _sign(email)
+    auth_logger.info(
+        "event=oauth_login_success user=%s provider=google auth_type=oauth2 ip=%s",
+        sanitize_log_value(email),
+        ip,
+    )
     frontend_redirect = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
 
     qs = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
@@ -125,28 +168,70 @@ def google_callback(request):
 
 # ---- auth guard ----
 def _require_auth(request):
+    ip = get_client_ip(request)
+    path = sanitize_log_value(getattr(request, "path", "-"))
     authz = request.META.get("HTTP_AUTHORIZATION", "")
     if not authz.startswith("Bearer "):
+        auth_logger.warning(
+            "event=auth_failure reason=missing_bearer_token auth_type=bearer_signed_token ip=%s path=%s",
+            ip,
+            path,
+        )
         return None, JsonResponse({"detail": "Missing bearer token"}, status=401)
 
     email = _unsign(authz.split(" ", 1)[1])
     if not email:
+        auth_logger.warning(
+            "event=auth_failure reason=invalid_or_expired_token auth_type=bearer_signed_token ip=%s path=%s",
+            ip,
+            path,
+        )
         return None, JsonResponse({"detail": "Invalid/expired token"}, status=401)
 
     creds = _creds_for(email)
     if not creds:
+        auth_logger.warning(
+            "event=auth_failure reason=no_google_credentials user=%s auth_type=google_oauth_token ip=%s path=%s",
+            sanitize_log_value(email),
+            ip,
+            path,
+        )
         return None, JsonResponse({"detail": "No Google credentials stored"}, status=401)
 
     # refresh if needed and persist
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
         try:
+            creds.refresh(Request())
             acc = GoogleAccount.objects.get(pk=email)
             acc.credentials = json.loads(creds.to_json())
             acc.save(update_fields=["credentials"])
+            auth_logger.info(
+                "event=oauth_token_refreshed user=%s provider=google auth_type=oauth2_refresh_token ip=%s",
+                sanitize_log_value(email),
+                ip,
+            )
         except GoogleAccount.DoesNotExist:
-            pass
+            error_logger.warning(
+                "event=google_account_missing_on_refresh user=%s ip=%s",
+                sanitize_log_value(email),
+                ip,
+            )
+        except Exception as exc:
+            error_logger.error(
+                "event=oauth_token_refresh_failed user=%s provider=google ip=%s error=%s",
+                sanitize_log_value(email),
+                ip,
+                sanitize_log_value(str(exc)),
+                exc_info=True,
+            )
+            return None, JsonResponse({"detail": "Failed to refresh Google credentials"}, status=401)
 
+    auth_logger.info(
+        "event=auth_success user=%s auth_type=bearer_signed_token ip=%s path=%s",
+        sanitize_log_value(email),
+        ip,
+        path,
+    )
     return (email, creds), None
 
 # ---- Classroom API ----
@@ -195,8 +280,13 @@ def list_active_submissions(request, course_id: str):
             cw_map[cw_id] = classroom.courses().courseWork().get(
                 courseId=course_id, id=cw_id
             ).execute()
-        except Exception:
-            pass  # ignore if missing
+        except Exception as exc:
+            error_logger.warning(
+                "event=classroom_coursework_fetch_error course_id=%s coursework_id=%s error=%s",
+                sanitize_log_value(course_id),
+                sanitize_log_value(cw_id),
+                sanitize_log_value(str(exc)),
+            )
 
     # merge coursework info into each submission
     for s in subs:
@@ -319,34 +409,70 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No file uploaded (field name must be 'file')."}, status=400)
 
         # 1) quick guards
+        ip = get_client_ip(request)
         name = (f.name or "").lower()
         ctype = (f.content_type or "").lower()
         if not name.endswith(".csv"):
+            error_logger.warning(
+                "event=csv_import_rejected reason=invalid_extension user=%s ip=%s filename=%s",
+                sanitize_log_value(user.username),
+                ip,
+                sanitize_log_value(name),
+            )
             return Response({"detail": "Only .csv files are accepted."}, status=400)
         if ctype and ctype not in ALLOWED_MIMES:
+            error_logger.warning(
+                "event=csv_import_rejected reason=unsupported_content_type user=%s ip=%s content_type=%s",
+                sanitize_log_value(user.username),
+                ip,
+                sanitize_log_value(ctype),
+            )
             return Response({"detail": f"Unsupported content-type '{ctype}'."}, status=415)
         if f.size and f.size > MAX_BYTES:
+            error_logger.warning(
+                "event=csv_import_rejected reason=file_too_large user=%s ip=%s size=%s",
+                sanitize_log_value(user.username),
+                ip,
+                f.size,
+            )
             return Response({"detail": f"File too large (> {MAX_BYTES//1000} KB)."}, status=413)
 
         # 2) decode (tolerate BOM)
         raw = f.read()
         try:
             text = raw.decode("utf-8-sig")
-        except Exception:
+        except UnicodeDecodeError:
             try:
                 text = raw.decode("utf-8")
-            except Exception:
+            except UnicodeDecodeError as exc:
+                error_logger.warning(
+                    "event=csv_import_rejected reason=invalid_utf8 user=%s ip=%s error=%s",
+                    sanitize_log_value(user.username),
+                    ip,
+                    sanitize_log_value(str(exc)),
+                )
                 return Response({"detail": "File is not valid UTF-8 text."}, status=400)
 
         # 3) sniff CSV
         sample = text[:4096]
         if "," not in sample and ";" not in sample and "\t" not in sample:
+            error_logger.warning(
+                "event=csv_import_rejected reason=not_csv_like user=%s ip=%s",
+                sanitize_log_value(user.username),
+                ip,
+            )
             return Response({"detail": "Not a CSV-like text file."}, status=400)
 
         # 4) dialect + reader
         try:
             dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
-        except Exception:
+        except csv.Error as exc:
+            error_logger.info(
+                "event=csv_sniffer_fallback user=%s ip=%s detail=%s",
+                sanitize_log_value(user.username),
+                ip,
+                sanitize_log_value(str(exc)),
+            )
             dialect = csv.excel
             dialect.delimiter = ","
 
@@ -534,13 +660,22 @@ def send_test_email(request):
 
     subject = "UniPlan Test Email"
     message = f"Hello {user.username or user.email},\n\nThis is a test email from UniPlan!"
-    send_mail(
-        subject,
-        message,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        error_logger.error(
+            "event=smtp_send_failed user=%s error=%s",
+            sanitize_log_value(user.email),
+            sanitize_log_value(str(exc)),
+            exc_info=True,
+        )
+        return Response({"detail": "Failed to send email."}, status=502)
     return Response({"detail": f"Email sent to {user.email}!"})
 
 @api_view(["GET"])
