@@ -495,7 +495,11 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
         def norm_time(s):
             s = (s or "").strip()
             if not s or not TIME_RE.match(s): return None
-            return s if len(s) == 8 else s + ":00"  # HH:MM -> HH:MM:SS
+            full = s if len(s) == 8 else s + ":00"  # HH:MM -> HH:MM:SS
+            hh, mm, ss = (int(part) for part in full.split(":"))
+            if not (0 <= hh <= 23 and 0 <= mm <= 59 and 0 <= ss <= 59):
+                return None
+            return full
 
         for i, row in enumerate(reader, start=2):  # data starts at line 2
             subj = (row.get("subject") or row.get("subject_name") or "").strip()
@@ -516,6 +520,8 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
                 errors.append(f"Line {i}: invalid day_of_week '{dow_raw}'"); continue
             if not st or not et:
                 errors.append(f"Line {i}: invalid time (use HH:MM or HH:MM:SS)"); continue
+            if st >= et:
+                errors.append(f"Line {i}: end_time must be after start_time"); continue
 
             rows.append((subj, dow, st, et, rm))
 
