@@ -18,7 +18,10 @@ const auth = {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 async function getGoogleAuthUrl() {
-  const r = await fetch(`${BASE_URL}/api/auth/google/login`);
+  // V10.1.2 / V10.2.1: credentials: "include" ensures the HttpOnly oauth_state cookie is stored
+  const r = await fetch(`${BASE_URL}/api/auth/google/login`, {
+    credentials: "include",
+  });
   if (!r.ok) throw new Error("Failed to get Google auth URL");
   return r.json(); // { auth_url }
 }
@@ -27,16 +30,16 @@ export default function Login() {
   const navigate = useNavigate();
   const [toasts, setToasts] = useState([]);
 
-
   function pushToast({ type = "info", title, desc = "", duration = 3500, icon = null }) {
     const id = (crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
     setToasts((t) => [...t, { id, type, title, desc, icon }]);
-    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration);
   }
 
-  // If we arrive with ?token=..., store and continue
+  // V10.1.1: Read token from URL fragment (#token=...) so it is never sent in HTTP requests/server logs
   useEffect(() => {
-    const qs = new URLSearchParams(window.location.search);
+    const rawHash = window.location.hash ? window.location.hash.substring(1) : "";
+    const qs = new URLSearchParams(rawHash || window.location.search);
     const token = qs.get("token");
     if (token) {
       const user = {
@@ -46,8 +49,8 @@ export default function Login() {
       };
       auth.token = token;
       auth.user = user;
-      // Clean the URL so the params don't linger
-      window.history.replaceState({}, "", "/login");
+      // Clean the URL immediately so the fragment/params don't linger in browser history
+      window.history.replaceState({}, "", "/");
       navigate("/tableandtask", { replace: true });
     }
   }, [navigate]);

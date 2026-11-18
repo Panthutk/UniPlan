@@ -2,6 +2,11 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
+import ssl
+
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")  # <-- add this
@@ -74,11 +79,19 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.auth.SignedTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # V6.1.1 & V6.3.1: Rate limiting / anti-automation without account lockout
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "120/minute",
+    },
 }
 
 # If using django-cors-headers:
@@ -112,3 +125,17 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+
+# V12.3.2: Verify default SSL/TLS context enforces certificate validation and hostname checking
+_DEFAULT_TLS_CTX = ssl.create_default_context()
+assert _DEFAULT_TLS_CTX.verify_mode == ssl.CERT_REQUIRED
+assert _DEFAULT_TLS_CTX.check_hostname is True
+
+# Production HTTPS / TLS enforcement when DEBUG is disabled
+DEBUG = os.getenv("DEBUG", "1").lower() in ("1", "true", "yes")
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True

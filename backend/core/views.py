@@ -3,11 +3,19 @@ import csv
 import io
 import re
 import json, os, urllib.parse
+import secrets
+import ssl
+import httplib2
+import google_auth_httplib2
+import requests
+from django.core.exceptions import ImproperlyConfigured
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.core.signing import dumps, loads, BadSignature, SignatureExpired
+from django.core.cache import cache
+from .auth import sign_token as _sign, _unsign
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -36,6 +44,24 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.dateparse import parse_datetime
 
+def _verified_requests_session() -> requests.Session:
+    """
+    V12.3.2: Return a requests.Session that strictly enforces TLS server
+    certificate chain and hostname verification (verify=True).
+    """
+    session = requests.Session()
+    session.verify = True
+    return session
+
+
+def _build_verified_google_service(service_name: str, version: str, creds: Credentials):
+    """
+    V12.3.2: Build a Google API client over an httplib2 transport that explicitly
+    enforces TLS server certificate validation (disable_ssl_certificate_validation=False).
+    """
+    http = httplib2.Http(disable_ssl_certificate_validation=False, timeout=15)
+    authed_http = google_auth_httplib2.AuthorizedHttp(creds, http=http)
+    return build(service_name, version, http=authed_http, cache_discovery=False)
 
 # ---- Scopes----
 SCOPES = [
@@ -44,10 +70,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly",
-    "https://www.googleapis.com/auth/classroom.coursework.me",
+    "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
 ]
 
 def _client_config():
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise ImproperlyConfigured("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured for confidential client authentication.")
     return {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -59,16 +87,6 @@ def _client_config():
             "javascript_origins": ["http://127.0.0.1:5173", "http://localhost:5173"],
         }
     }
-
-# ---- signed token helpers (demo) ----
-def _sign(email: str) -> str:
-    return dumps({"sub": email}, salt="uniplan", key=settings.SECRET_KEY)
-
-def _unsign(token: str):
-    try:
-        return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8)["sub"]
-    except (BadSignature, SignatureExpired, KeyError):
-        return None
 
 def _creds_for(email: str):
     try:
@@ -82,36 +100,86 @@ def hello(request):
     return JsonResponse({"ok": True})
 
 # ---- OAuth ----
+def _check_auth_rate_limit(request, scope: str, limit: int = 15, window: int = 60) -> bool:
+    """
+    V6.1.1 / V6.3.1: Per-IP rate limiting on authentication endpoints.
+    Returns True if allowed, False if rate limit exceeded (prevents brute-force
+    and token-endpoint abuse without locking out user accounts).
+    """
+    ip = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip() or request.META.get("REMOTE_ADDR", "unknown")
+    key = f"rl:{scope}:{ip}"
+    count = cache.get(key, 0)
+    if count >= limit:
+        return False
+    cache.set(key, count + 1, timeout=window)
+    return True
+
 @require_GET
 def google_login(request):
+    if not _check_auth_rate_limit(request, "oauth_login", limit=15, window=60):
+        return JsonResponse({"detail": "Too many login requests. Please try again in a minute."}, status=429)
     flow = Flow.from_client_config(
         _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
     )
-    auth_url, _ = flow.authorization_url(
+    # V10.1.2 & V10.2.1: Generate CSPRNG state parameter bound to user agent session
+    raw_state = secrets.token_urlsafe(32)
+    auth_url, state = flow.authorization_url(
+        state=raw_state,
         access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",
+        prompt="consent",  # V10.7.1: Explicitly prompt user for consent on each authorization request
     )
-    return JsonResponse({"auth_url": auth_url})
+    signed_state = dumps({"state": state}, salt="uniplan-oauth-state", key=settings.SECRET_KEY)
+    resp = JsonResponse({"auth_url": auth_url})
+    resp.set_cookie(
+        "oauth_state",
+        signed_state,
+        max_age=600,       # 10-minute transaction lifetime
+        httponly=True,
+        samesite="Lax",
+        secure=not settings.DEBUG,
+    )
+    resp["Cache-Control"] = "no-store"
+    return resp
 
 @require_GET
 def google_callback(request):
+    if not _check_auth_rate_limit(request, "oauth_callback", limit=15, window=60):
+        return JsonResponse({"detail": "Too many authentication attempts. Please try again in a minute."}, status=429)
     code = request.GET.get("code")
+    returned_state = request.GET.get("state")
+    cookie_state = request.COOKIES.get("oauth_state")
+
     if not code:
         return HttpResponseBadRequest("Missing code")
 
+    # V10.1.2 & V10.2.1: Validate state parameter against the signed HttpOnly session cookie
+    if not returned_state or not cookie_state:
+        return HttpResponseBadRequest("Missing OAuth state parameter")
+    try:
+        expected_state = loads(
+            cookie_state, salt="uniplan-oauth-state", key=settings.SECRET_KEY, max_age=600
+        ).get("state")
+    except (BadSignature, SignatureExpired):
+        return HttpResponseBadRequest("Invalid or expired OAuth state")
+
+    if not expected_state or not secrets.compare_digest(str(returned_state), str(expected_state)):
+        return HttpResponseBadRequest("OAuth state mismatch (CSRF protection)")
+
+    # V10.4.10: Backchannel token exchange authenticates confidential client using client_id & client_secret
     flow = Flow.from_client_config(
-        _client_config(), scopes=SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI
+        _client_config(), scopes=SCOPES, state=expected_state, redirect_uri=settings.GOOGLE_REDIRECT_URI
     )
     flow.fetch_token(code=code)
     creds: Credentials = flow.credentials
 
-    oauth2 = build("oauth2", "v2", credentials=creds)
+    oauth2 = _build_verified_google_service("oauth2", "v2", creds)
     me = oauth2.userinfo().get().execute()
     email = me.get("email")
     name = me.get("name", "")
     picture = me.get("picture", "")
 
+    # V10.1.1: Backend-for-Frontend (BFF) pattern — Google OAuth access_token and refresh_token
+    # are stored strictly on the backend database and never sent to the browser.
     GoogleAccount.objects.update_or_create(
         email=email,
         defaults={"credentials": json.loads(creds.to_json()), "name": name, "picture": picture},
@@ -120,12 +188,18 @@ def google_callback(request):
     token = _sign(email)
     frontend_redirect = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
 
-    qs = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
-    return redirect(f"{frontend_redirect}?{qs}")
+    # V10.1.1: Deliver app session token via URL fragment (#) instead of query string (?)
+    # so it is never transmitted in HTTP requests, server logs, or Referer headers.
+    fragment = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
+    resp = redirect(f"{frontend_redirect}#{fragment}")
+    resp.delete_cookie("oauth_state")
+    resp["Cache-Control"] = "no-store"
+    return resp
 
 # ---- auth guard ----
 def _require_auth(request):
     authz = request.META.get("HTTP_AUTHORIZATION", "")
+
     if not authz.startswith("Bearer "):
         return None, JsonResponse({"detail": "Missing bearer token"}, status=401)
 
@@ -139,7 +213,7 @@ def _require_auth(request):
 
     # refresh if needed and persist
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        creds.refresh(Request(session=_verified_requests_session()))
         try:
             acc = GoogleAccount.objects.get(pk=email)
             acc.credentials = json.loads(creds.to_json())
@@ -157,7 +231,7 @@ def list_courses(request):
     if err: return err
     _, creds = auth
 
-    classroom = build("classroom", "v1", credentials=creds)
+    classroom = _build_verified_google_service("classroom", "v1", creds)
     data = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute()
     return JsonResponse(data)
 
@@ -173,7 +247,7 @@ def list_active_submissions(request, course_id: str):
         return err
     _, creds = auth
 
-    classroom = build("classroom", "v1", credentials=creds)
+    classroom = _build_verified_google_service("classroom", "v1", creds)
 
     # fetch my active submissions
     data = classroom.courses().courseWork().studentSubmissions().list(
@@ -221,7 +295,7 @@ def summary(request):
     if err: return err
     email, creds = auth
 
-    classroom = build("classroom", "v1", credentials=creds)
+    classroom = _build_verified_google_service("classroom", "v1", creds)
     courses = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute().get("courses", [])
     return JsonResponse({
         "email": email,
@@ -275,11 +349,26 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
 
+    @staticmethod
+    def _sanitize_csv_cell(val: str) -> str:
+        """
+        V5.1.1 / V5.3.1: Prevent CSV Formula Injection when end-users download/open the file.
+        Prefixes dangerous leading characters (=, +, -, @, tab, CR) with a single quote.
+        """
+        s = str(val or "")
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return f"'{s}"
+        return s
+
     @action(detail=False, methods=["get"], url_path="export", url_name="export")
     def export_csv(self, request):
         user = request.user
         if not user or not user.is_authenticated:
             return Response({"detail": "Authentication required."}, status=401)
+
+        # V5.3.2 & V5.4.1: Explicitly ignore any user-submitted filename parameters in URL/JSON
+        # Always use a trusted, internally generated static filename.
+        safe_filename = "timetable.csv"
 
         rows = (
             TimetableEntry.objects
@@ -288,26 +377,28 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
             .order_by("day_of_week", "start_time")
         )
 
-        # build CSV
-        resp = HttpResponse(content_type="text/csv")
-        resp["Content-Disposition"] = 'attachment; filename="timetable.csv"'
+        # Build CSV strictly in-memory (V5.3.1: never written to a public folder)
+        resp = HttpResponse(content_type="text/csv; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
+        resp["X-Content-Type-Options"] = "nosniff"
+        resp["Cache-Control"] = "no-store"
+
         writer = csv.writer(resp)
-        # headers — keep simple and stable
         writer.writerow(["subject", "day_of_week", "start_time", "end_time", "room"])
         for r in rows:
             writer.writerow([
-                r.subject.name if r.subject else "",
+                self._sanitize_csv_cell(r.subject.name if r.subject else ""),
                 r.day_of_week,                 # backend 0=Sun..6=Sat
                 r.start_time.strftime("%H:%M:%S"),
                 r.end_time.strftime("%H:%M:%S"),
-                r.room or "",
+                self._sanitize_csv_cell(r.room or ""),
             ])
         return resp
 
     @action(detail=False, methods=["post"], url_path="import", url_name="import")
     def import_csv(self, request):
-        MAX_BYTES = 1_000_000  # 1 MB
-        ALLOWED_MIMES = {"text/csv", "application/csv", "application/vnd.ms-excel"}  # browsers vary
+        MAX_BYTES = 1_000_000  # 1 MB (V5.2.1)
+        ALLOWED_MIMES = {"text/csv", "application/csv", "application/vnd.ms-excel"}
         TIME_RE = re.compile(r"^\d{2}:\d{2}(:\d{2})?$")
 
         user = request.user
@@ -318,10 +409,13 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
         if not f:
             return Response({"detail": "No file uploaded (field name must be 'file')."}, status=400)
 
-        # 1) quick guards
-        name = (f.name or "").lower()
+        # V5.3.2: Sanitize user-submitted filename with os.path.basename() solely to check extension;
+        # never use the user-submitted filename to construct a filesystem path.
+        raw_filename = os.path.basename(f.name or "")
+        _, ext = os.path.splitext(raw_filename.lower())
         ctype = (f.content_type or "").lower()
-        if not name.endswith(".csv"):
+
+        if ext != ".csv":
             return Response({"detail": "Only .csv files are accepted."}, status=400)
         if ctype and ctype not in ALLOWED_MIMES:
             return Response({"detail": f"Unsupported content-type '{ctype}'."}, status=415)
@@ -372,11 +466,11 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
             return s if len(s) == 8 else s + ":00"  # HH:MM -> HH:MM:SS
 
         for i, row in enumerate(reader, start=2):  # data starts at line 2
-            subj = (row.get("subject") or row.get("subject_name") or "").strip()
+            subj = (row.get("subject") or row.get("subject_name") or "").strip().lstrip("=+-@\t\r")
             dow_raw = (row.get("day_of_week") or "").strip()
             st = norm_time(row.get("start_time"))
             et = norm_time(row.get("end_time"))
-            rm = (row.get("room") or "").strip()
+            rm = (row.get("room") or "").strip().lstrip("=+-@\t\r")
 
             if not subj:
                 errors.append(f"Line {i}: subject empty"); continue
