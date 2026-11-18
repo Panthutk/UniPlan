@@ -8,9 +8,10 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import uniplanLogo from "./assets/uniplanLogo.svg";
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import { Toasts } from '@/components/popup/Toasts';
+// V14.2.1: Token is stored in HttpOnly cookie (not accessible to JS).
+// Only non-sensitive display info (name, picture) is kept in localStorage.
 const auth = {
-  get token() { return localStorage.getItem("jwt"); },
-  set token(v) { v ? localStorage.setItem("jwt", v) : localStorage.removeItem("jwt"); },
+  // Token is in HttpOnly cookie — no JS access needed (V3.3.4)
   get user() { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } },
   set user(v) { v ? localStorage.setItem("user", JSON.stringify(v)) : localStorage.removeItem("user"); }
 };
@@ -34,17 +35,17 @@ export default function Login() {
     setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
   }
 
-  // If we arrive with ?token=..., store and continue
+  // V14.2.1: Token is now in an HttpOnly cookie (not in URL).
+  // We only receive non-sensitive display info (name, picture) via URL.
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
-    const token = qs.get("token");
-    if (token) {
+    const loginSuccess = qs.get("login");
+    if (loginSuccess === "success") {
       const user = {
-        email: qs.get("email"),
         name: qs.get("name"),
         picture: qs.get("picture"),
       };
-      auth.token = token;
+      // Store only display info (not the token — that's in the HttpOnly cookie)
       auth.user = user;
       // Clean the URL so the params don't linger
       window.history.replaceState({}, "", "/login");

@@ -250,10 +250,10 @@ function buildAssignments(courses, subsByCourse) {
 
 
 /* ----------------- API (from google classroom) ----------------- */
-async function authGet(path, token) {
+// V14.2.1: Auth token is now in HttpOnly cookie — no need to pass Bearer header
+async function authGet(path) {
   const r = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    credentials: "include",
+    credentials: "include",  // sends the HttpOnly cookie automatically
   });
   if (!r.ok) throw new Error(`GET ${path} failed (${r.status})`);
   return r.json();
@@ -537,7 +537,8 @@ function EventModal({ open, initial, onClose, onSave, onDelete, subjectOptions, 
 /* Page: layout  */
 export default function ClassroomTimetableDashboard() {
   const nav = useNavigate();
-  const token = localStorage.getItem("jwt");
+  // V14.2.1: Token is in HttpOnly cookie — we just check if user display info exists
+  const isLoggedIn = !!localStorage.getItem("user");
   const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "null"), []);
 
   const [loading, setLoading] = useState(true);
@@ -913,13 +914,13 @@ export default function ClassroomTimetableDashboard() {
   };
 
   useEffect(() => {
-    if (!token) { nav("/login"); return; }
+    if (!isLoggedIn) { nav("/login"); return; }
     (async () => {
       try {
         setLoading(true);
         setErr(null);
 
-        const coursesJson = await authGet("/api/classroom/courses", token);
+        const coursesJson = await authGet("/api/classroom/courses");
         const active = normalizeCourses(coursesJson).filter(
           (c) => (c.courseState || c.state || "ACTIVE") === "ACTIVE"
         );
@@ -928,7 +929,7 @@ export default function ClassroomTimetableDashboard() {
         const results = await Promise.allSettled(
           active.map(async (c) => {
             const id = c.id || c.courseId;
-            const sj = await authGet(`/api/classroom/active-submissions/${encodeURIComponent(id)}`, token);
+            const sj = await authGet(`/api/classroom/active-submissions/${encodeURIComponent(id)}`);
             return { id, list: normalizeSubmissions(sj) };
           })
         );
@@ -942,7 +943,7 @@ export default function ClassroomTimetableDashboard() {
         setLoading(false);
       }
     })();
-  }, [token, nav]);
+  }, [isLoggedIn, nav]);
 
   // subject options for datalist
   const subjectOptions = useMemo(() => {
@@ -1104,7 +1105,7 @@ export default function ClassroomTimetableDashboard() {
     };
   }, []);
 
-  if (!token) return null;
+  if (!isLoggedIn) return null;
 
   // Show full skeleton until EVERYTHING is ready
   if (loading || meLoading || tasksLoading || !subjects.length) {

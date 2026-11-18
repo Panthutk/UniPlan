@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-
+import secrets
 import jwt
 from django.conf import settings
 
@@ -20,8 +20,10 @@ def issue_session_token(email: str) -> str:
         {
             "sub": email,
             "iat": now,
+            "iat_f": now.timestamp(),
             "nbf": now,
             "exp": now + TOKEN_LIFETIME,
+            "jti": secrets.token_urlsafe(24),  # 192 bits of CSPRNG entropy (V7.2.3)
         },
         _signing_key(),
         algorithm=SIGNING_ALGORITHM,
@@ -29,18 +31,18 @@ def issue_session_token(email: str) -> str:
     )
 
 
-def verify_session_token(token: str) -> str | None:
+def decode_session_token(token: str) -> tuple[str | None, int | None]:
     if not token:
-        return None
+        return None, None
     try:
         header = jwt.get_unverified_header(token)
     except jwt.InvalidTokenError:
-        return None
+        return None, None
 
     if header.get("alg") not in ALLOWED_ALGORITHMS:
-        return None
+        return None, None
     if FORBIDDEN_HEADER_PARAMS.intersection(header):
-        return None
+        return None, None
 
     try:
         payload = jwt.decode(
@@ -56,7 +58,37 @@ def verify_session_token(token: str) -> str | None:
             },
         )
     except jwt.InvalidTokenError:
-        return None
+        return None, None
 
     sub = payload.get("sub")
-    return sub if isinstance(sub, str) and sub else None
+    if not isinstance(sub, str) or not sub:
+        return None, None
+
+    iat = payload.get("iat")
+    iat_f = payload.get("iat_f")
+    if iat_f is not None:
+        check_ts = float(iat_f)
+    elif isinstance(iat, (int, float)):
+        check_ts = float(iat)
+    elif hasattr(iat, "timestamp"):
+        check_ts = float(iat.timestamp())
+    else:
+        check_ts = 0.0
+
+    # V7.4.2 — check if token was issued before a forced invalidation (e.g. logout)
+    try:
+        from .models import GoogleAccount
+        acc = GoogleAccount.objects.get(pk=sub)
+        if acc.token_valid_after:
+            if check_ts < acc.token_valid_after.timestamp():
+                return None, None
+    except Exception:
+        pass
+
+    iat_ret = int(check_ts) if check_ts else 0
+    return sub, iat_ret
+
+
+def verify_session_token(token: str) -> str | None:
+    sub, _ = decode_session_token(token)
+    return sub

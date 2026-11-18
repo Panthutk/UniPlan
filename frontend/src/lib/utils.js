@@ -22,9 +22,8 @@ export async function exchangeCode(code) {
   return r.json(); // { token, user }
 }
 
-export async function authGet(path, token) {
+export async function authGet(path) {
   const r = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
     credentials: "include",
   });
   if (!r.ok) throw new Error(`GET ${path} failed`);

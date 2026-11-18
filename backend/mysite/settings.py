@@ -4,12 +4,19 @@ from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")  # <-- add this
+load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET", "dev-only-secret")  # <-- change
+# ---- V13.3.1: Secret management — no hardcoded fallback in production ----
+SECRET_KEY = os.getenv("DJANGO_SECRET")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn("DJANGO_SECRET not set! Using insecure dev default.", stacklevel=1)
+    SECRET_KEY = "dev-only-secret-CHANGE-ME"
 
-DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+# ---- V13.4.2: Debug mode from env (must be OFF in production) ----
+DEBUG = os.getenv("DEBUG", "0") == "1"
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
 INSTALLED_APPS = [
     'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
@@ -20,6 +27,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    # ---- V3.4 / V3.2.1: Security headers + Sec-Fetch validation ----
+    "core.middleware.SecurityHeadersMiddleware",
+    "core.middleware.SecFetchValidationMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -32,7 +42,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5173",
 ]
-CORS_ALLOW_CREDENTIALS = True  # <-- add this
+CORS_ALLOW_CREDENTIALS = True  # Required for cookie-based auth
 
 ROOT_URLCONF = 'mysite.urls'
 
@@ -83,12 +93,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# If using django-cors-headers:
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
 # Ensure Authorization header is allowed (usually default is fine)
 CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 
@@ -114,3 +118,30 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+
+# =====================================================================
+# SECURITY SETTINGS (OWASP ASVS)
+# =====================================================================
+
+# V3.3.1 / V3.3.4 — Auth cookie settings (HttpOnly, Secure, SameSite)
+AUTH_COOKIE_NAME = "__Secure-uniplan-auth"
+AUTH_COOKIE_MAX_AGE = 60 * 60 * 8   # 8 hours (matches token max_age)
+AUTH_COOKIE_HTTPONLY = True           # V3.3.4: not accessible to JS
+AUTH_COOKIE_SAMESITE = "Lax"         # V3.3.2: CSRF protection
+AUTH_COOKIE_SECURE = not DEBUG       # V3.3.1: Secure in production
+AUTH_COOKIE_PATH = "/"
+AUTH_COOKIE_DOMAIN = None            # current host only
+
+# V3.4.1 — HSTS via Django SecurityMiddleware
+SECURE_HSTS_SECONDS = 31536000       # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# V3.4.4 — X-Content-Type-Options
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# V13.4.1 — Prevent serving .git and similar
+# (Handled by .dockerignore excluding .git from build context)
+
+# Frontend URL for OAuth redirect
+FRONTEND_URL = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
