@@ -17,6 +17,7 @@ UniPlan aims to provide an **all-in-one application** that integrates both class
 - [📄 GoogleDoc](https://docs.google.com/document/d/1DCrA-3688mUq6HGsNAnI9CS53ziWLud2McELJog4sqA/edit?usp=sharing) — Project write-up  
 - [🎨 MockUp UI](https://www.canva.com/design/DAGxuHuyKDU/g_PNCcumdICsxAvOEeKd9A/edit?utm_content=DAGxuHuyKDU&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) — Canva prototype  
 - [🛠 Jira Board](https://ku-team-panthut.atlassian.net/jira/software/projects/TAW/settings/access) — Project management  
+- [🔒 Security V1 — Encoding & Sanitization](SECURITY_V1.md) — OWASP ASVS V1 documentation & verification  
 - [📋 Security Logging & Error Handling Inventory (ASVS V16)](SECURITY_LOGGING.md) — Logging architecture, events, and error handling  
 
 ## 👥 Team Members
