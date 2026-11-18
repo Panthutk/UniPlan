@@ -9,7 +9,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import SchoolIcon from '@mui/icons-material/School';
 
 // Helper Calling
-import { get, post, patch, del, API, BASE_URL, authHeader } from "./utils/api";
+import { get, post, patch, del, API, BASE_URL, authHeader, safeExternalUrl } from "./utils/api";
 import { DAYS, parseHHMM, toHHMM, toLabelSS } from "./utils/time";
 import { colorForDay, CreateNewColorHex } from "./utils/color.js";
 import { XIcon } from "./utils/icon.jsx";
@@ -1265,9 +1265,9 @@ export default function ClassroomTimetableDashboard() {
 
                         {/* RIGHT SIDE */}
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          {task.assignment_alt_link && (
+                          {safeExternalUrl(task.assignment_alt_link) && (
                             <a
-                              href={task.assignment_alt_link}
+                              href={safeExternalUrl(task.assignment_alt_link)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 font-semibold"

@@ -32,6 +32,19 @@ export async function logout() {
     sessionStorage.clear();
 }
 
+export function safeExternalUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== "string") return null;
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+            return parsed.href;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 export async function get(path) {
     const r = await fetch(`${API}${path}`, {
         credentials: "include",

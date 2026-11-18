@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import secrets
 import jwt
 from django.conf import settings
+
+auth_logger = logging.getLogger("security.auth")
 
 ALLOWED_ALGORITHMS = ("HS256",)
 SIGNING_ALGORITHM = ALLOWED_ALGORITHMS[0]
@@ -37,11 +40,20 @@ def decode_session_token(token: str) -> tuple[str | None, int | None]:
     try:
         header = jwt.get_unverified_header(token)
     except jwt.InvalidTokenError:
+        auth_logger.warning(
+            "event=token_validation_failed reason=bad_signature auth_type=bearer_signed_token"
+        )
         return None, None
 
     if header.get("alg") not in ALLOWED_ALGORITHMS:
+        auth_logger.warning(
+            "event=token_validation_failed reason=disallowed_algorithm auth_type=bearer_signed_token"
+        )
         return None, None
     if FORBIDDEN_HEADER_PARAMS.intersection(header):
+        auth_logger.warning(
+            "event=token_validation_failed reason=forbidden_header_param auth_type=bearer_signed_token"
+        )
         return None, None
 
     try:
@@ -57,11 +69,22 @@ def decode_session_token(token: str) -> tuple[str | None, int | None]:
                 "verify_iat": True,
             },
         )
+    except jwt.ExpiredSignatureError:
+        auth_logger.warning(
+            "event=token_validation_failed reason=expired_signature auth_type=bearer_signed_token"
+        )
+        return None, None
     except jwt.InvalidTokenError:
+        auth_logger.warning(
+            "event=token_validation_failed reason=bad_signature auth_type=bearer_signed_token"
+        )
         return None, None
 
     sub = payload.get("sub")
     if not isinstance(sub, str) or not sub:
+        auth_logger.warning(
+            "event=token_validation_failed reason=missing_subject auth_type=bearer_signed_token"
+        )
         return None, None
 
     iat = payload.get("iat")
@@ -81,6 +104,9 @@ def decode_session_token(token: str) -> tuple[str | None, int | None]:
         acc = GoogleAccount.objects.get(pk=sub)
         if acc.token_valid_after:
             if check_ts < acc.token_valid_after.timestamp():
+                auth_logger.warning(
+                    "event=token_validation_failed reason=revoked_before_token_valid_after auth_type=bearer_signed_token"
+                )
                 return None, None
     except Exception:
         pass

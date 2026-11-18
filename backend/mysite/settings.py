@@ -91,6 +91,10 @@ REST_FRAMEWORK = {
         "core.authorization.EnforcesDeclaredFunctionPermission",
         "core.authorization.OwnsObject",
     ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "EXCEPTION_HANDLER": "core.exceptions.security_exception_handler",
 }
 
 # Ensure Authorization header is allowed (usually default is fine)
@@ -145,3 +149,62 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Frontend URL for OAuth redirect
 FRONTEND_URL = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
+
+# --- Security & Application Logging (OWASP ASVS V16.1.1, V16.3.1, V16.3.4) ---
+LOG_DIR = Path(os.getenv("LOG_DIR", str(BASE_DIR / "logs")))
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "security_structured": {
+            "format": "{asctime} [{levelname}] logger={name} module={module} pid={process} {message}",
+            "datefmt": "%Y-%m-%dT%H:%M:%SZ",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "security_structured",
+        },
+        "security_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOG_DIR / "security.log"),
+            "maxBytes": 5 * 1024 * 1024,  # 5 MB
+            "backupCount": 5,
+            "encoding": "utf-8",
+            "formatter": "security_structured",
+        },
+    },
+    "loggers": {
+        "security": {
+            "handlers": ["console", "security_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "security.auth": {
+            "handlers": ["console", "security_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "security.errors": {
+            "handlers": ["console", "security_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "security_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "security_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}
