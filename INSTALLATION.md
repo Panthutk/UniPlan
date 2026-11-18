@@ -13,18 +13,18 @@ cd UniPlan
 
 ```env
 # ----------------- GOOGLE OAUTH2 CONFIGURATION ----------------
-DJANGO_SECRET=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
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+DJANGO_SECRET=__CHANGE_ME__
+GOOGLE_CLIENT_ID=__CHANGE_ME__
+GOOGLE_CLIENT_SECRET=__CHANGE_ME__
 GOOGLE_REDIRECT_URI=http://127.0.0.1:8000/api/auth/google/callback
 
 # ----------------- EMAIL CONFIGURATION ----------------
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-DEFAULT_FROM_EMAIL="Uniplan <uniplanlover@gmail.com>"
+DEFAULT_FROM_EMAIL="Uniplan <your_email@example.com>"
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_HOST_USER=uniplanlover@gmail.com
-EMAIL_HOST_PASSWORD=frfbnecxsnrormnp
+EMAIL_HOST_USER=your_email@example.com
+EMAIL_HOST_PASSWORD=__CHANGE_ME__
 EMAIL_USE_TLS=true
 ```
 

@@ -7,7 +7,6 @@ from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
-from django.core.signing import dumps, loads, BadSignature, SignatureExpired
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -15,7 +14,7 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
 from .models import GoogleAccount
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets
 from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -32,9 +31,16 @@ from .serializers import (
     ReminderIntakeSerializer,  # <-- add this here
 )
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import get_user_model
+from .authorization import (
+    FunctionAuthorizedMixin,
+    HasFunctionPermission,
+    ensure_consumer_grants,
+    user_has_function_permission,
+)
+from .tokens import issue_session_token, verify_session_token
 
 from django.core.files.uploadedfile import UploadedFile
-from django.utils.dateparse import parse_datetime
 
 
 # ---- Scopes----
@@ -60,15 +66,6 @@ def _client_config():
         }
     }
 
-# ---- signed token helpers (demo) ----
-def _sign(email: str) -> str:
-    return dumps({"sub": email}, salt="uniplan", key=settings.SECRET_KEY)
-
-def _unsign(token: str):
-    try:
-        return loads(token, salt="uniplan", key=settings.SECRET_KEY, max_age=60 * 60 * 8)["sub"]
-    except (BadSignature, SignatureExpired, KeyError):
-        return None
 
 def _creds_for(email: str):
     try:
@@ -117,7 +114,14 @@ def google_callback(request):
         defaults={"credentials": json.loads(creds.to_json()), "name": name, "picture": picture},
     )
 
-    token = _sign(email)
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(username=email, defaults={"email": email})
+    if user.email != email:
+        user.email = email
+        user.save(update_fields=["email"])
+    ensure_consumer_grants(user)
+
+    token = issue_session_token(email)
     frontend_redirect = os.getenv("FRONTEND_REDIRECT", "http://localhost:5173")
 
     qs = urllib.parse.urlencode({"token": token, "email": email, "name": name, "picture": picture})
@@ -129,7 +133,7 @@ def _require_auth(request):
     if not authz.startswith("Bearer "):
         return None, JsonResponse({"detail": "Missing bearer token"}, status=401)
 
-    email = _unsign(authz.split(" ", 1)[1])
+    email = verify_session_token(authz.split(" ", 1)[1])
     if not email:
         return None, JsonResponse({"detail": "Invalid/expired token"}, status=401)
 
@@ -149,17 +153,39 @@ def _require_auth(request):
 
     return (email, creds), None
 
+
+def _require_function_permission(email, permission_code):
+    User = get_user_model()
+    user = User.objects.filter(username=email).first() or User.objects.filter(email=email).first()
+    if user is None or not user_has_function_permission(user, permission_code):
+        return JsonResponse(
+            {"detail": "You do not have permission to perform this function."},
+            status=403,
+        )
+    return None
+
 # ---- Classroom API ----
 @require_GET
 def list_courses(request):
     """Return ACTIVE courses only."""
     auth, err = _require_auth(request)
     if err: return err
-    _, creds = auth
+    email, creds = auth
+    denied = _require_function_permission(email, "classroom.read")
+    if denied:
+        return denied
 
     classroom = build("classroom", "v1", credentials=creds)
     data = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute()
-    return JsonResponse(data)
+    courses = [
+        {
+            "id": c.get("id"),
+            "name": c.get("name"),
+            "section": c.get("section"),
+        }
+        for c in data.get("courses", [])
+    ]
+    return JsonResponse({"courses": courses})
 
 @require_GET
 def list_active_submissions(request, course_id: str):
@@ -171,7 +197,10 @@ def list_active_submissions(request, course_id: str):
     auth, err = _require_auth(request)
     if err:
         return err
-    _, creds = auth
+    email, creds = auth
+    denied = _require_function_permission(email, "classroom.read")
+    if denied:
+        return denied
 
     classroom = build("classroom", "v1", credentials=creds)
 
@@ -212,7 +241,21 @@ def list_active_submissions(request, course_id: str):
         if cw.get("dueTime"):
             s["dueTime"] = cw["dueTime"]       # {hours, minutes}
 
-    return JsonResponse({"studentSubmissions": subs})
+    trimmed = []
+    for s in subs:
+        trimmed.append({
+            "id": s.get("id"),
+            "courseId": s.get("courseId"),
+            "courseWorkId": s.get("courseWorkId"),
+            "title": s.get("title"),
+            "alternateLink": s.get("alternateLink"),
+            "state": s.get("state"),
+            "dueDate": s.get("dueDate"),
+            "dueTime": s.get("dueTime"),
+            "updateTime": s.get("updateTime"),
+            "creationTime": s.get("creationTime"),
+        })
+    return JsonResponse({"studentSubmissions": trimmed})
 
 @require_GET
 def summary(request):
@@ -220,6 +263,9 @@ def summary(request):
     auth, err = _require_auth(request)
     if err: return err
     email, creds = auth
+    denied = _require_function_permission(email, "classroom.read")
+    if denied:
+        return denied
 
     classroom = build("classroom", "v1", credentials=creds)
     courses = classroom.courses().list(pageSize=50, courseStates=["ACTIVE"]).execute().get("courses", [])
@@ -230,27 +276,24 @@ def summary(request):
     })
 
 @api_view(["GET"])
-@permission_classes([permissions.AllowAny])  # it will return id: null if not logged in
+@permission_classes([IsAuthenticated, HasFunctionPermission("debug.read")])
 def echo_auth(request):
     return Response({
-        "auth_meta": request.META.get("HTTP_AUTHORIZATION"),
-        "auth_header": request.headers.get("Authorization"),  # DRF’s header helper
         "is_authenticated": bool(getattr(request.user, "is_authenticated", False)),
         "user": getattr(request.user, "username", None),
     })
 
 @api_view(["GET"])
-@permission_classes([permissions.AllowAny])
+@permission_classes([IsAuthenticated, HasFunctionPermission("account.read")])
 def whoami(request):
     u = request.user
-    if not u.is_authenticated:
-        return Response({"id": None})
     return Response({"id": u.id, "email": u.email, "username": u.username})
 
-class SubjectViewSet(viewsets.ModelViewSet):
+class SubjectViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
     queryset = Subject.objects.none()
     serializer_class = SubjectSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    read_permission = "subjects.read"
+    write_permission = "subjects.write"
 
     def get_queryset(self):
         return Subject.objects.filter(user=self.request.user).order_by("name")
@@ -261,10 +304,15 @@ class SubjectViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
         
-class TimetableEntryViewSet(viewsets.ModelViewSet):
+class TimetableEntryViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
     queryset = TimetableEntry.objects.none()
     serializer_class = TimetableEntrySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    read_permission = "timetable.read"
+    write_permission = "timetable.write"
+    function_permissions = {
+        "export_csv": "timetable.read",
+        "import_csv": "timetable.write",
+    }
 
     def get_queryset(self):
         return TimetableEntry.objects.filter(user=self.request.user).order_by("day_of_week", "start_time")
@@ -415,12 +463,16 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
 
         return Response({"replaced": created}, status=200)
 
-from rest_framework.decorators import action
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
     queryset = Task.objects.none()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    read_permission = "tasks.read"
+    write_permission = "tasks.write"
+    function_permissions = {
+        "archive": "tasks.write",
+        "unarchive": "tasks.write",
+    }
     
     
     def get_queryset(self):
@@ -472,32 +524,45 @@ class TaskViewSet(viewsets.ModelViewSet):
         task.save(update_fields=["is_archived"])
         return Response({"success": True, "id": task.id, "is_archived": False})
 
-class ReminderViewSet(viewsets.ModelViewSet):
+class ReminderViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
     queryset = Reminder.objects.none()        # <-- add this
     serializer_class = ReminderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    read_permission = "reminders.read"
+    write_permission = "reminders.write"
     def get_queryset(self):
         return (Reminder.objects
                 .filter(task__user=self.request.user)
                 .select_related("task")
                 .order_by("-notify_at"))
 
-class ClassroomCourseViewSet(viewsets.ModelViewSet):
-    queryset = ClassroomCourse.objects.all()
+class ClassroomCourseViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
+    queryset = ClassroomCourse.objects.none()
     serializer_class = ClassroomCourseSerializer
+    read_permission = "classroom.read"
+    write_permission = "classroom.write"
 
-class ClassroomAssignmentViewSet(viewsets.ModelViewSet):
-    queryset = ClassroomAssignment.objects.all()
+    def get_queryset(self):
+        return ClassroomCourse.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class ClassroomAssignmentViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
+    queryset = ClassroomAssignment.objects.none()
     serializer_class = ClassroomAssignmentSerializer
+    read_permission = "classroom.read"
+    write_permission = "classroom.write"
 
-class IsOwner(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return obj.user_id == request.user.id
+    def get_queryset(self):
+        return ClassroomAssignment.objects.filter(
+            classroom_course__user=self.request.user
+        )
 
-class OAuthAccountViewSet(viewsets.ModelViewSet):
-    queryset = OAuthAccount.objects.all() 
+class OAuthAccountViewSet(FunctionAuthorizedMixin, viewsets.ModelViewSet):
+    queryset = OAuthAccount.objects.none()
     serializer_class = OAuthAccountSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwner]
+    read_permission = "oauth.read"
+    write_permission = "oauth.write"
 
     def get_queryset(self):
         # only their own accounts
@@ -507,12 +572,12 @@ class OAuthAccountViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
         
         
-class ReminderIntakeViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+class ReminderIntakeViewSet(FunctionAuthorizedMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     """
     POST /api/reminders/intake/
     Body: { assignmentId, courseName?, title, dueISO, remindAtISO, offsetDays?, link? }
     """
-    permission_classes = [permissions.IsAuthenticated]
+    write_permission = "reminders.write"
     serializer_class = ReminderIntakeSerializer
     queryset = Reminder.objects.none()  # <-- instead of []
 
@@ -523,7 +588,7 @@ class ReminderIntakeViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 
 @api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([IsAuthenticated, HasFunctionPermission("email.send")])
 def send_test_email(request):
     """
     Sends a test email to the currently logged-in user.
@@ -544,7 +609,7 @@ def send_test_email(request):
     return Response({"detail": f"Email sent to {user.email}!"})
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, HasFunctionPermission("reminders.read")])
 def reminders_summary(request):
     qs = (Reminder.objects
           .select_related("task")

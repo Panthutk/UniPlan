@@ -5,7 +5,7 @@ WORKDIR /app
 
 # install Python deps
 COPY backend/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir --index-url https://pypi.org/simple -r /tmp/requirements.txt
 
 # copy backend code
 COPY backend /app

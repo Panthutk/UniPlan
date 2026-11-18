@@ -8,6 +8,40 @@ on:
 
 jobs:
 
+  dependency-governance:
+    name: SBOM and dependency policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify SBOM inventory
+        run: python3 scripts/check_sbom.py
+
+      - name: Audit Python packages from PyPI
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install --index-url https://pypi.org/simple pip-audit
+          pip-audit -r requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+
+      - name: Audit npm packages
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
   backend-tests:
     name: Backend tests (Django + Pytest)
     runs-on: ubuntu-latest

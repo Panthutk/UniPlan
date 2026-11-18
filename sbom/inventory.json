@@ -1,0 +1,369 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "last_reviewed": "2026-11-17",
+  "trusted_repositories": {
+    "pypi": "https://pypi.org/simple",
+    "npm": "https://registry.npmjs.org/"
+  },
+  "remediation_sla_days": {
+    "critical": 7,
+    "high": 30,
+    "medium": 90,
+    "inventory_refresh": 90
+  },
+  "components": [
+    {
+      "name": "asgiref",
+      "version": "3.9.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/asgiref@3.9.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "Django",
+      "version": "5.2.6",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/django@5.2.6",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "django-cors-headers",
+      "version": "4.7.0",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/django-cors-headers@4.7.0",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "djangorestframework",
+      "version": "3.16.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/djangorestframework@3.16.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "sqlparse",
+      "version": "0.5.3",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/sqlparse@0.5.3",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "tzdata",
+      "version": "2025.2",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/tzdata@2025.2",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "google-api-python-client",
+      "version": "2.151.0",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/google-api-python-client@2.151.0",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "google-auth",
+      "version": "2.34.0",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/google-auth@2.34.0",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "google-auth-oauthlib",
+      "version": "1.2.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/google-auth-oauthlib@1.2.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "google-auth-httplib2",
+      "version": "0.2.0",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/google-auth-httplib2@0.2.0",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "httplib2",
+      "version": "0.22.0",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/httplib2@0.22.0",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.0.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/python-dotenv@1.0.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "PyJWT",
+      "version": "2.10.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/pyjwt@2.10.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "PyMySQL",
+      "version": "1.1.1",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/pymysql@1.1.1",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "cryptography",
+      "version": "43.0.3",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/cryptography@43.0.3",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "ruff",
+      "version": "0.8.6",
+      "ecosystem": "pypi",
+      "purl": "pkg:pypi/ruff@0.8.6",
+      "source": "https://pypi.org/simple"
+    },
+    {
+      "name": "@emotion/react",
+      "version": "11.14.0",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/@emotion/react@11.14.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@emotion/styled",
+      "version": "11.14.1",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/@emotion/styled@11.14.1",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@mui/icons-material",
+      "version": "7.3.2",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/@mui/icons-material@7.3.2",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@mui/material",
+      "version": "7.3.2",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/@mui/material@7.3.2",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@radix-ui/react-slot",
+      "version": "1.2.3",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/@radix-ui/react-slot@1.2.3",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "class-variance-authority",
+      "version": "0.7.1",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/class-variance-authority@0.7.1",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "clsx",
+      "version": "2.1.1",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/clsx@2.1.1",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "lucide-react",
+      "version": "0.542.0",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/lucide-react@0.542.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "react",
+      "version": "18.2.0",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/react@18.2.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "react-dom",
+      "version": "18.2.0",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/react-dom@18.2.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "react-router-dom",
+      "version": "7.8.2",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/react-router-dom@7.8.2",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "tailwind-merge",
+      "version": "3.3.1",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/tailwind-merge@3.3.1",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "tailwind-variants",
+      "version": "3.1.0",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/tailwind-variants@3.1.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "tailwindcss-animate",
+      "version": "1.0.7",
+      "ecosystem": "npm",
+      "scope": "runtime",
+      "purl": "pkg:npm/tailwindcss-animate@1.0.7",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@eslint/js",
+      "version": "9.33.0",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@eslint/js@9.33.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.1.10",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@types/react@19.1.10",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@types/react-dom",
+      "version": "19.1.7",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@types/react-dom@19.1.7",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@vitejs/plugin-react",
+      "version": "5.0.0",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@vitejs/plugin-react@5.0.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@vitest/coverage-v8",
+      "version": "4.0.10",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@vitest/coverage-v8@4.0.10",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "@vitest/ui",
+      "version": "4.0.10",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/@vitest/ui@4.0.10",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "autoprefixer",
+      "version": "10.4.21",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/autoprefixer@10.4.21",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "esbuild",
+      "version": "0.25.10",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/esbuild@0.25.10",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "eslint",
+      "version": "9.33.0",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/eslint@9.33.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "eslint-plugin-react-hooks",
+      "version": "5.2.0",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/eslint-plugin-react-hooks@5.2.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "eslint-plugin-react-refresh",
+      "version": "0.4.20",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/eslint-plugin-react-refresh@0.4.20",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "globals",
+      "version": "16.3.0",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/globals@16.3.0",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "postcss",
+      "version": "8.5.6",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/postcss@8.5.6",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "tailwindcss",
+      "version": "3.4.17",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/tailwindcss@3.4.17",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "vite",
+      "version": "7.1.2",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/vite@7.1.2",
+      "source": "https://registry.npmjs.org/"
+    },
+    {
+      "name": "vitest",
+      "version": "4.0.10",
+      "ecosystem": "npm",
+      "scope": "development",
+      "purl": "pkg:npm/vitest@4.0.10",
+      "source": "https://registry.npmjs.org/"
+    }
+  ]
+}

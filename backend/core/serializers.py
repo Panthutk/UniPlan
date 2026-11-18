@@ -6,17 +6,21 @@ from .models import (
 )
 import re
 from core.services.reminders import upsert_email_reminder
+from core.authorization import require_owned_item
 from datetime import timedelta
 
 HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
+
+def _request_user(serializer):
+    request = serializer.context.get("request")
+    return getattr(request, "user", None) if request else None
+
 class SubjectSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
-        user = serializers.PrimaryKeyRelatedField(read_only=True)  # <- explicit
         model = Subject
-        fields = "__all__"
-        read_only_fields = ("id", "user", "created_at", "updated_at")
+        fields = ("id", "name", "code", "color_hex")
+        read_only_fields = ("id",)
 
     def validate_color_hex(self, value):
         if value == "":
@@ -28,8 +32,11 @@ class SubjectSerializer(serializers.ModelSerializer):
 class TimetableEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimetableEntry
-        fields = "__all__"
-        read_only_fields = ("user",)
+        fields = ("id", "subject", "day_of_week", "start_time", "end_time", "room")
+        read_only_fields = ("id",)
+
+    def validate_subject(self, subject):
+        return require_owned_item(_request_user(self), subject)
 
     def validate(self, attrs):
         """
@@ -77,12 +84,14 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            "id","user","subject","title","description",
-            "status","priority","due_at","rrule","source","external_id",
-            "assignment_alt_link","created_at","updated_at","completed_at", "is_archived",
-            "reminder_days_before","next_reminder_at","days_left","day_of_week",
+            "id", "subject", "title", "status", "priority", "due_at",
+            "source", "external_id", "assignment_alt_link", "is_archived",
+            "reminder_days_before", "next_reminder_at", "days_left", "day_of_week",
         ]
-        read_only_fields = ["user","created_at","updated_at","completed_at","days_left","day_of_week"]
+        read_only_fields = ("id", "days_left", "day_of_week", "next_reminder_at")
+
+    def validate_subject(self, subject):
+        return require_owned_item(_request_user(self), subject)
 
     def get_days_left(self, obj):
         if not obj.due_at:
@@ -125,20 +134,17 @@ class ReminderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Reminder
-        fields = ["id", "task", "channel", "notify_at", "delivered_at", "status", "days_before", "created_at"]
-        read_only_fields = ["delivered_at", "status", "created_at", "notify_at"]  # we compute notify_at
+        fields = ("id", "task", "channel", "notify_at", "status", "days_before")
+        read_only_fields = ("id", "status", "notify_at")
 
     def validate(self, attrs):
-        request = self.context.get("request")
         task: Task = attrs.get("task")
         days_before = attrs.get("days_before", None)
 
         if not task:
             raise serializers.ValidationError("Task is required.")
 
-        # ensure ownership
-        if request and task.user_id != request.user.id:
-            raise serializers.ValidationError("You don’t own this task.")
+        require_owned_item(_request_user(self), task)
 
         if not task.due_at:
             raise serializers.ValidationError("Task has no due date; cannot schedule reminder.")
@@ -167,26 +173,28 @@ class ReminderSerializer(serializers.ModelSerializer):
 class ClassroomCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassroomCourse
-        fields = "__all__"
+        fields = ("id", "google_course_id", "name", "section", "subject")
+        read_only_fields = ("id",)
 
 class ClassroomAssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassroomAssignment
-        fields = "__all__"
+        fields = ("id", "classroom_course", "google_assignment_id", "title", "due_at", "task")
+        read_only_fields = ("id",)
+
+    def validate_classroom_course(self, course):
+        return require_owned_item(_request_user(self), course)
+
+    def validate_task(self, task):
+        return require_owned_item(_request_user(self), task)
 
 class OAuthAccountSerializer(serializers.ModelSerializer):
     refresh_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = OAuthAccount
-        fields = "__all__"
-        read_only_fields = ("user", "created_at", "updated_at")
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        # never leak refresh tokens
-        data["refresh_token"] = "********"
-        return data
+        fields = ("id", "provider", "provider_user_id", "refresh_token")
+        read_only_fields = ("id",)
 
 
 
@@ -235,6 +243,3 @@ class ReminderIntakeSerializer(serializers.Serializer):
                 "assignment_alt_link": getattr(t, "assignment_alt_link", None),
             },
         }
-
-
-    

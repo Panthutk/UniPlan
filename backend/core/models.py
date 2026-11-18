@@ -2,6 +2,29 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+class FunctionGrant(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="function_grants",
+    )
+    permission = models.CharField(max_length=80)
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "permission"],
+                name="uq_function_grant_user_permission",
+            )
+        ]
+        indexes = [models.Index(fields=["user", "permission"])]
+        ordering = ["permission"]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.permission}"
+
+
 class GoogleAccount(models.Model):
     email = models.EmailField(primary_key=True)
     credentials = models.JSONField()  # serialized google Credentials

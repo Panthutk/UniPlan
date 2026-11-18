@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount
+from .models import Subject, TimetableEntry, Task, Reminder, ClassroomCourse, ClassroomAssignment, OAuthAccount, FunctionGrant
+
+@admin.register(FunctionGrant)
+class FunctionGrantAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "permission", "granted_at")
+    list_filter = ("permission",)
+    search_fields = ("user__email", "user__username", "permission")
+
 
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
