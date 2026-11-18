@@ -1,7 +1,13 @@
 from pathlib import Path
 import os
+import ssl
 from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
+
+# V11.2.1 & V11.4.3: Explicitly enforce PBKDF2 with 256-bit HMAC-SHA256
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -14,7 +20,7 @@ if not SECRET_KEY:
     SECRET_KEY = "dev-only-secret-CHANGE-ME"
 
 # ---- V13.4.2: Debug mode from env (must be OFF in production) ----
-DEBUG = os.getenv("DEBUG", "0") == "1"
+DEBUG = os.getenv("DEBUG", "0").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
@@ -84,7 +90,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.auth.SignedTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -95,6 +100,15 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
     "EXCEPTION_HANDLER": "core.exceptions.security_exception_handler",
+    # V6.1.1 & V6.3.1: Rate limiting / anti-automation without account lockout
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "120/minute",
+    },
 }
 
 # Ensure Authorization header is allowed (usually default is fine)
@@ -127,6 +141,11 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 # SECURITY SETTINGS (OWASP ASVS)
 # =====================================================================
 
+# V12.3.2: Verify default SSL/TLS context enforces certificate validation and hostname checking
+_DEFAULT_TLS_CTX = ssl.create_default_context()
+assert _DEFAULT_TLS_CTX.verify_mode == ssl.CERT_REQUIRED
+assert _DEFAULT_TLS_CTX.check_hostname is True
+
 # V3.3.1 / V3.3.4 — Auth cookie settings (HttpOnly, Secure, SameSite)
 AUTH_COOKIE_NAME = "__Secure-uniplan-auth"
 AUTH_COOKIE_MAX_AGE = 60 * 60 * 8   # 8 hours (matches token max_age)
@@ -143,6 +162,10 @@ SECURE_HSTS_PRELOAD = True
 
 # V3.4.4 — X-Content-Type-Options
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # V13.4.1 — Prevent serving .git and similar
 # (Handled by .dockerignore excluding .git from build context)

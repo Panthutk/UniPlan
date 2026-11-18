@@ -8,7 +8,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import uniplanLogo from "./assets/uniplanLogo.svg";
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import { Toasts } from '@/components/popup/Toasts';
-// V14.2.1: Token is stored in HttpOnly cookie (not accessible to JS).
+
+// V10.1.1 & V14.2.1: Token is stored in HttpOnly cookie (not accessible to JS).
 // Only non-sensitive display info (name, picture) is kept in localStorage.
 const auth = {
   // Token is in HttpOnly cookie — no JS access needed (V3.3.4)
@@ -19,7 +20,10 @@ const auth = {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 async function getGoogleAuthUrl() {
-  const r = await fetch(`${BASE_URL}/api/auth/google/login`);
+  // V10.1.2 / V10.2.1: credentials: "include" ensures the HttpOnly oauth_state cookie is stored
+  const r = await fetch(`${BASE_URL}/api/auth/google/login`, {
+    credentials: "include",
+  });
   if (!r.ok) throw new Error("Failed to get Google auth URL");
   return r.json(); // { auth_url }
 }
@@ -28,27 +32,31 @@ export default function Login() {
   const navigate = useNavigate();
   const [toasts, setToasts] = useState([]);
 
-
   function pushToast({ type = "info", title, desc = "", duration = 3500, icon = null }) {
     const id = (crypto?.randomUUID?.() ?? String(Date.now() + Math.random()));
     setToasts((t) => [...t, { id, type, title, desc, icon }]);
-    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration)
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), duration);
   }
 
-  // V14.2.1: Token is now in an HttpOnly cookie (not in URL).
-  // We only receive non-sensitive display info (name, picture) via URL.
+  // V10.1.1 & V14.2.1: Token is set in an HttpOnly cookie (and never exposed in URL query strings).
+  // We read non-sensitive display info (name, picture) from search/hash and scrub the URL immediately.
   useEffect(() => {
-    const qs = new URLSearchParams(window.location.search);
-    const loginSuccess = qs.get("login");
-    if (loginSuccess === "success") {
+    const searchParams = new URLSearchParams(window.location.search);
+    const rawHash = window.location.hash ? window.location.hash.substring(1) : "";
+    const hashParams = new URLSearchParams(rawHash);
+
+    const loginSuccess = searchParams.get("login") === "success";
+    const hasFragmentToken = Boolean(hashParams.get("token"));
+
+    if (loginSuccess || hasFragmentToken) {
       const user = {
-        name: qs.get("name"),
-        picture: qs.get("picture"),
+        name: searchParams.get("name") || hashParams.get("name"),
+        picture: searchParams.get("picture") || hashParams.get("picture"),
       };
       // Store only display info (not the token — that's in the HttpOnly cookie)
       auth.user = user;
-      // Clean the URL so the params don't linger
-      window.history.replaceState({}, "", "/login");
+      // Clean the URL immediately so fragment/params don't linger in browser history
+      window.history.replaceState({}, "", "/");
       navigate("/tableandtask", { replace: true });
     }
   }, [navigate]);
