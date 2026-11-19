@@ -51,6 +51,7 @@ export default function Login() {
     if (loginSuccess || hasFragmentToken) {
       const user = {
         name: searchParams.get("name") || hashParams.get("name"),
+        email: searchParams.get("email") || hashParams.get("email"),
         picture: searchParams.get("picture") || hashParams.get("picture"),
       };
       // Store only display info (not the token — that's in the HttpOnly cookie)

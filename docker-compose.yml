@@ -9,9 +9,8 @@ services:
       MYSQL_ROOT_PASSWORD: root
     volumes:
       - db_data:/var/lib/mysql
-    # expose to host ONLY if you need to connect with a local GUI client:
-    # ports:
-    #   - "3306:3306"
+    ports:
+      - "3307:3306"
     healthcheck:
       test:
         ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
@@ -39,6 +38,8 @@ services:
       DJANGO_SECRET: "dev-only-please-change"
       DEBUG: "1"
       ALLOWED_HOSTS: "*"
+      # Same host as GOOGLE_REDIRECT_URI so the oauth_state cookie is sent on callback.
+      FRONTEND_REDIRECT: "http://127.0.0.1:5173"
     depends_on:
       db:
         condition: service_healthy
@@ -61,7 +62,7 @@ services:
     container_name: uniplan_frontend
     environment:
       # make the SPA talk to backend on your host
-      VITE_API_BASE_URL: "http://localhost:8000"
+      VITE_API_BASE_URL: "http://127.0.0.1:8000"
       CHOKIDAR_USEPOLLING: "true"   # helps on Windows/WSL/docker-for-mac file watching
     ports:
       - "5173:5173"

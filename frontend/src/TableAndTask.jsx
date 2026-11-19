@@ -1131,7 +1131,7 @@ export default function ClassroomTimetableDashboard() {
       <DrawerPanel
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-        user={user}
+        user={{ ...(user || {}), email: me?.email || user?.email }}
         timetableRef={timetableRef}
         activeMenu={activeMenu}
         tasksRef={tasksRef}

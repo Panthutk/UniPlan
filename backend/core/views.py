@@ -310,6 +310,8 @@ def google_callback(request):
             state=expected_state,
             redirect_uri=settings.GOOGLE_REDIRECT_URI,
         )
+        # Google may omit a requested Classroom scope. Accept the granted subset.
+        os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
         flow.fetch_token(code=code)
         creds: Credentials = flow.credentials
 

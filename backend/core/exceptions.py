@@ -1,5 +1,4 @@
 import logging
-from rest_framework.views import exception_handler
 from rest_framework.exceptions import (
     AuthenticationFailed,
     NotAuthenticated,
@@ -36,6 +35,8 @@ def security_exception_handler(exc, context):
     Custom DRF exception handler that logs authentication failures (V16.3.1),
     security control / validation failures, and unexpected server errors (V16.3.4).
     """
+    from rest_framework.views import exception_handler
+
     response = exception_handler(exc, context)
     request = context.get("request")
     view = context.get("view")

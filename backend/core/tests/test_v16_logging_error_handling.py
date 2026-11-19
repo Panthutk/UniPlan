@@ -10,6 +10,19 @@ from core.exceptions import security_exception_handler
 from core.authorization import ensure_consumer_grants
 
 
+@pytest.fixture(autouse=True)
+def _capture_security_logs():
+    """security.* loggers do not propagate, so caplog would otherwise see nothing."""
+    names = ("security", "security.auth", "security.errors")
+    loggers = [logging.getLogger(name) for name in names]
+    previous = [logger.propagate for logger in loggers]
+    for logger in loggers:
+        logger.propagate = True
+    yield
+    for logger, propagate in zip(loggers, previous):
+        logger.propagate = propagate
+
+
 @pytest.fixture
 def auth_client(db):
     user = User.objects.create_user(username="v16user@example.com", email="v16user@example.com", password="pw")

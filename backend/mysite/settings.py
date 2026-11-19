@@ -147,11 +147,12 @@ assert _DEFAULT_TLS_CTX.verify_mode == ssl.CERT_REQUIRED
 assert _DEFAULT_TLS_CTX.check_hostname is True
 
 # V3.3.1 / V3.3.4 — Auth cookie settings (HttpOnly, Secure, SameSite)
-AUTH_COOKIE_NAME = "__Secure-uniplan-auth"
 AUTH_COOKIE_MAX_AGE = 60 * 60 * 8   # 8 hours (matches token max_age)
 AUTH_COOKIE_HTTPONLY = True           # V3.3.4: not accessible to JS
 AUTH_COOKIE_SAMESITE = "Lax"         # V3.3.2: CSRF protection
 AUTH_COOKIE_SECURE = not DEBUG       # V3.3.1: Secure in production
+# Browsers reject the __Secure- prefix unless the Secure flag is set.
+AUTH_COOKIE_NAME = "__Secure-uniplan-auth" if AUTH_COOKIE_SECURE else "uniplan-auth"
 AUTH_COOKIE_PATH = "/"
 AUTH_COOKIE_DOMAIN = None            # current host only
 
