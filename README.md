@@ -18,34 +18,23 @@ University students typically juggle separate tools for weekly class timetables 
 
 ### Key Features
 
-<<<<<<< HEAD
 - **Interactive Weekly Timetable:** Create, edit, color-code, and manage classes with built-in schedule overlap detection.
 - **CSV Timetable Import & Export:** Bulk import/export schedules with strict file-type, size, UTF-8, and CSV formula-injection protections.
 - **Subject-Linked Task Tracking:** Create, prioritize (`none`, `low`, `normal`, `high`), update status (`NOT_STARTED`, `IN_PROCESS`, `COMPLETED`), and archive/unarchive tasks directly from timetable classes.
 - **Google Classroom Sync:** Sign in via Google OAuth 2.0 (SSO) and synchronize courses, coursework, and student submissions automatically using read-only scopes.
 - **Automated Due-Date Reminders:** Background reminder worker (`send_reminders`) delivers scheduled email reminders (`1`, `3`, or `7` days before deadlines).
-=======
-- [🔐 Authorization Rules](docs/authorization.md) — Function-level and data-specific access
-- [📝 Dependency Policy](docs/dependency-policy.md) — Trusted registries and remediation time frames
-- [📄 GoogleDoc](https://docs.google.com/document/d/1DCrA-3688mUq6HGsNAnI9CS53ziWLud2McELJog4sqA/edit?usp=sharing) — Project write-up
-- [🎨 MockUp UI](https://www.canva.com/design/DAGxuHuyKDU/g_PNCcumdICsxAvOEeKd9A/edit?utm_content=DAGxuHuyKDU&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) — Canva prototype
-- [🛠 Jira Board](https://ku-team-panthut.atlassian.net/jira/software/projects/TAW/settings/access) — Project management
-- [🔒 Security V1 — Encoding &amp; Sanitization](SECURITY_V1.md) — OWASP ASVS V1 documentation & verification
-- [✅ Input Validation &amp; Business Logic Rules (ASVS V2)](VALIDATION_RULES.md) — Data structure & input validation specification
-- [📋 Security Logging &amp; Error Handling Inventory (ASVS V16)](SECURITY_LOGGING.md) — Logging architecture, events, and error handling
->>>>>>> 706640ead55fabb6bde14cbc997b47c838d29457
 
 ---
 
 ## Tech Stack
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend** | React 18, Vite, Tailwind CSS, Shadcn/ui, Material UI (MUI), React Router |
-| **Backend** | Python 3.13, Django 5.2, Django REST Framework (DRF), PyJWT, Google API Client |
-| **Database** | MySQL 8.4 |
-| **Background Worker** | Django management command (`send_reminders --loop`) |
-| **Infrastructure** | Docker & Docker Compose |
+| Layer                       | Technologies                                                                   |
+| :-------------------------- | :----------------------------------------------------------------------------- |
+| **Frontend**          | React 18, Vite, Tailwind CSS, Shadcn/ui, Material UI (MUI), React Router       |
+| **Backend**           | Python 3.13, Django 5.2, Django REST Framework (DRF), PyJWT, Google API Client |
+| **Database**          | MySQL 8.4                                                                      |
+| **Background Worker** | Django management command (`send_reminders --loop`)                          |
+| **Infrastructure**    | Docker & Docker Compose                                                        |
 
 ---
 
@@ -75,13 +64,12 @@ For complete step-by-step details and troubleshooting tips, see **[INSTALLATION.
 
 2. **Complete Google OAuth 2.0 setup (Required):**
    Follow **[OAuth2Setup.md](OAuth2Setup.md)** to configure your Google Cloud project, OAuth consent screen, authorized origins/redirect URIs, Google Classroom API scopes, and download your **Client ID** and **Client Secret**.
-
 3. **Set up Email Reminders (Optional):**
    Follow **[EmailSetup.md](EmailSetup.md)** to configure Gmail SMTP (using a 16-character Google App Password) for real reminder emails, or keep `console.EmailBackend` in `backend/.env` for local testing without SMTP.
-
 4. **Create environment files:**
 
    - **Backend (`backend/.env`)** — copy from `backend/.env.example` or create directly:
+
      ```env
      DJANGO_SECRET=__CHANGE_ME__
      GOOGLE_CLIENT_ID=__YOUR_GOOGLE_CLIENT_ID__
@@ -97,7 +85,9 @@ For complete step-by-step details and troubleshooting tips, see **[INSTALLATION.
      EMAIL_HOST_PASSWORD=__YOUR_APP_PASSWORD__
      EMAIL_USE_TLS=true
      ```
+
    - **Frontend (`frontend/.env`)**:
+
      ```env
      VITE_API_BASE_URL=http://127.0.0.1:8000
      ```
@@ -110,11 +100,11 @@ For complete step-by-step details and troubleshooting tips, see **[INSTALLATION.
 
 6. **Access the application:**
 
-   | Service | URL |
-   | :--- | :--- |
-   | **Frontend Web App** | `http://127.0.0.1:5173` *(use `127.0.0.1` so OAuth state cookies match `GOOGLE_REDIRECT_URI`)* |
-   | **Backend REST API** | `http://127.0.0.1:8000` |
-   | **Django Admin Panel** | `http://127.0.0.1:8000/admin` |
+   | Service                      | URL                                                                                                    |
+   | :--------------------------- | :----------------------------------------------------------------------------------------------------- |
+   | **Frontend Web App**   | `http://127.0.0.1:5173` *(use `127.0.0.1` so OAuth state cookies match `GOOGLE_REDIRECT_URI`)* |
+   | **Backend REST API**   | `http://127.0.0.1:8000`                                                                              |
+   | **Django Admin Panel** | `http://127.0.0.1:8000/admin`                                                                        |
 
 7. **Optional — Create a Django Admin superuser:**
 
@@ -139,24 +129,24 @@ UniPlanPlus was systematically hardened against **OWASP ASVS v5.0**. Every plann
 
 ### Compliance Overview by Chapter
 
-| Chapter | Security Domain | Planned | Done | Extra | Key Implemented Controls & Documentation |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| **V1** | Encoding & Sanitization | 6 | **6 / 6** | — | React JSX auto-escaping, DRF `JSONRenderer`, Django ORM parameterized queries (zero raw SQL), URL protocol allowlisting (`http`/`https` only), zero `eval`/`subprocess` — [`ASVS_COMPLIANCE.md`](ASVS_COMPLIANCE.md#chapter-v1--encoding-and-sanitization-6--6) |
-| **V2** | Validation & Business Logic | 4 | **4 / 4** | — | Server-side DRF serializer validation (`HEX_RE`, `TIME_RE`, overlap checks, enum choices), atomic CSV row validation, sequential OAuth flow — [`VALIDATION_RULES.md`](VALIDATION_RULES.md) |
-| **V3** | Web Frontend Security | 5 | **5 / 5** | +9 | `SecFetchValidationMiddleware`, `SecurityHeadersMiddleware` (HSTS, CSP `frame-ancestors`, `nosniff`, Referrer-Policy, COOP), `HttpOnly`/`SameSite=Lax`/`__Secure-` cookies, strict CORS allowlist, safe HTTP methods — [`SECURITY.md`](SECURITY.md) |
-| **V5** | File Handling | 5 | **5 / 5** | — | `.csv`-only extension & MIME allowlist, 1 MB max size, strictly in-memory processing (`io.StringIO`), `os.path.basename()`, hardcoded `Content-Disposition`, CSV formula injection sanitization — [Policy below](#file-handling--security-policy-owasp-asvs-v5) |
-| **V6** | Authentication | 4 | **4 / 4** | — | Federated Google OAuth 2.0 only (no local passwords, no default accounts, no secret questions), per-IP OAuth rate limiting (`15/60s`) & DRF throttling (`20/min` anon, `120/min` user) — [Policy below](#authentication--anti-automation-policy-owasp-asvs-v6) |
-| **V7** | Session Management | 5 | **5 / 5** | +2 | Server-side `SignedTokenAuthentication`, dynamic session JWTs with 192-bit CSPRNG `jti`, 8-hour lifetime, immediate revocation via `GoogleAccount.token_valid_after` on logout — [`SECURITY.md`](SECURITY.md) |
-| **V8** | Authorization | 4 | **4 / 4** | — | Deny-by-default function grants (`FunctionGrant`, 15 permission codes), strict per-user queryset filtering & `OwnsObject` / `require_owned_item()` IDOR/BOLA protection — [`docs/authorization.md`](docs/authorization.md) |
-| **V9** | Self-contained Tokens | 4 | **4 / 4** | — | Mandatory HMAC-SHA256 verification, strict `HS256` allowlist (rejects `none`), server-only key material (rejects `jku`/`x5u`/`jwk`/`x5c`), enforced `nbf`/`exp`/`iat` window — [`docs/authorization.md`](docs/authorization.md) |
-| **V10** | OAuth & OIDC | 6 | **6 / 6** | — | BFF pattern (Google tokens strictly backend-only), 256-bit signed `HttpOnly` `oauth_state` CSRF cookie, confidential client backchannel auth, read-only Classroom scopes, `prompt="consent"` — [Policy below](#oauth-20--oidc-security-policy-owasp-asvs-v10) |
-| **V11** | Cryptography | 2 | **2 / 2** | — | Industry-validated stdlib/PyJWT/`cryptography`/Django primitives only; pinned 256-bit `HS256` & `PBKDF2-HMAC-SHA256` (zero MD5/SHA-1) — [Policy below](#cryptography--data-integrity-policy-owasp-asvs-v11) |
-| **V12** | Secure Communication | 1 | **1 / 1** | — | Mandatory TLS certificate & hostname verification for Google OAuth (`verify=True`), Google APIs (`disable_ssl_certificate_validation=False`), and SMTP STARTTLS (`CERT_REQUIRED`) — [Policy below](#secure-communications--tls-certificate-validation-owasp-asvs-v12) |
-| **V13** | Configuration | 3 | **3 / 3** | +3 | External services documented, gitignored `.env` secret management with `.env.example`, directory listings disabled, `.git` excluded via `.dockerignore`, `DEBUG=0` default, masked `Server` header — [`SECURITY.md`](SECURITY.md) |
-| **V14** | Data Protection | 3 | **3 / 3** | +1 | Sensitive data classification, tokens removed from URL query strings (`HttpOnly` cookie + `replaceState()`), zero third-party trackers, `Clear-Site-Data` + client storage wipe on logout — [`SECURITY.md`](SECURITY.md) |
-| **V15** | Secure Coding & Architecture | 4 | **4 / 4** | — | Vulnerability remediation SLAs, CycloneDX 1.5 SBOM (`sbom/inventory.json`, 46 components), trusted registries enforced (`scripts/check_sbom.py`), explicit serializer field allowlists — [`docs/dependency-policy.md`](docs/dependency-policy.md) |
-| **V16** | Logging & Error Handling | 3 | **3 / 3** | — | 5-layer structured UTC logging inventory (`backend/logs/security.log`), full auth & security error event logging, log-injection escaping, generic HTTP 500 responses — [`SECURITY_LOGGING.md`](SECURITY_LOGGING.md) |
-| **Total** | **15 Active Chapters** | **59** | **59 / 59 (100%)** | **+15** | **[View Full Matrix -> `ASVS_COMPLIANCE.md`](ASVS_COMPLIANCE.md)** |
+|     Chapter     | Security Domain              |   Planned   |           Done           |     Extra     | Key Implemented Controls & Documentation                                                                                                                                                                                                                                    |
+| :-------------: | :--------------------------- | :----------: | :----------------------: | :-----------: | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|  **V1**  | Encoding & Sanitization      |      6      |     **6 / 6**     |      —      | React JSX auto-escaping, DRF `JSONRenderer`, Django ORM parameterized queries (zero raw SQL), URL protocol allowlisting (`http`/`https` only), zero `eval`/`subprocess` — [`ASVS_COMPLIANCE.md`](ASVS_COMPLIANCE.md#chapter-v1--encoding-and-sanitization-6--6) |
+|  **V2**  | Validation & Business Logic  |      4      |     **4 / 4**     |      —      | Server-side DRF serializer validation (`HEX_RE`, `TIME_RE`, overlap checks, enum choices), atomic CSV row validation, sequential OAuth flow — [`VALIDATION_RULES.md`](VALIDATION_RULES.md)                                                                            |
+|  **V3**  | Web Frontend Security        |      5      |     **5 / 5**     |      +9      | `SecFetchValidationMiddleware`, `SecurityHeadersMiddleware` (HSTS, CSP `frame-ancestors`, `nosniff`, Referrer-Policy, COOP), `HttpOnly`/`SameSite=Lax`/`__Secure-` cookies, strict CORS allowlist, safe HTTP methods — [`SECURITY.md`](SECURITY.md)         |
+|  **V5**  | File Handling                |      5      |     **5 / 5**     |      —      | `.csv`-only extension & MIME allowlist, 1 MB max size, strictly in-memory processing (`io.StringIO`), `os.path.basename()`, hardcoded `Content-Disposition`, CSV formula injection sanitization — [Policy below](#file-handling--security-policy-owasp-asvs-v5)     |
+|  **V6**  | Authentication               |      4      |     **4 / 4**     |      —      | Federated Google OAuth 2.0 only (no local passwords, no default accounts, no secret questions), per-IP OAuth rate limiting (`15/60s`) & DRF throttling (`20/min` anon, `120/min` user) — [Policy below](#authentication--anti-automation-policy-owasp-asvs-v6)        |
+|  **V7**  | Session Management           |      5      |     **5 / 5**     |      +2      | Server-side `SignedTokenAuthentication`, dynamic session JWTs with 192-bit CSPRNG `jti`, 8-hour lifetime, immediate revocation via `GoogleAccount.token_valid_after` on logout — [`SECURITY.md`](SECURITY.md)                                                       |
+|  **V8**  | Authorization                |      4      |     **4 / 4**     |      —      | Deny-by-default function grants (`FunctionGrant`, 15 permission codes), strict per-user queryset filtering & `OwnsObject` / `require_owned_item()` IDOR/BOLA protection — [`docs/authorization.md`](docs/authorization.md)                                          |
+|  **V9**  | Self-contained Tokens        |      4      |     **4 / 4**     |      —      | Mandatory HMAC-SHA256 verification, strict `HS256` allowlist (rejects `none`), server-only key material (rejects `jku`/`x5u`/`jwk`/`x5c`), enforced `nbf`/`exp`/`iat` window — [`docs/authorization.md`](docs/authorization.md)                         |
+|  **V10**  | OAuth & OIDC                 |      6      |     **6 / 6**     |      —      | BFF pattern (Google tokens strictly backend-only), 256-bit signed `HttpOnly` `oauth_state` CSRF cookie, confidential client backchannel auth, read-only Classroom scopes, `prompt="consent"` — [Policy below](#oauth-20--oidc-security-policy-owasp-asvs-v10)         |
+|  **V11**  | Cryptography                 |      2      |     **2 / 2**     |      —      | Industry-validated stdlib/PyJWT/`cryptography`/Django primitives only; pinned 256-bit `HS256` & `PBKDF2-HMAC-SHA256` (zero MD5/SHA-1) — [Policy below](#cryptography--data-integrity-policy-owasp-asvs-v11)                                                           |
+|  **V12**  | Secure Communication         |      1      |     **1 / 1**     |      —      | Mandatory TLS certificate & hostname verification for Google OAuth (`verify=True`), Google APIs (`disable_ssl_certificate_validation=False`), and SMTP STARTTLS (`CERT_REQUIRED`) — [Policy below](#secure-communications--tls-certificate-validation-owasp-asvs-v12) |
+|  **V13**  | Configuration                |      3      |     **3 / 3**     |      +3      | External services documented, gitignored `.env` secret management with `.env.example`, directory listings disabled, `.git` excluded via `.dockerignore`, `DEBUG=0` default, masked `Server` header — [`SECURITY.md`](SECURITY.md)                             |
+|  **V14**  | Data Protection              |      3      |     **3 / 3**     |      +1      | Sensitive data classification, tokens removed from URL query strings (`HttpOnly` cookie + `replaceState()`), zero third-party trackers, `Clear-Site-Data` + client storage wipe on logout — [`SECURITY.md`](SECURITY.md)                                            |
+|  **V15**  | Secure Coding & Architecture |      4      |     **4 / 4**     |      —      | Vulnerability remediation SLAs, CycloneDX 1.5 SBOM (`sbom/inventory.json`, 46 components), trusted registries enforced (`scripts/check_sbom.py`), explicit serializer field allowlists — [`docs/dependency-policy.md`](docs/dependency-policy.md)                     |
+|  **V16**  | Logging & Error Handling     |      3      |     **3 / 3**     |      —      | 5-layer structured UTC logging inventory (`backend/logs/security.log`), full auth & security error event logging, log-injection escaping, generic HTTP 500 responses — [`SECURITY_LOGGING.md`](SECURITY_LOGGING.md)                                                     |
+| **Total** | **15 Active Chapters** | **59** | **59 / 59 (100%)** | **+15** | **[View Full Matrix -> `ASVS_COMPLIANCE.md`](ASVS_COMPLIANCE.md)**                                                                                                                                                                                                    |
 
 ---
 
@@ -165,6 +155,7 @@ UniPlanPlus was systematically hardened against **OWASP ASVS v5.0**. Every plann
 ### File Handling & Security Policy (OWASP ASVS V5)
 
 #### 1. Timetable CSV Upload (`POST /api/timetable/import/`)
+
 - **Permitted File Types & MIME Types:** `text/csv`, `application/csv`, `application/vnd.ms-excel`
 - **Expected File Extension:** `.csv` (strictly validated on both client and server)
 - **Maximum File Size:** `1,000,000` bytes (1 MB). Archives/compressed files (`.zip`, `.gz`) are rejected (`400`/`415`).
@@ -175,6 +166,7 @@ UniPlanPlus was systematically hardened against **OWASP ASVS v5.0**. Every plann
   - Leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`) are stripped from imported text fields to prevent stored CSV injection.
 
 #### 2. Timetable CSV Download (`GET /api/timetable/export/`)
+
 - Ignores any user-supplied filename parameters in URLs or payloads and enforces a hardcoded server header: `Content-Disposition: attachment; filename="timetable.csv"` (`V5.4.1`).
 - Sets `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, and `Content-Type: text/csv; charset=utf-8` so browsers download the file safely rather than rendering or executing content.
 - All exported text fields (`subject`, `room`) are sanitized against CSV Formula Injection by prefixing dangerous leading characters (`=`, `+`, `-`, `@`, `\t`, `\r`) with a single quote (`'`).
@@ -221,6 +213,7 @@ pytest -v
 ```
 
 Test suites included in `backend/core/tests/`:
+
 - `test_v1_encoding_sanitization.py` — JSON/JS output encoding, URL protocol validation, ORM SQLi protection
 - `test_v2_validation_rules.py` — Serializer regex/range/overlap validation and CSV upload guards
 - `test_security_v3_v7_v13_v14.py` — Security headers, `Sec-Fetch` context isolation, token entropy/revocation, logout `Clear-Site-Data`
@@ -230,29 +223,29 @@ Test suites included in `backend/core/tests/`:
 
 ## Project Documentation
 
-| Document | Description |
-| :--- | :--- |
-| **[INSTALLATION.md](INSTALLATION.md)** | Complete Docker installation, environment configuration, and operations guide |
-| **[OAuth2Setup.md](OAuth2Setup.md)** | Step-by-step Google Cloud OAuth 2.0 & Classroom API setup guide *(Required)* |
-| **[EmailSetup.md](EmailSetup.md)** | Quick Gmail SMTP App Password & console email setup guide *(Optional)* |
-| **[ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md)** | Complete OWASP ASVS v5.0 Plan/Done compliance matrix (`59/59` planned + `15` extra controls) |
-| **[PROJECT_SECURITY_REPORT.md](PROJECT_SECURITY_REPORT.md)** | Course security report mapped to rubric Items 4–18, STRIDE threat model, OWASP ASVS v5.0 & Top 10, and 4 advanced security features |
-| **[SECURITY.md](SECURITY.md)** | External communications inventory, secrets management, data classification, session & frontend controls |
-| **[VALIDATION_RULES.md](VALIDATION_RULES.md)** | OWASP ASVS V2 input validation schemas, allowlists, and CSV upload rules |
-| **[SECURITY_LOGGING.md](SECURITY_LOGGING.md)** | OWASP ASVS V16 5-layer logging inventory, event catalog, and error-handling policy |
-| **[docs/authorization.md](docs/authorization.md)** | OWASP ASVS V8 & V9 function-level permission catalog, ownership checks, and session JWT rules |
-| **[docs/dependency-policy.md](docs/dependency-policy.md)** | OWASP ASVS V15 trusted package registries, vulnerability SLAs, and SBOM workflow |
-| **[Project Write-up (Google Doc)](https://docs.google.com/document/d/1DCrA-3688mUq6HGsNAnI9CS53ziWLud2McELJog4sqA/edit?usp=sharing)** | Original project design specification |
-| **[UI Prototype (Canva)](https://www.canva.com/design/DAGxuHuyKDU/g_PNCcumdICsxAvOEeKd9A/edit?utm_content=DAGxuHuyKDU&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)** | Application UI/UX design prototype |
-| **[Project Management (Jira)](https://ku-team-panthut.atlassian.net/jira/software/projects/TAW/settings/access)** | Sprint & issue tracking board |
+| Document                                                                                                                                                                                       | Description                                                                                                                          |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| **[INSTALLATION.md](INSTALLATION.md)**                                                                                                                                                    | Complete Docker installation, environment configuration, and operations guide                                                        |
+| **[OAuth2Setup.md](OAuth2Setup.md)**                                                                                                                                                      | Step-by-step Google Cloud OAuth 2.0 & Classroom API setup guide *(Required)*                                                       |
+| **[EmailSetup.md](EmailSetup.md)**                                                                                                                                                        | Quick Gmail SMTP App Password & console email setup guide *(Optional)*                                                             |
+| **[ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md)**                                                                                                                                              | Complete OWASP ASVS v5.0 Plan/Done compliance matrix (`59/59` planned + `15` extra controls)                                     |
+| **[PROJECT_SECURITY_REPORT.md](PROJECT_SECURITY_REPORT.md)**                                                                                                                              | Course security report mapped to rubric Items 4–18, STRIDE threat model, OWASP ASVS v5.0 & Top 10, and 4 advanced security features |
+| **[SECURITY.md](SECURITY.md)**                                                                                                                                                            | External communications inventory, secrets management, data classification, session & frontend controls                              |
+| **[VALIDATION_RULES.md](VALIDATION_RULES.md)**                                                                                                                                            | OWASP ASVS V2 input validation schemas, allowlists, and CSV upload rules                                                             |
+| **[SECURITY_LOGGING.md](SECURITY_LOGGING.md)**                                                                                                                                            | OWASP ASVS V16 5-layer logging inventory, event catalog, and error-handling policy                                                   |
+| **[docs/authorization.md](docs/authorization.md)**                                                                                                                                        | OWASP ASVS V8 & V9 function-level permission catalog, ownership checks, and session JWT rules                                        |
+| **[docs/dependency-policy.md](docs/dependency-policy.md)**                                                                                                                                | OWASP ASVS V15 trusted package registries, vulnerability SLAs, and SBOM workflow                                                     |
+| **[Project Write-up (Google Doc)](https://docs.google.com/document/d/1DCrA-3688mUq6HGsNAnI9CS53ziWLud2McELJog4sqA/edit?usp=sharing)**                                                     | Original project design specification                                                                                                |
+| **[UI Prototype (Canva)](https://www.canva.com/design/DAGxuHuyKDU/g_PNCcumdICsxAvOEeKd9A/edit?utm_content=DAGxuHuyKDU&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)** | Application UI/UX design prototype                                                                                                   |
+| **[Project Management (Jira)](https://ku-team-panthut.atlassian.net/jira/software/projects/TAW/settings/access)**                                                                         | Sprint & issue tracking board                                                                                                        |
 
 ---
 
 ## Team Members
 
-| No. | Student ID | Full Name |
-| :---: | :---: | :--- |
-| 1 | `6410546262` | **Vorakorn Leechavanan** |
-| 2 | `6610545774` | **Jongchana Khachatrokphai** |
-| 3 | `6610545421` | **Panthut Ketphan** |
-| 4 | `6610545944` | **Sorasit Kateratorn** |
+| No. |   Student ID   | Full Name                          |
+| :-: | :------------: | :--------------------------------- |
+|  1  | `6410546262` | **Vorakorn Leechavanan**     |
+|  2  | `6610545774` | **Jongchana Khachatrokphai** |
+|  3  | `6610545421` | **Panthut Ketphan**          |
+|  4  | `6610545944` | **Sorasit Kateratorn**       |
