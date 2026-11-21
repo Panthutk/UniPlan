@@ -2,30 +2,30 @@
 
 This document records the complete **OWASP Application Security Verification Standard (ASVS v5.0)** security plan, completion status, and codebase verification evidence for **UniPlanPlus (UniPlan)**.
 
-All **59 planned security requirements** across **15 ASVS chapters** (`V1`–`V3`, `V5`–`V16`) have been implemented and verified in the codebase, along with **15 additional defense-in-depth hardening controls** beyond the initial project plan (**74 verified controls in total**).
+All **59 planned security requirements** across **15 ASVS chapters** (`V1`–`V3`, `V5`–`V16`) have been implemented and verified in the codebase.
 
 ---
 
 ## Executive Summary
 
-|     Chapter     | Domain                              |   Planned   |           Done           | Additional Controls | Primary Reference / Evidence                                                                                                             |
-| :-------------: | :---------------------------------- | :----------: | :----------------------: | :-----------------: | :--------------------------------------------------------------------------------------------------------------------------------------- |
-|  **V1**  | Encoding and Sanitization           |      6      |     **6 / 6**     |         —         | `core/serializers.py`, `core/views.py`, `test_v1_encoding_sanitization.py`                                                         |
-|  **V2**  | Validation and Business Logic       |      4      |     **4 / 4**     |         —         | [`VALIDATION_RULES.md`](VALIDATION_RULES.md), `test_v2_validation_rules.py`                                                           |
-|  **V3**  | Web Frontend Security               |      5      |     **5 / 5**     |         +9         | [`SECURITY.md`](SECURITY.md), `core/middleware.py`, `test_security_v3_v7_v13_v14.py`                                                |
-|  **V5**  | File Handling                       |      5      |     **5 / 5**     |         —         | [`README.md`](README.md#file-handling--security-policy-owasp-asvs-v5), [`VALIDATION_RULES.md`](VALIDATION_RULES.md), `core/views.py` |
-|  **V6**  | Authentication                      |      4      |     **4 / 4**     |         —         | [`README.md`](README.md#authentication--anti-automation-policy-owasp-asvs-v6), `core/views.py`, `mysite/settings.py`                |
-|  **V7**  | Session Management                  |      5      |     **5 / 5**     |         +2         | [`SECURITY.md`](SECURITY.md), `core/auth.py`, `core/tokens.py`, `test_security_v3_v7_v13_v14.py`                                  |
-|  **V8**  | Authorization                       |      4      |     **4 / 4**     |         —         | [`docs/authorization.md`](docs/authorization.md), `core/authorization.py`, `core/views.py`                                          |
-|  **V9**  | Self-contained Tokens               |      4      |     **4 / 4**     |         —         | [`docs/authorization.md`](docs/authorization.md#session-tokens), `core/tokens.py`                                                     |
-|  **V10**  | OAuth and OIDC                      |      6      |     **6 / 6**     |         —         | [`README.md`](README.md#oauth-20--oidc-security-policy-owasp-asvs-v10), [`OAuth2Setup.md`](OAuth2Setup.md), `core/views.py`          |
-|  **V11**  | Cryptography                        |      2      |     **2 / 2**     |         —         | [`README.md`](README.md#cryptography--data-integrity-policy-owasp-asvs-v11), `core/auth.py`, `core/tokens.py`                       |
-|  **V12**  | Secure Communication                |      1      |     **1 / 1**     |         —         | [`README.md`](README.md#secure-communications--tls-certificate-validation-owasp-asvs-v12), `core/views.py`, `mysite/settings.py`    |
-|  **V13**  | Configuration                       |      3      |     **3 / 3**     |         +3         | [`SECURITY.md`](SECURITY.md), `backend/.env.example`, `mysite/settings.py`                                                          |
-|  **V14**  | Data Protection                     |      3      |     **3 / 3**     |         +1         | [`SECURITY.md`](SECURITY.md), `core/views.py`, `frontend/src/utils/api.js`                                                          |
-|  **V15**  | Secure Coding and Architecture      |      4      |     **4 / 4**     |         —         | [`docs/dependency-policy.md`](docs/dependency-policy.md), `sbom/inventory.json`, `scripts/check_sbom.py`                            |
-|  **V16**  | Security Logging and Error Handling |      3      |     **3 / 3**     |         —         | [`SECURITY_LOGGING.md`](SECURITY_LOGGING.md), `core/exceptions.py`, `test_v16_logging_error_handling.py`                            |
-| **Total** | **15 Active Chapters**        | **59** | **59 / 59 (100%)** |    **+15**    | **74 Total Verified Controls**                                                                                                     |
+| Chapter | Domain | Planned | Done | Primary Reference / Evidence |
+| :---: | :--- | :---: | :---: | :--- |
+| **V1** | Encoding and Sanitization | 6 | **6 / 6** | `core/serializers.py`, `core/views.py`, `test_v1_encoding_sanitization.py` |
+| **V2** | Validation and Business Logic | 4 | **4 / 4** | [`VALIDATION_RULES.md`](VALIDATION_RULES.md), `test_v2_validation_rules.py` |
+| **V3** | Web Frontend Security | 5 | **5 / 5** | [`SECURITY.md`](SECURITY.md), `core/middleware.py`, `test_security_v3_v7_v13_v14.py` |
+| **V5** | File Handling | 5 | **5 / 5** | [`README.md`](README.md#file-handling--security-policy-owasp-asvs-v5), [`VALIDATION_RULES.md`](VALIDATION_RULES.md), `core/views.py` |
+| **V6** | Authentication | 4 | **4 / 4** | [`README.md`](README.md#authentication--anti-automation-policy-owasp-asvs-v6), `core/views.py`, `mysite/settings.py` |
+| **V7** | Session Management | 5 | **5 / 5** | [`SECURITY.md`](SECURITY.md), `core/auth.py`, `core/tokens.py`, `test_security_v3_v7_v13_v14.py` |
+| **V8** | Authorization | 4 | **4 / 4** | [`docs/authorization.md`](docs/authorization.md), `core/authorization.py`, `core/views.py` |
+| **V9** | Self-contained Tokens | 4 | **4 / 4** | [`docs/authorization.md`](docs/authorization.md#session-tokens), `core/tokens.py` |
+| **V10** | OAuth and OIDC | 6 | **6 / 6** | [`README.md`](README.md#oauth-20--oidc-security-policy-owasp-asvs-v10), [`OAuth2Setup.md`](OAuth2Setup.md), `core/views.py` |
+| **V11** | Cryptography | 2 | **2 / 2** | [`README.md`](README.md#cryptography--data-integrity-policy-owasp-asvs-v11), `core/auth.py`, `core/tokens.py` |
+| **V12** | Secure Communication | 1 | **1 / 1** | [`README.md`](README.md#secure-communications--tls-certificate-validation-owasp-asvs-v12), `core/views.py`, `mysite/settings.py` |
+| **V13** | Configuration | 3 | **3 / 3** | [`SECURITY.md`](SECURITY.md), `backend/.env.example`, `mysite/settings.py` |
+| **V14** | Data Protection | 3 | **3 / 3** | [`SECURITY.md`](SECURITY.md), `core/views.py`, `frontend/src/utils/api.js` |
+| **V15** | Secure Coding and Architecture | 4 | **4 / 4** | [`docs/dependency-policy.md`](docs/dependency-policy.md), `sbom/inventory.json`, `scripts/check_sbom.py` |
+| **V16** | Security Logging and Error Handling | 3 | **3 / 3** | [`SECURITY_LOGGING.md`](SECURITY_LOGGING.md), `core/exceptions.py`, `test_v16_logging_error_handling.py` |
+| **Total** | **15 Active Chapters** | **59** | **59 / 59 (100%)** | **All Planned Controls Verified** |
 
 > [!NOTE]
 > Chapters **V4** (API/Web Service framing, GraphQL, WebSocket) and **V17** (WebRTC) were not in scope (`Plan = False`) because UniPlan does not expose GraphQL, WebSocket, or WebRTC services.

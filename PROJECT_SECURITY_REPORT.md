@@ -189,26 +189,26 @@ STRIDE threat model mapped directly to current implementation status, distinguis
 
 ### 6.1 OWASP ASVS v5.0 Coverage Summary
 
-All **59 / 59 planned requirements (100%)** across **15 active ASVS chapters** plus **15 additional hardening controls** (**74 total verified controls**) are implemented and documented in full in [ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md):
+All **59 / 59 planned requirements (100%)** across **15 active ASVS chapters** are implemented and documented in full in [ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md):
 
-| Chapters | Planned | Done | Extra | Supporting Documentation |
-| :--- | :---: | :---: | :---: | :--- |
-| **V1** Encoding & Sanitization | 6 | 6 / 6 | — | [ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md), `test_v1_encoding_sanitization.py` |
-| **V2** Validation & Business Logic | 4 | 4 / 4 | — | [VALIDATION_RULES.md](VALIDATION_RULES.md), `test_v2_validation_rules.py` |
-| **V3** Web Frontend Security | 5 | 5 / 5 | +9 | [SECURITY.md](SECURITY.md), `test_security_v3_v7_v13_v14.py` |
-| **V5** File Handling | 5 | 5 / 5 | — | [README.md](README.md#file-handling--security-policy-owasp-asvs-v5), [VALIDATION_RULES.md](VALIDATION_RULES.md) |
-| **V6** Authentication | 4 | 4 / 4 | — | [README.md](README.md#authentication--anti-automation-policy-owasp-asvs-v6) |
-| **V7** Session Management | 5 | 5 / 5 | +2 | [SECURITY.md](SECURITY.md), `test_security_v3_v7_v13_v14.py` |
-| **V8** Authorization | 4 | 4 / 4 | — | [docs/authorization.md](docs/authorization.md) |
-| **V9** Self-contained Tokens | 4 | 4 / 4 | — | [docs/authorization.md](docs/authorization.md#session-tokens), `core/tokens.py` |
-| **V10** OAuth & OIDC | 6 | 6 / 6 | — | [README.md](README.md#oauth-20--oidc-security-policy-owasp-asvs-v10), [OAuth2Setup.md](OAuth2Setup.md) |
-| **V11** Cryptography | 2 | 2 / 2 | — | [README.md](README.md#cryptography--data-integrity-policy-owasp-asvs-v11) |
-| **V12** Secure Communication | 1 | 1 / 1 | — | [README.md](README.md#secure-communications--tls-certificate-validation-owasp-asvs-v12) |
-| **V13** Configuration | 3 | 3 / 3 | +3 | [SECURITY.md](SECURITY.md) |
-| **V14** Data Protection | 3 | 3 / 3 | +1 | [SECURITY.md](SECURITY.md) |
-| **V15** Secure Coding & Architecture | 4 | 4 / 4 | — | [docs/dependency-policy.md](docs/dependency-policy.md), `sbom/inventory.json` |
-| **V16** Security Logging & Error Handling | 3 | 3 / 3 | — | [SECURITY_LOGGING.md](SECURITY_LOGGING.md), `test_v16_logging_error_handling.py` |
-| **Total** | **59** | **59 / 59 (100%)** | **+15** | **74 Verified Controls** |
+| Chapters | Planned | Done | Supporting Documentation |
+| :--- | :---: | :---: | :--- |
+| **V1** Encoding & Sanitization | 6 | 6 / 6 | [ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md), `test_v1_encoding_sanitization.py` |
+| **V2** Validation & Business Logic | 4 | 4 / 4 | [VALIDATION_RULES.md](VALIDATION_RULES.md), `test_v2_validation_rules.py` |
+| **V3** Web Frontend Security | 5 | 5 / 5 | [SECURITY.md](SECURITY.md), `test_security_v3_v7_v13_v14.py` |
+| **V5** File Handling | 5 | 5 / 5 | [README.md](README.md#file-handling--security-policy-owasp-asvs-v5), [VALIDATION_RULES.md](VALIDATION_RULES.md) |
+| **V6** Authentication | 4 | 4 / 4 | [README.md](README.md#authentication--anti-automation-policy-owasp-asvs-v6) |
+| **V7** Session Management | 5 | 5 / 5 | [SECURITY.md](SECURITY.md), `test_security_v3_v7_v13_v14.py` |
+| **V8** Authorization | 4 | 4 / 4 | [docs/authorization.md](docs/authorization.md) |
+| **V9** Self-contained Tokens | 4 | 4 / 4 | [docs/authorization.md](docs/authorization.md#session-tokens), `core/tokens.py` |
+| **V10** OAuth & OIDC | 6 | 6 / 6 | [README.md](README.md#oauth-20--oidc-security-policy-owasp-asvs-v10), [OAuth2Setup.md](OAuth2Setup.md) |
+| **V11** Cryptography | 2 | 2 / 2 | [README.md](README.md#cryptography--data-integrity-policy-owasp-asvs-v11) |
+| **V12** Secure Communication | 1 | 1 / 1 | [README.md](README.md#secure-communications--tls-certificate-validation-owasp-asvs-v12) |
+| **V13** Configuration | 3 | 3 / 3 | [SECURITY.md](SECURITY.md) |
+| **V14** Data Protection | 3 | 3 / 3 | [SECURITY.md](SECURITY.md) |
+| **V15** Secure Coding & Architecture | 4 | 4 / 4 | [docs/dependency-policy.md](docs/dependency-policy.md), `sbom/inventory.json` |
+| **V16** Security Logging & Error Handling | 3 | 3 / 3 | [SECURITY_LOGGING.md](SECURITY_LOGGING.md), `test_v16_logging_error_handling.py` |
+| **Total** | **59** | **59 / 59 (100%)** | **All Planned Controls Verified** |
 
 ### 6.2 OWASP Top 10 (2021) Mapping
 
@@ -273,7 +273,7 @@ From the rubric's advanced security feature options, UniPlanPlus implements the 
 | 14 | SAST Tool Analysis & Report | *To be completed and attached by team* | **Pending** |
 | 15 | DAST Tool Analysis & Report | *To be completed and attached by team* | **Pending** |
 | 16 | Threat Model Implementation Mapping | STRIDE checklist mapping Done vs. Not Done (Prod-Deferred) mitigations in Section 5 | Complete |
-| 17 | Mapping to OWASP ASVS & Top 10 | 59/59 Planned + 15 Extra ASVS v5.0 controls ([ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md)) + full OWASP Top 10 (2021) table | Complete |
+| 17 | Mapping to OWASP ASVS & Top 10 | 59/59 Planned ASVS v5.0 controls ([ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md)) + full OWASP Top 10 (2021) table | Complete |
 | 18 | 4 Advanced Security Features | (1) Authorization with scope, (2) Login attempt rate limit, (3) Backend API rate limit, (4) JWT expiration & management *(+ Login timeout)* | Complete |
 
 ---
