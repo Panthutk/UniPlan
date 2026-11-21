@@ -1,4 +1,4 @@
-# ⚙️ Installation & Running Guide
+# Installation & Running Guide
 
 This guide walks you through setting up and running **UniPlan** locally with Docker.
 
@@ -8,7 +8,7 @@ This guide walks you through setting up and running **UniPlan** locally with Doc
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before you begin, make sure you have:
 
@@ -67,7 +67,7 @@ EMAIL_USE_TLS=true
 
 - Replace `__CHANGE_ME__` with a strong random secret key for `DJANGO_SECRET`.
 - Paste the **Client ID** and **Client Secret** you created in **[OAuth2Setup.md](OAuth2Setup.md)**.
-- **Email reminders (optional):** If you do not need to send real reminder emails during local testing, set `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` so emails are printed to the backend container logs instead. For Gmail SMTP, use a Google App Password for `EMAIL_HOST_PASSWORD`.
+- **Email reminders (optional):** See **[EmailSetup.md](EmailSetup.md)** for Gmail App Password setup or local console-only testing.
 
 ### Frontend (`frontend/.env`)
 
@@ -115,7 +115,7 @@ Then sign in at `http://127.0.0.1:8000/admin`.
 
 ---
 
-## 🛠️ Useful Commands
+## Useful Commands
 
 - **View container logs:**
   ```bash
