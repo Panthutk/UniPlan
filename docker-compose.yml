@@ -50,9 +50,14 @@ services:
     working_dir: /app
     command: >
       sh -c "
-      python manage.py migrate &&
+      python manage.py migrate --noinput &&
       python manage.py runserver 0.0.0.0:8000
       "
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/hello/', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     restart: unless-stopped
 
   frontend:
@@ -82,7 +87,7 @@ services:
       db:
         condition: service_healthy
       backend:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - backend/.env
     environment:
@@ -99,7 +104,6 @@ services:
     working_dir: /app
     command: >
       sh -c "
-      python manage.py migrate &&
       python manage.py send_reminders --loop --interval=60
       "
     restart: unless-stopped
