@@ -21,7 +21,7 @@ export function AssignmentsBoard({ TaskObjects, onUpdateTask, onArchiveTask, Sub
     // Make Subject ID to be Key for easier to use Subject data
     const SubjectMap = useMemo(() => {
         const map = {};
-        SubjectObjects.forEach(subj => {
+        (SubjectObjects || []).forEach(subj => {
             map[subj.id] = subj;
         });
         return map;
@@ -251,7 +251,7 @@ function sortTasks(groupedTasks, groupBy) {
 // --- Linking assignments to timetable events ---
 function annotateAssignmentsWithEvents(items, events, SubjectMap) {
     return (items || []).map((a) => {
-        const link = linkOneAssignmentToEvents(a, events, SubjectMap[a.subject].name);
+        const link = linkOneAssignmentToEvents(a, events, SubjectMap[a.subject]?.name || "");
         return { ...a, TableLink: link };
     });
 }

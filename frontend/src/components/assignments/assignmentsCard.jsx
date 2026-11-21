@@ -212,7 +212,7 @@ export function AssignmentsCard({ task, SubjectMap, onUpdateTask, color, groupLa
             <div className="p-4 min-w-0">
                 <div className="flex items-center justify-between gap-3">
                     <div className="text-sm opacity-80 truncate">
-                        <span className="tracking-wider">{subject.name || "Loading..."}</span>
+                        <span className="tracking-wider">{subject?.name || "Unknown Subject"}</span>
                         {task.assignment_alt_link && linked === true ? (
                             <span className="ml-2 text-xs px-2 py-0.4 rounded-full bg-neutral-800 border border-white/10">
                                 {lectureText && (

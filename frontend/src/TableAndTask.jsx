@@ -91,24 +91,6 @@ const HOURS = Array.from({ length: DAY_END_H - DAY_START_H + 1 }, (_, i) => DAY_
 const MINUTES = Array.from({ length: 60 / STEP_MIN }, (_, i) => i * STEP_MIN);
 
 
-async function getSubjectKeyByCourse(courseName, setSubjects) {
-  // get all subjects from backend
-  const subjects = await listSubjects();
-  // look for an existing subject by name
-  const match = subjects.find(sub => sub.name === courseName);
-
-  if (match) {
-    // found tell user the Key
-    return match.id;
-  } else {
-    // not found create new Subject obj
-    const newSubject = await createSubject(courseName);
-    setSubjects(prev => [...prev, newSubject]);
-    return newSubject.id;
-  }
-}
-
-
 // Send new assignment to tasks DB
 async function syncAssignmentsToTasks(assignments, setSubjects) {
   try {
@@ -123,19 +105,29 @@ async function syncAssignmentsToTasks(assignments, setSubjects) {
     // check assignments that not appear in classroom API anymore
     const removedTasks = existingClassroomTasks.filter(t => !classroomIds.has(t.external_id));
 
-    // Add new assignments
-    for (const a of newAssignments) {
-      const subjectKey = await getSubjectKeyByCourse(a.courseName, setSubjects);
+    // Add new assignments (cache subjects list once instead of re-fetching per assignment)
+    if (newAssignments.length > 0) {
+      const subjectsCache = await listSubjects();
+      for (const a of newAssignments) {
+        let match = subjectsCache.find(sub => sub.name === a.courseName);
+        if (!match) {
+          const code = uniqueCodeFromName(a.courseName, subjectsCache);
+          const color_hex = CreateNewColorHex();
+          match = await post(`/api/subjects/`, { name: a.courseName, code, color_hex });
+          subjectsCache.push(match);
+          setSubjects(prev => (prev.some(s => s.id === match.id) ? prev : [...prev, match]));
+        }
 
-      const body = {
-        title: a.title,
-        subject: subjectKey,
-        due_at: a.due ? new Date(a.due).toISOString() : null,
-        source: "classroom",
-        external_id: a.id,
-        assignment_alt_link: a.altLink
-      };
-      await post("/api/tasks/", body);
+        const body = {
+          title: a.title,
+          subject: match.id,
+          due_at: a.due ? new Date(a.due).toISOString() : null,
+          source: "classroom",
+          external_id: a.id,
+          assignment_alt_link: a.altLink
+        };
+        await post("/api/tasks/", body);
+      }
     }
 
     // Delete finished assignments
@@ -544,10 +536,10 @@ export default function ClassroomTimetableDashboard() {
   const [loading, setLoading] = useState(true);
   const [, setErr] = useState(null);
   const [courses, setCourses] = useState([]);
-  const [subsByCourse, setSubsByCourse] = useState({});
   // DB-backed subjects and user id (temp)
   const [me, setMe] = useState(null);
   const [meLoading, setMeLoading] = useState(true);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
 
   // local timetable events created via the modal
@@ -579,28 +571,42 @@ export default function ClassroomTimetableDashboard() {
 
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const data = await whoami();        // { id, ... } when logged in
-        if (data && data.id) setMe(data);
+        if (!cancelled && data && data.id) setMe(data);
       } catch (e) {
         console.error("whoami failed:", e);
       } finally {
-        setMeLoading(false);
+        if (!cancelled) setMeLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
 
   useEffect(() => {
-    if (!me || !me.id || meLoading) return;   // wait until we know who the user is
+    if (meLoading) return;   // wait until we know who the user is
+    if (!me || !me.id) {
+      setSubjectsLoading(false);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
-        const [subj, tte] = await Promise.all([
+        setSubjectsLoading(true);
+        const [subj, tte, dbTasks] = await Promise.all([
           listSubjects(me.id),
           listTimetable(me.id), //UI after refresh it, api call backend will return data from db
+          get("/api/tasks/"),
         ]);
-        setSubjects(subj);
+        if (cancelled) return;
+        setSubjects(prev => {
+          const map = new Map(prev.map(s => [s.id, s]));
+          for (const s of subj) map.set(s.id, s);
+          return Array.from(map.values());
+        });
 
         const byId = Object.fromEntries(subj.map(s => [s.id, s]));
         const evs = tte.map(t => ({
@@ -614,10 +620,14 @@ export default function ClassroomTimetableDashboard() {
           color: colorForDay(dbToUiDay(t.day_of_week)),
         }));
         setEvents(evs);
+        setTaskObjects(prev => (prev.length ? prev : dbTasks));
       } catch (e) {
         console.error(e);
+      } finally {
+        if (!cancelled) setSubjectsLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [me, me?.id, meLoading]);
 
 
@@ -915,16 +925,20 @@ export default function ClassroomTimetableDashboard() {
 
   useEffect(() => {
     if (!isLoggedIn) { nav("/login"); return; }
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setErr(null);
 
         const coursesJson = await authGet("/api/classroom/courses");
+        if (cancelled) return;
         const active = normalizeCourses(coursesJson).filter(
           (c) => (c.courseState || c.state || "ACTIVE") === "ACTIVE"
         );
         setCourses(active);
+
+        if (active.length === 0) return;
 
         const results = await Promise.allSettled(
           active.map(async (c) => {
@@ -933,16 +947,19 @@ export default function ClassroomTimetableDashboard() {
             return { id, list: normalizeSubmissions(sj) };
           })
         );
+        if (cancelled) return;
         const byId = {};
         for (const r of results) if (r.status === "fulfilled") byId[r.value.id] = r.value.list;
-        setSubsByCourse(byId);
-      } catch (e) {
 
-        setErr(String(e));
+        const tasks = await SetupTasks(active, byId, setSubjects);
+        if (!cancelled) setTaskObjects(tasks);
+      } catch (e) {
+        if (!cancelled) setErr(String(e));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [isLoggedIn, nav]);
 
   // subject options for datalist
@@ -951,18 +968,6 @@ export default function ClassroomTimetableDashboard() {
     for (const c of courses) if (c?.name) set.add(c.name.trim());
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [courses]);
-
-  useEffect(() => {
-    (async () => {
-      if (!courses.length || !Object.keys(subsByCourse).length) return;
-      try {
-        const tasks = await SetupTasks(courses, subsByCourse, setSubjects);
-        setTaskObjects(tasks);
-      } catch (err) {
-        console.error("Failed to fetch or sync tasks:", err);
-      }
-    })();
-  }, [courses, subsByCourse]);
 
   async function handleUpdateTask(id, newData) {
     await patch(`/api/tasks/${id}/`, newData);
@@ -1107,8 +1112,8 @@ export default function ClassroomTimetableDashboard() {
 
   if (!isLoggedIn) return null;
 
-  // Show full skeleton until EVERYTHING is ready
-  if (loading || meLoading || tasksLoading || !subjects.length) {
+  // Show full skeleton only while core user/DB data is loading
+  if (meLoading || subjectsLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -1140,7 +1145,7 @@ export default function ClassroomTimetableDashboard() {
         events={events}
         handleCellClick={handleCellClick}
         handleEventClick={handleEventClick}
-        tasksLoading={tasksLoading}
+        tasksLoading={tasksLoading || (loading && taskObjects.length === 0)}
         taskObjects={taskObjects}
         handleUpdateTask={handleUpdateTask}
         archiveTask={archiveTask}

@@ -234,7 +234,10 @@ def google_login(request):
         ip,
     )
     signed_state = dumps({"state": state}, salt="uniplan-oauth-state", key=settings.SECRET_KEY)
-    resp = JsonResponse({"auth_url": auth_url})
+    if request.GET.get("redirect") == "1":
+        resp = redirect(auth_url)
+    else:
+        resp = JsonResponse({"auth_url": auth_url})
     resp.set_cookie(
         "oauth_state",
         signed_state,
@@ -546,10 +549,37 @@ def list_active_submissions(request, course_id: str):
     if not subs:
         return JsonResponse({"studentSubmissions": []})
 
-    # fetch coursework objects once per ID (so we can attach title/due/link)
+    # fetch coursework objects in bulk via list() first (avoids N+1 get() calls)
     cw_ids = sorted({s.get("courseWorkId") for s in subs if s.get("courseWorkId")})
+    cw_needed = set(cw_ids)
     cw_map = {}
+
+    if cw_needed:
+        try:
+            page_token = None
+            while len(cw_map) < len(cw_needed):
+                list_kwargs = {"courseId": course_id, "pageSize": 100}
+                if page_token:
+                    list_kwargs["pageToken"] = page_token
+                cw_resp = classroom.courses().courseWork().list(**list_kwargs).execute()
+                for cw in cw_resp.get("courseWork", []):
+                    cw_id = cw.get("id")
+                    if cw_id in cw_needed:
+                        cw_map[cw_id] = cw
+                page_token = cw_resp.get("nextPageToken")
+                if not page_token:
+                    break
+        except Exception as exc:
+            error_logger.warning(
+                "event=classroom_coursework_list_error course_id=%s error=%s",
+                sanitize_log_value(course_id),
+                sanitize_log_value(str(exc)),
+            )
+
+    # fallback to per-item get() only for any coursework IDs not returned by list()
     for cw_id in cw_ids:
+        if cw_id in cw_map:
+            continue
         try:
             cw_map[cw_id] = (
                 classroom.courses()
