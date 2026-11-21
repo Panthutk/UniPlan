@@ -88,7 +88,10 @@ https://www.googleapis.com/auth/classroom.student-submissions.me.readonly
 ---
 
 ## **5. Publish the App (Audience Setting)**
-
+go to branding
+then fill
+Branding, App domain and Authorized domains
+  ![Google OAuth Screenshot](./image/20.png)
 - Open **Audience** from the side menu![Google OAuth Screenshot](./image/17.png)
 - Under Publishing Status → Click **Publish App** and confirm
   ![Google OAuth Screenshot](./image/18.png)
