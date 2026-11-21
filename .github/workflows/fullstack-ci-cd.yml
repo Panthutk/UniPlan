@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Verify SBOM inventory
         run: python3 scripts/check_sbom.py
@@ -48,7 +48,7 @@ jobs:
 
     services:
       db:
-        image: mysql:8.0
+        image: mysql:8.4
         env:
           MYSQL_DATABASE: uniplan
           MYSQL_ROOT_PASSWORD: rootpassword
@@ -66,7 +66,9 @@ jobs:
       DB_PASSWORD: rootpassword
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DJANGO_SECRET: test-secret
+      DEBUG: "1"
+      ALLOWED_HOSTS: "127.0.0.1,localhost,testserver"
+      DJANGO_SECRET: test-secret-key-for-ci-only-32-bytes-minimum
       GOOGLE_CLIENT_ID: fake
       GOOGLE_CLIENT_SECRET: fake
       GOOGLE_REDIRECT_URI: http://localhost/dummy
@@ -78,20 +80,20 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install backend dependencies
         working-directory: backend
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-django ruff
+          pip install --index-url https://pypi.org/simple -r requirements.txt
+          pip install --index-url https://pypi.org/simple pytest pytest-django
 
       - name: Soft lint backend (Ruff)
         working-directory: backend
         run: |
           echo "::group::Backend Lint"
-          ruff . || true
+          ruff check . || true
           echo "::endgroup::"
 
       - name: Wait for MySQL
@@ -107,7 +109,7 @@ jobs:
 
       - name: Run backend tests
         working-directory: backend
-        run: pytest
+        run: pytest -v
 
   frontend-build:
     name: Frontend build (Vite)
@@ -143,7 +145,9 @@ jobs:
   build-and-push-images:
     name: Build & push Docker images (backend + frontend)
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
+      - dependency-governance
       - backend-tests
       - frontend-build
 

@@ -1,8 +1,8 @@
 asgiref==3.9.1
-Django==5.2.6
+Django==5.2.19
 django-cors-headers==4.7.0
-djangorestframework==3.16.1
-sqlparse==0.5.3
+djangorestframework==3.18.3
+sqlparse==0.6.1
 tzdata==2025.2
 
 # extra packages for Google OAuth + Classroom
@@ -10,9 +10,9 @@ google-api-python-client==2.151.0
 google-auth==2.34.0
 google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
-httplib2==0.22.0
-python-dotenv==1.0.1
-PyJWT==2.10.1
+httplib2==0.32.1
+python-dotenv==1.2.4
+PyJWT==2.15.1
 PyMySQL==1.1.1
-cryptography==43.0.3
+cryptography==50.0.2
 ruff==0.8.6
