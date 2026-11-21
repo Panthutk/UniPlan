@@ -1,6 +1,6 @@
-# Dependency policy
+# Dependency Policy
 
-## Trusted repositories
+## Trusted Repositories
 
 Install third-party libraries only from:
 
@@ -13,7 +13,7 @@ Do not use unofficial mirrors, GitHub tarball URLs, or unpinned `git+` installs.
 
 Direct libraries are listed in `sbom/inventory.json`. Transitive libraries are locked by `frontend/package-lock.json` and the pinned Python requirements.
 
-## Update and remediation time frames
+## Update and Remediation Time Frames
 
 | Severity | Maximum time to update or mitigate |
 |---|---|
@@ -24,7 +24,7 @@ Direct libraries are listed in `sbom/inventory.json`. Transitive libraries are l
 
 `sbom/inventory.json` `last_reviewed` must be no older than 90 days. Refresh it after dependency upgrades or security reviews.
 
-## How to refresh the inventory
+## How To Refresh The Inventory
 
 ```bash
 python3 scripts/generate_sbom.py

@@ -18,11 +18,22 @@ University students typically juggle separate tools for weekly class timetables 
 
 ### Key Features
 
+<<<<<<< HEAD
 - **Interactive Weekly Timetable:** Create, edit, color-code, and manage classes with built-in schedule overlap detection.
 - **CSV Timetable Import & Export:** Bulk import/export schedules with strict file-type, size, UTF-8, and CSV formula-injection protections.
 - **Subject-Linked Task Tracking:** Create, prioritize (`none`, `low`, `normal`, `high`), update status (`NOT_STARTED`, `IN_PROCESS`, `COMPLETED`), and archive/unarchive tasks directly from timetable classes.
 - **Google Classroom Sync:** Sign in via Google OAuth 2.0 (SSO) and synchronize courses, coursework, and student submissions automatically using read-only scopes.
 - **Automated Due-Date Reminders:** Background reminder worker (`send_reminders`) delivers scheduled email reminders (`1`, `3`, or `7` days before deadlines).
+=======
+- [🔐 Authorization Rules](docs/authorization.md) — Function-level and data-specific access
+- [📝 Dependency Policy](docs/dependency-policy.md) — Trusted registries and remediation time frames
+- [📄 GoogleDoc](https://docs.google.com/document/d/1DCrA-3688mUq6HGsNAnI9CS53ziWLud2McELJog4sqA/edit?usp=sharing) — Project write-up
+- [🎨 MockUp UI](https://www.canva.com/design/DAGxuHuyKDU/g_PNCcumdICsxAvOEeKd9A/edit?utm_content=DAGxuHuyKDU&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) — Canva prototype
+- [🛠 Jira Board](https://ku-team-panthut.atlassian.net/jira/software/projects/TAW/settings/access) — Project management
+- [🔒 Security V1 — Encoding &amp; Sanitization](SECURITY_V1.md) — OWASP ASVS V1 documentation & verification
+- [✅ Input Validation &amp; Business Logic Rules (ASVS V2)](VALIDATION_RULES.md) — Data structure & input validation specification
+- [📋 Security Logging &amp; Error Handling Inventory (ASVS V16)](SECURITY_LOGGING.md) — Logging architecture, events, and error handling
+>>>>>>> 706640ead55fabb6bde14cbc997b47c838d29457
 
 ---
 

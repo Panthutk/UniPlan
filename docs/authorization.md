@@ -1,4 +1,4 @@
-# Authorization rules
+# Authorization Rules
 
 Authorization is enforced on the Django API (trusted service layer). The browser must not be treated as an access-control boundary.
 
@@ -10,13 +10,13 @@ A request is allowed only if all of the following hold:
 
 Missing authentication returns **401**. Missing function grant or object access returns **403**. An undeclared function permission is **deny by default**.
 
-## Consumers and grants
+## Consumers and Grants
 
 Grants are stored in `FunctionGrant` (`user` + `permission` code). They are the source of truth.
 
 On first Google sign-in, a consumer receives the default set: every catalog permission except `debug.*`. Later grants are not auto-repaired; revoke or add rows in Django admin (`Function grants`). Superusers bypass function grants but still use ownership checks on object APIs unless using Django admin.
 
-## Function-level access
+## Function-level Access
 
 Each API names the permission it requires. SAFE methods (GET/HEAD/OPTIONS) use `*.read`. POST/PUT/PATCH/DELETE use `*.write`, unless the view maps a specific action.
 
@@ -44,7 +44,7 @@ Public (no consumer grant): Google OAuth login/callback. These do not return use
 
 Enforcement: `EnforcesDeclaredFunctionPermission` and `HasFunctionPermission` in `backend/core/authorization.py`.
 
-## Data-specific access (resource attributes)
+## Data-specific Access (Resource Attributes)
 
 Function grants are not enough to read or change another consumer’s item. Access to a row is restricted by ownership attributes:
 
@@ -63,7 +63,7 @@ Rules:
 
 Classroom Google calls use that consumer’s stored Google credentials, so course/submission data is only the data Google returns for that account.
 
-## Session tokens
+## Session Tokens
 
 Self-contained session JWTs are issued after Google login (`backend/core/tokens.py`). Before any payload is trusted:
 
@@ -72,7 +72,7 @@ Self-contained session JWTs are issued after Google login (`backend/core/tokens.
 - The verification key is only `SECRET_KEY` from Django settings. Header parameters `jku`, `x5u`, `jwk`, `x5c`, and related key-source fields are rejected.
 - `nbf` and `exp` (and `iat`) are required. The token is accepted only when verification time is in `[nbf, exp]` (lifetime 8 hours).
 
-## Where to change the rules
+## Where To Change The Rules
 
 | Concern | Location |
 |---|---|
