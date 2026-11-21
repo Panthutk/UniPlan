@@ -18,7 +18,10 @@ Follow these steps to configure **Google OAuth2** for uniplan setup.
 
 ## **2. Client & Project Configuration**
 
-- After creating the project, click **Client** in the side menu and select **Get Started** to set up the OAuth consent screen.![Google OAuth Screenshot](./image/4.png)
+- After creating the project, click 
+![Google OAuth Screenshot](./image/19.png)
+then click
+**Client** in the side menu and select **Get Started** to set up the OAuth consent screen.![Google OAuth Screenshot](./image/4.png)
 - Fill in the required details, select **External**, then click **Create**.
   ![Google OAuth Screenshot](./image/5.png)
 
