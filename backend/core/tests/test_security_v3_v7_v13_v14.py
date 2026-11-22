@@ -40,9 +40,9 @@ class SecurityHeadersTests(TestCase):
         # V3.4.8: Cross-Origin-Opener-Policy
         self.assertEqual(resp.get("Cross-Origin-Opener-Policy"), "same-origin")
 
-        # V13.4.6: Server version suppressed
+        # V13.4.6: Server version suppressed and X-Powered-By omitted
         self.assertEqual(resp.get("Server"), "UniPlan")
-        self.assertEqual(resp.get("X-Powered-By"), "")
+        self.assertNotIn("X-Powered-By", resp)
 
 
 class SecFetchValidationTests(TestCase):

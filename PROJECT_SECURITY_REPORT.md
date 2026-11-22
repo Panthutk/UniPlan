@@ -122,10 +122,10 @@ Explicitly implemented in code via `SecurityHeadersMiddleware` and `SecFetchVali
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Enforce HTTPS (V3.4.1) |
 | `X-Content-Type-Options` | `nosniff` | Prevent MIME sniffing (V3.4.4) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Prevent URL/query leakage (V3.4.5) |
-| `Content-Security-Policy` | `frame-ancestors 'self'; object-src 'none'; base-uri 'self'` | Clickjacking & object/base defense (V3.4.6) |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'` | Clickjacking, default-deny & object/base/form defense (V3.4.3, V3.4.6) |
 | `Cross-Origin-Opener-Policy` | `same-origin` | Isolate browsing context / anti-tabnabbing (V3.4.8) |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Disable unused browser APIs |
-| `Server` / `X-Powered-By` | `Server: UniPlan`, `X-Powered-By` cleared | Mask backend version info (V13.4.6) |
+| `Server` / `X-Powered-By` | `Server: UniPlan`, `X-Powered-By` removed | Mask backend version info (V13.4.6) |
 | `Clear-Site-Data` | `"cookies", "storage"` *(on `POST /api/auth/logout`)* | Purge client storage on logout (V14.3.1) |
 | `Cache-Control` | `no-store` *(on OAuth & CSV export responses)* | Prevent sensitive response caching (V14.3.2) |
 | `Sec-Fetch-Dest` enforcement | Blocks `Sec-Fetch-Dest: document` on `/api/*` (`403`) | Prevent direct browser rendering of APIs (V3.2.1) |
@@ -156,11 +156,38 @@ Explicitly implemented in code via `SecurityHeadersMiddleware` and `SecFetchVali
 
 ### Item 15 — Dynamic Application Security Testing (DAST) Report
 
-- **Status:** `[Pending]` — To be populated once OWASP ZAP DAST scan results are completed and attached.
-- **Placeholder for Findings & Remediation Summary:**
-  - *Tool Used:* OWASP ZAP (TBD)
-  - *Target Endpoints & Scan Date:* TBD
-  - *Summary of Alerts & Remediation:* TBD
+- **Status:** Complete (Scanned, Backend Findings Remediated & Re-Verified)
+- **Tool Used:** OWASP ZAP by Checkmarx `v2.17.0`
+- **Scan Date:** November 22, 2026
+  - **Frontend Scan (`Default Policy`):** `14:02:48` — [Zap_Report_Default_Policy.html](Zap_Report_Default_Policy.html)
+  - **Backend API Re-Scan (`API` Policy, Post-Remediation):** `14:15:06` — [Zap_Report_API.html](Zap_Report_API.html)
+- **Targets Scanned:**
+  - `http://127.0.0.1:8000` (Django REST backend API — authenticated with Bearer JWT via ZAP Replacer + `API` scan policy)
+  - `http://127.0.0.1:5173` (React + Vite frontend — 6 endpoints crawled with `Default Policy`)
+- **Overall Result (Attached Reports):** **0 High / Critical vulnerabilities**, **3 Medium**, **1 Low**, **1 Informational** (**5 alert types total**, all on the local Vite dev server; **0 alerts** on the Django backend API after remediation). Zero injection (SQLi, XSS, command injection, path traversal) or broken access control vulnerabilities were detected.
+
+#### Summary by Site and Risk Level (Attached Reports)
+
+| Target Site | Report File | High | Medium | Low | Informational |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| `http://127.0.0.1:8000` (Django Backend API — Post-Fix) | [Zap_Report_API.html](Zap_Report_API.html) | **0** | **0** *(4 earlier fixed)* | **0** *(1 earlier fixed)* | **0** |
+| `http://127.0.0.1:5173` (Vite Dev Frontend) | [Zap_Report_Default_Policy.html](Zap_Report_Default_Policy.html) | **0** | 3 | 1 | 1 |
+| **Total in Attached Reports** | **2 Reports** | **0** | **3** | **1** | **1** |
+
+#### Detailed Findings, Triage & Remediations
+
+| Alert Type | Risk | Target | Instances | Status & Action Taken |
+| :--- | :---: | :--- | :---: | :--- |
+| CSP: Failure to Define Directive with No Fallback (`form-action`) | Medium | Backend (`:8000`) | 0 *(re-scan)* | **Fixed & Verified:** Added `form-action 'self'` to `Content-Security-Policy` in `backend/core/middleware.py`; confirmed `0` alerts in [Zap_Report_API.html](Zap_Report_API.html). |
+| CSP: Wildcard Directive (`default-src` missing) | Medium | Backend (`:8000`) | 0 *(re-scan)* | **Fixed & Verified:** Added `default-src 'none'` to `Content-Security-Policy` in `backend/core/middleware.py`; confirmed `0` alerts in [Zap_Report_API.html](Zap_Report_API.html). |
+| CSP: `script-src unsafe-inline` | Medium | Backend (`:8000`) | 0 *(re-scan)* | **Fixed & Verified:** Resolved by defining explicit `default-src 'none'` in `backend/core/middleware.py`; confirmed `0` alerts in [Zap_Report_API.html](Zap_Report_API.html). |
+| CSP: `style-src unsafe-inline` | Medium | Backend (`:8000`) | 0 *(re-scan)* | **Fixed & Verified:** Resolved by defining explicit `default-src 'none'` in `backend/core/middleware.py`; confirmed `0` alerts in [Zap_Report_API.html](Zap_Report_API.html). |
+| Server Leaks Information via `X-Powered-By` Header | Low | Backend (`:8000`) | 0 *(re-scan)* | **Fixed & Verified:** Replaced `response["X-Powered-By"] = ""` with `response.headers.pop("X-Powered-By", None)` in `backend/core/middleware.py` and updated `test_security_v3_v7_v13_v14.py`; confirmed `0` alerts in [Zap_Report_API.html](Zap_Report_API.html). |
+| Content Security Policy (CSP) Header Not Set | Medium | Vite Dev (`:5173`) | 3 | **Accepted (Dev Server):** Local Vite dev server requires inline HMR scripts; production reverse proxy sets frontend CSP headers. |
+| Missing Anti-clickjacking Header | Medium | Vite Dev (`:5173`) | 3 | **Accepted (Dev Server):** Backend enforces `CSP frame-ancestors 'self'` and `X-Frame-Options: DENY`; production reverse proxy sets headers for built frontend static assets. |
+| Sub Resource Integrity Attribute Missing | Medium | Vite Dev (`:5173`) / `frontend/index.html` | 5 | **Accepted:** `fonts.googleapis.com` serves dynamic user-agent-specific CSS that cannot use static SRI hashes; self-hosting fonts is recommended for production. |
+| X-Content-Type-Options Header Missing | Low | Vite Dev (`:5173`) | 5 | **Accepted (Dev Server):** Enforced on all Django backend responses (`nosniff`); applied by web server/reverse proxy for production frontend static assets. |
+| Modern Web Application | Informational | Vite Dev (`:5173`) | 3 | **Informational:** React SPA fingerprint; no action required. |
 
 ---
 
@@ -271,7 +298,7 @@ From the rubric's advanced security feature options, UniPlanPlus implements the 
 | 12 | Logging | Structured UTC logging (`security.auth`, `security.errors`) to rotating `security.log` + `stdout` | Complete |
 | 13 | HTTP Security Headers | `SecurityHeadersMiddleware` (HSTS, nosniff, CSP, Referrer-Policy, COOP, masked Server) + `SecFetchValidationMiddleware` | Complete |
 | 14 | SAST Tool Analysis & Report | *To be completed and attached by team* | **Pending** |
-| 15 | DAST Tool Analysis & Report | *To be completed and attached by team* | **Pending** |
+| 15 | DAST Tool Analysis & Report | OWASP ZAP v2.17.0 scans ([Zap_Report_API.html](Zap_Report_API.html): 0 alerts post-fix; [Zap_Report_Default_Policy.html](Zap_Report_Default_Policy.html): 0 High, 3 Med, 1 Low, 1 Info on Vite dev) | Complete |
 | 16 | Threat Model Implementation Mapping | STRIDE checklist mapping Done vs. Not Done (Prod-Deferred) mitigations in Section 5 | Complete |
 | 17 | Mapping to OWASP ASVS & Top 10 | 59/59 Planned ASVS v5.0 controls ([ASVS_COMPLIANCE.md](ASVS_COMPLIANCE.md)) + full OWASP Top 10 (2021) table | Complete |
 | 18 | 4 Advanced Security Features | (1) Authorization with scope, (2) Login attempt rate limit, (3) Backend API rate limit, (4) JWT expiration & management *(+ Login timeout)* | Complete |

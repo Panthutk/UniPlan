@@ -38,16 +38,17 @@ class SecurityHeadersMiddleware:
         # V3.4.5 — Referrer-Policy (no leaking full URL to third parties)
         response["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        # V3.4.6 — frame-ancestors via Content-Security-Policy
-        # Also includes object-src 'none' and base-uri 'none' (V3.4.3 partial)
+        # V3.4.3 / V3.4.6 — Hardened Content-Security-Policy (remediated per OWASP ZAP DAST)
         response["Content-Security-Policy"] = (
+            "default-src 'none'; "
             "frame-ancestors 'self'; "
             "object-src 'none'; "
-            "base-uri 'self'"
+            "base-uri 'self'; "
+            "form-action 'self'"
         )
 
-        # V13.4.6 — Suppress server version header
-        response["X-Powered-By"] = ""  # remove / blank
+        # V13.4.6 — Suppress server version header (remove X-Powered-By completely)
+        response.headers.pop("X-Powered-By", None)
         response["Server"] = "UniPlan"
 
         # Permissions-Policy — disable unused browser features
